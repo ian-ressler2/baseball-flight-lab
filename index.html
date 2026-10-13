@@ -1,0 +1,2863 @@
+<title>Baseball Flight Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: a ballpark control room. Left rail = inputs, centre = the field on a scoreboard-style stage,
+   right/below = instruments (flight data, Monte Carlo, hit finder, sweep, physics).
+   Palette: field neutrals with seam red as the single accent; outcome colours are separate data colours. */
+:root {
+  --font-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --bg: #eceee7; --surface: #f7f8f3; --surface-2: #e4e8de; --ink: #17201b; --ink-2: #404d46; --muted: #66736b;
+  --line: #d0d6c8; --accent: #b8322a; --accent-ink: #ffffff; --accent-soft: #f3d9d4; --focus: #1f6fa8;
+
+  --sky-top: #c7dde6; --sky-bot: #e8f0ec; --outside: #aab5a1; --stand: #8d99a0; --stand-2: #a7b1b6;
+  --grass-a: #70a35f; --grass-b: #689a58; --foul: #5c8a50; --dirt: #c5a47d; --dirt-2: #d2b48f; --track: #b58c61;
+  --wall: #1f4a3a; --chalk: #f5f7f1; --path: #17609b; --path-2: #6ba6d4; --ghost: #7a857e;
+  --c-hr: #d03a25; --c-wall: #d29114; --c-in: #1f78a8; --c-foul: #7b857f; --c-good: #2d8a4e;
+  --heat-0: #eef3e9; --heat-1: #b6d4c2; --heat-2: #4f9a8b; --heat-3: #1f5f78; --heat-4: #2a2a5e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1310; --surface: #151c18; --surface-2: #1d2722; --ink: #e8efe8; --ink-2: #b6c2ba; --muted: #8b988f;
+    --line: #2a362f; --accent: #ee6b56; --accent-ink: #1a0b08; --accent-soft: #3a1f1b; --focus: #6cb6ea;
+    --sky-top: #14222a; --sky-bot: #0d171c; --outside: #0b110d; --stand: #232d33; --stand-2: #2f3a41;
+    --grass-a: #2f5b35; --grass-b: #2a522f; --foul: #244b2a; --dirt: #6b5640; --dirt-2: #7a644b; --track: #765a3f;
+    --wall: #3c7c63; --chalk: #dfe6dc; --path: #5fb0e6; --path-2: #2c6a95; --ghost: #8a978f;
+    --c-hr: #f06a4f; --c-wall: #e9b03a; --c-in: #54b2e0; --c-foul: #8e9a93; --c-good: #5cc487;
+    --heat-0: #17211c; --heat-1: #254a45; --heat-2: #2f7f78; --heat-3: #8fc9b1; --heat-4: #f1ecb8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1310; --surface: #151c18; --surface-2: #1d2722; --ink: #e8efe8; --ink-2: #b6c2ba; --muted: #8b988f;
+  --line: #2a362f; --accent: #ee6b56; --accent-ink: #1a0b08; --accent-soft: #3a1f1b; --focus: #6cb6ea;
+  --sky-top: #14222a; --sky-bot: #0d171c; --outside: #0b110d; --stand: #232d33; --stand-2: #2f3a41;
+  --grass-a: #2f5b35; --grass-b: #2a522f; --foul: #244b2a; --dirt: #6b5640; --dirt-2: #7a644b; --track: #765a3f;
+  --wall: #3c7c63; --chalk: #dfe6dc; --path: #5fb0e6; --path-2: #2c6a95; --ghost: #8a978f;
+  --c-hr: #f06a4f; --c-wall: #e9b03a; --c-in: #54b2e0; --c-foul: #8e9a93; --c-good: #5cc487;
+  --heat-0: #17211c; --heat-1: #254a45; --heat-2: #2f7f78; --heat-3: #8fc9b1; --heat-4: #f1ecb8;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--bg); }
+body { color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45; padding-inline: 16px; padding-block: 12px 40px; }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; letter-spacing: .01em; margin: 0; text-wrap: balance; }
+button, select, input { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* header */
+.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 10px 24px; margin-bottom: 12px; }
+.brand h1 { font-size: 34px; line-height: 1; text-transform: uppercase; letter-spacing: .03em; }
+.brand h1 b { color: var(--accent); font-weight: 700; }
+.brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.top-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.top-controls label { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+
+/* grid */
+.app { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "stage" "inputs" "analysis"; }
+.stage-card { grid-area: stage; }
+.inputs { grid-area: inputs; }
+.analysis { grid-area: analysis; }
+@media (min-width: 1000px) {
+  .app { grid-template-columns: 330px minmax(0, 1fr); grid-template-rows: auto 1fr; grid-template-areas: "inputs stage" "inputs analysis"; align-items: start; }
+  .inputs { position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow: auto; align-self: start; }
+}
+@media (min-width: 1560px) {
+  .app { grid-template-columns: 330px minmax(0, 1.25fr) minmax(0, 1fr); grid-template-rows: auto; grid-template-areas: "inputs stage analysis"; }
+  .stage-card { position: sticky; top: 8px; }
+}
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.stage-card { padding: 10px; min-width: 0; }
+.analysis { padding: 0; min-width: 0; overflow: hidden; }
+
+/* stage */
+.stage-top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.seg button { border: 0; background: transparent; padding: 5px 12px; cursor: pointer; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; font-size: 14px; color: var(--ink-2); }
+.seg button[aria-pressed="true"], .seg button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.seg button:not([aria-pressed="true"]):hover { background: var(--line); }
+.toggles { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+.toggles label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.stage-wrap { position: relative; border-radius: 4px; overflow: hidden; background: var(--sky-bot); border: 1px solid var(--line); aspect-ratio: 16 / 10; max-height: 62vh; min-height: 260px; width: 100%; }
+@media (max-width: 560px) { .stage-wrap { aspect-ratio: 4 / 4; max-height: none; } }
+#stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.hud { position: absolute; left: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; max-width: calc(100% - 16px); }
+.chip { background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chip b { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; font-size: 12px; color: var(--muted); margin-right: 5px; }
+.chip.out { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; border-color: transparent; }
+.stage-hint { position: absolute; right: 8px; bottom: 8px; font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); border: 1px solid var(--line); padding: 3px 8px; border-radius: 4px; pointer-events: none; max-width: 46%; text-align: right; }
+@media (max-width: 700px) { .stage-hint { display: none; } }
+.stage-wrap.wide { aspect-ratio: 2.3 / 1; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; font-family: var(--font-mono); white-space: nowrap; transform: translate(10px, 10px); z-index: 3; }
+.tip[hidden] { display: none !important; }
+
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 4px; padding: 6px 12px; cursor: pointer; font-weight: 500; }
+.btn:hover { background: var(--line); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 16px; padding: 5px 16px 5px 12px; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.sm { padding: 3px 9px; font-size: 13px; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+#scrub { flex: 1 1 140px; min-width: 100px; accent-color: var(--accent); }
+.tread { font-size: 13px; color: var(--ink-2); min-width: 98px; text-align: right; }
+.speed { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+select { background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px; }
+.live { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.live div { border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; background: var(--surface); }
+.live small { display: block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; color: var(--muted); }
+.live span { font-family: var(--font-mono); font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* inputs */
+.inputs { padding: 0; }
+.inputs details { border-bottom: 1px solid var(--line); }
+.inputs details:last-child { border-bottom: 0; }
+.inputs summary { cursor: pointer; padding: 10px 12px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .09em; font-size: 16px; font-weight: 600; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.inputs summary::-webkit-details-marker { display: none; }
+.inputs summary::after { content: "+"; font-family: var(--font-mono); color: var(--muted); }
+.inputs details[open] summary::after { content: "–"; }
+.grp { padding: 2px 12px 12px; display: grid; gap: 8px; }
+.ctl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; }
+.ctl label { font-size: 13px; color: var(--ink-2); grid-column: 1; }
+.ctl .num { grid-column: 2; display: flex; align-items: baseline; gap: 4px; }
+.ctl input[type=number] { width: 74px; text-align: right; background: var(--surface-2); border: 1px solid var(--line); border-radius: 3px; padding: 2px 5px; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ctl .unit { font-size: 12px; color: var(--muted); min-width: 22px; }
+.ctl input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+.ctl .hint { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); margin-top: -2px; }
+.ctl.disabled { opacity: .55; }
+.ctl .sp { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; margin-top: 1px; }
+.ctl .sp .sp-l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.ctl .sp input[type=number] { width: 56px; font-size: 12px; padding: 1px 4px; }
+.ctl .sp .band { position: relative; flex: 1; height: 5px; border-radius: 3px; background: var(--line); margin: 0 7px 0 4px; }
+.ctl .sp .band i { position: absolute; top: 0; bottom: 0; background: var(--accent); opacity: .55; border-radius: 3px; }
+.ctl.disabled .sp { opacity: 1; }
+.nospread .sp { display: none !important; }
+.mcstrip { display: grid; gap: 2px; font-size: 12px; color: var(--ink-2); background: var(--surface-2); border-left: 3px solid var(--accent); border-radius: 3px; padding: 7px 10px; font-variant-numeric: tabular-nums; }
+.mcstrip b { color: var(--ink); font-weight: 600; }
+.mcstrip.stale { opacity: .7; } .mcstrip em { color: var(--accent); font-style: normal; }
+.derived .mcline { grid-column: 1 / -1; border-top: 1px dashed var(--line); padding-top: 4px; margin-top: 2px; }
+.chip.mcchip { background: var(--surface); }
+.fence-note { font-family: inherit; font-size: 11.5px; color: var(--muted); line-height: 1.45; grid-column: 1 / -1; }
+.fence-note b { color: var(--ink-2); }
+.chk { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.chk input { accent-color: var(--accent); }
+.derived { background: var(--surface-2); border-radius: 4px; padding: 8px 10px; font-size: 12.5px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 10px; }
+.derived span { display: flex; justify-content: space-between; gap: 6px; }
+.derived b { font-family: var(--font-mono); font-weight: 500; }
+.wind-dial { display: flex; align-items: center; gap: 10px; }
+.wind-dial svg { width: 54px; height: 54px; flex: none; }
+.fence-note { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+
+/* analysis */
+.tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.tabs button { border: 0; border-right: 1px solid var(--line); background: transparent; cursor: pointer; padding: 10px 14px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 15px; white-space: nowrap; color: var(--ink-2); }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: inset 0 -3px 0 var(--accent); }
+.pane { padding: 14px; display: none; gap: 14px; }
+.pane.on { display: grid; }
+.pane h3 { font-size: 18px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
+.pane h3 small { font-family: var(--font-body); text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 4px; padding: 6px 9px; background: var(--surface); min-width: 0; }
+.tile small { display: block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 11.5px; color: var(--muted); }
+.tile .v { font-family: var(--font-mono); font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.tile .v i { font-style: normal; font-size: 12px; color: var(--muted); margin-left: 3px; }
+.tile.key { border-color: var(--ink); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+canvas.plot { width: 100%; display: block; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.budget { display: grid; gap: 5px; }
+.brow { display: grid; grid-template-columns: 112px 1fr 74px; gap: 8px; align-items: center; font-size: 13px; }
+.brow .bar { height: 14px; background: var(--surface-2); border-radius: 2px; position: relative; overflow: hidden; }
+.brow .bar i { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.brow .val { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+.field-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; }
+.field-row label { display: grid; gap: 2px; font-size: 12.5px; color: var(--ink-2); }
+.field-row input[type=number] { width: 100px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 3px; padding: 4px 6px; font-family: var(--font-mono); }
+.field-row select { width: auto; max-width: 100%; font-family: var(--font-body); }
+.prog { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.prog i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+table.dt { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.dt th { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; font-weight: 600; font-size: 12px; color: var(--muted); text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.dt th:first-child, table.dt td:first-child { text-align: left; }
+table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-family: var(--font-display); letter-spacing: .06em; text-transform: uppercase; font-size: 13px; font-weight: 600; color: #fff; }
+.eqs { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; line-height: 1.6; }
+.ok { color: var(--c-good); } .bad { color: var(--c-hr); }
+.empty { border: 1px dashed var(--line); border-radius: 6px; padding: 18px; color: var(--muted); text-align: center; }
+.spin-wrap { display: flex; gap: 12px; align-items: center; }
+.spin-wrap canvas { width: 118px; height: 118px; flex: none; }
+.spin-wrap div { font-size: 13px; color: var(--ink-2); display: grid; gap: 2px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>Baseball <b>Flight</b> Lab</h1>
+    <p>Three-dimensional batted-ball trajectories with drag, Magnus lift, weather, Monte Carlo and a reverse hit finder.</p>
+  </div>
+  <div class="top-controls">
+    <label>Preset <select id="preset" aria-label="Load a preset"></select></label>
+    <button class="btn" id="btn-reset" type="button" title="Put every input, the field and the views back to their starting values"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Reset</span></button>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="inputs card" id="inputs" aria-label="Simulation inputs"></aside>
+
+  <section class="stage-card card" aria-label="Field view">
+    <div class="stage-top">
+      <div class="seg" role="group" aria-label="Camera view" id="views">
+        <button data-view="3d" aria-pressed="true">3-D</button>
+        <button data-view="top" aria-pressed="false">Overhead</button>
+        <button data-view="side" aria-pressed="false">Side</button>
+      </div>
+      <button class="btn sm" id="btn-cam" type="button" title="Back to the default 3-D camera (double-click the field does the same)"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 5.5h2.2l1-1.7h5.6l1 1.7H14V13H2zM8 6.6a2.6 2.6 0 100 5.2 2.6 2.6 0 000-5.2z" fill="currentColor"/></svg><span>Reset camera</span></button>
+      <div class="toggles">
+        <label><input type="checkbox" id="t-trail" checked> Trail</label>
+        <label><input type="checkbox" id="t-forces"> Force vectors</label>
+        <label><input type="checkbox" id="t-stands" checked> Stands</label>
+        <label><input type="checkbox" id="t-compare"> Compare paths</label>
+        <label id="t-ens-wrap" hidden><input type="checkbox" id="t-ens" checked> Monte Carlo (replaces single hit)</label>
+      </div>
+    </div>
+    <div class="stage-wrap" id="stagewrap">
+      <canvas id="stage" aria-label="Interactive field. Click the overhead view to choose a landing spot."></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="stage-hint" id="stagehint">Drag to orbit · scroll to zoom</div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="transport">
+      <button class="btn primary" id="btn-play" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg><span>Play</span></button>
+      <button class="btn" id="btn-replay" type="button" title="Restart from the bat"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Replay</span></button>
+      <input type="range" id="scrub" min="0" max="1000" value="1000" aria-label="Timeline">
+      <span class="tread mono" id="tread">0.00 / 0.00 s</span>
+      <label class="speed">Speed
+        <select id="speed" aria-label="Playback speed">
+          <option value="0.1">0.1×</option><option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+          <option value="1" selected>1× real time</option><option value="2">2×</option>
+        </select>
+      </label>
+    </div>
+    <div class="live" id="live"></div>
+  </section>
+
+  <section class="analysis card" aria-label="Analysis">
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="flight" aria-selected="true">Flight data</button>
+      <button role="tab" data-tab="mc" aria-selected="false">Monte Carlo</button>
+      <button role="tab" data-tab="hit" aria-selected="false">Hit finder</button>
+      <button role="tab" data-tab="sweep" aria-selected="false">EV × LA map</button>
+      <button role="tab" data-tab="phys" aria-selected="false">Physics</button>
+    </div>
+
+    <div class="pane on" id="pane-flight">
+      <div class="tiles" id="tiles"></div>
+      <div class="two">
+        <div>
+          <h3>Speed and forces <small>vs. time of flight</small></h3>
+          <canvas class="plot" id="ch-speed" height="190"></canvas>
+          <canvas class="plot" id="ch-force" height="170" style="margin-top:8px"></canvas>
+        </div>
+        <div style="display:grid;gap:14px;align-content:start">
+          <div>
+            <h3>Where the feet go <small>distance budget, one effect at a time</small></h3>
+            <div class="budget" id="budget"></div>
+          </div>
+          <div>
+            <h3>Ball spin <small>live orientation</small></h3>
+            <div class="spin-wrap"><canvas id="spin-cv" width="236" height="236"></canvas><div id="spin-read"></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="note" id="env-note"></p>
+    </div>
+
+    <div class="pane" id="pane-mc">
+      <div>
+        <h3>Run many swings at once <small>each ball gets its own random draw</small></h3>
+        <div class="field-row">
+          <label>Balls<input type="number" id="mc-n" value="500" min="10" max="5000" step="50"></label>
+          <label>Seed<input type="number" id="mc-seed" value="2026" step="1"></label>
+          <label>Distribution<select id="mc-dist"><option value="gauss">Gaussian (±3σ)</option><option value="uniform">Uniform (same σ)</option></select></label>
+          <button class="btn primary" id="mc-run" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg><span>Run</span></button>
+          <button class="btn" id="mc-play" type="button" disabled>Fly all together</button>
+        </div>
+      </div>
+      <div id="mc-spec"></div>
+      <div class="prog" id="mc-prog" hidden><i></i></div>
+      <div id="mc-out"></div>
+    </div>
+
+    <div class="pane" id="pane-hit">
+      <div>
+        <h3>Hit finder <small>which swings land on a chosen spot</small></h3>
+        <p class="note">While this tab is open, click anywhere on the field (Overhead or 3-D view). The spot marker disappears when you leave the tab. The solver searches exit velocity and launch angle, re-aiming the spray angle so wind and sidespin still bring the ball down on the spot.</p>
+      </div>
+      <div class="field-row" id="hf-ctl">
+        <label>Spin model<select id="hf-spin"><option value="auto">Follows launch angle and spray</option><option value="hold">Hold current spin</option></select></label>
+        <label>Landing tolerance (ft)<input type="number" id="hf-tol" value="8" min="0" max="40" step="1"></label>
+        <button class="btn" id="hf-view" type="button">Go to overhead view</button>
+      </div>
+      <div id="hf-out"><div class="empty">No spot chosen yet. Switch to the overhead view and click the field.</div></div>
+    </div>
+
+    <div class="pane" id="pane-sweep">
+      <div>
+        <h3>Distance map <small>landing distance for every exit velocity and launch angle</small></h3>
+        <p class="note">Uses the current weather, wind, spray angle and spin model. Click a cell to load that hit.</p>
+      </div>
+      <div class="field-row"><button class="btn primary" id="sw-run" type="button">Compute map</button><span class="note" id="sw-status"></span></div>
+      <canvas class="plot" id="sw-cv" height="360"></canvas>
+      <div class="legend" id="sw-legend"></div>
+    </div>
+
+    <div class="pane" id="pane-phys">
+      <div>
+        <h3>How the model works</h3>
+        <div class="eqs" id="eqs"></div>
+      </div>
+      <div>
+        <h3>Live constants <small>for the current inputs</small></h3>
+        <div class="tablewrap"><table class="dt" id="const-tbl"></table></div>
+      </div>
+      <div>
+        <h3>Validation <small>runs in your browser</small></h3>
+        <div class="field-row"><button class="btn" id="val-run" type="button">Run checks</button><span class="note" id="val-status"></span></div>
+        <div class="tablewrap"><table class="dt" id="val-tbl"></table></div>
+      </div>
+      <div id="limits"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* Baseball Flight Lab: physics engine
+ * Coordinates (metres, field frame): origin = back point of home plate,
+ *   +x toward right field, +y toward center field, +z up.
+ * Spray angle: 0 = center, + toward RF, - toward LF.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.BFL = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const FT = 0.3048, MPH = 0.44704, IN = 0.0254, OZ = 0.0283495;
+  const RPM = Math.PI / 30, D2R = Math.PI / 180, R2D = 180 / Math.PI;
+  const OMEGA_E = 7.2921159e-5;
+  const H_SCALE = 8400; // density scale height (m)
+
+  /* ------------------------------------------------------------------ */
+  /* Venues: all 30 MLB parks. Distances (ft) are the posted/published    */
+  /* figures at -45 (LF line), -22.5, 0 (CF), +22.5, +45 (RF line);       */
+  /* extra [angle, dist, height] points capture notches. Approximate.     */
+  /* ------------------------------------------------------------------ */
+  const ANG = [-45, -22.5, 0, 22.5, 45];
+  const PARKS = {};
+  // roof: 0 open air, 1 retractable, 2 fixed dome. t/rh = typical summer game-time weather.
+  function park(key, o) {
+    const pts = o.pts || ANG.map((a, i) => [a, o.d[i], o.h[i]]);
+    pts.sort((a, b) => a[0] - b[0]);
+    PARKS[key] = {
+      key, name: o.name, team: o.team, div: o.div, city: o.city, elevFt: o.elev, lat: o.lat, cfAz: o.az, tempF: o.t, rh: o.rh, roof: o.roof || 0,
+      a: pts.map(p => p[0]), d: pts.map(p => p[1]), h: pts.map(p => p[2]), stands: 'ddd',
+      wall: o.wall || null, stand: o.stand || 1, dim: o.dim || null
+    };
+  }
+  park('generic', { name: 'Generic MLB park', team: '', div: '', city: 'Sea level', elev: 0, lat: 40, az: 45, t: 72, rh: 50, d: [330, 375, 400, 375, 330], h: [8, 8, 8, 8, 8] });
+  park('dome', { name: 'Indoor dome (benchmark)', team: '', div: '', city: 'Climate controlled', elev: 0, lat: 40, az: 45, t: 72, rh: 50, roof: 2, d: [330, 380, 410, 380, 330], h: [10, 10, 10, 10, 10] });
+  // AL East
+  park('bal', { name: 'Oriole Park at Camden Yards', team: 'Orioles', div: 'AL East', city: 'Baltimore', elev: 20, lat: 39.28, az: 31, t: 80, rh: 62, d: [333, 364, 400, 373, 318], h: [7, 7, 7, 13, 25], stand: 1.0,
+    pts: [[-45, 333, 7], [-22.5, 364, 7], [0, 400, 7], [12, 398, 7], [13, 398, 25], [22.5, 373, 25], [45, 318, 25]] });
+  park('bos', { name: 'Fenway Park', team: 'Red Sox', div: 'AL East', city: 'Boston', elev: 20, lat: 42.35, az: 45, t: 72, rh: 60, wall: '#2b6a45', stand: 0.7,
+    pts: [[-45, 310, 37], [-33, 340, 37], [-24, 379, 37], [-23, 379, 17], [-10, 390, 17], [0, 390, 17], [9, 420, 17], [14, 420, 17], [22.5, 380, 5], [35, 340, 5], [44, 302, 5], [45, 302, 5]] });
+  park('nyy', { name: 'Yankee Stadium', team: 'Yankees', div: 'AL East', city: 'New York', elev: 55, lat: 40.83, az: 75, t: 78, rh: 60, d: [318, 399, 408, 385, 314], h: [8, 8, 8, 8, 8], stand: 1.1 });
+  park('tb', { name: 'Tropicana Field', team: 'Rays', div: 'AL East', city: 'St. Petersburg', elev: 44, lat: 27.77, az: 45, t: 72, rh: 50, roof: 2, d: [315, 370, 404, 370, 322], h: [9, 9, 9, 9, 9], stand: 0.9 });
+  park('tor', { name: 'Rogers Centre', team: 'Blue Jays', div: 'AL East', city: 'Toronto', elev: 250, lat: 43.64, az: 20, t: 75, rh: 55, roof: 1, d: [328, 375, 400, 375, 328], h: [10, 10, 10, 10, 10], stand: 1.2 });
+  // AL Central
+  park('cws', { name: 'Rate Field', team: 'White Sox', div: 'AL Central', city: 'Chicago', elev: 595, lat: 41.83, az: 130, t: 80, rh: 62, d: [330, 377, 400, 372, 335], h: [8, 8, 8, 8, 8], stand: 1.1 });
+  park('cle', { name: 'Progressive Field', team: 'Guardians', div: 'AL Central', city: 'Cleveland', elev: 650, lat: 41.50, az: 0, t: 76, rh: 62, stand: 1.0,
+    pts: [[-45, 325, 19], [-22.5, 370, 19], [-10, 392, 19], [-9, 392, 9], [0, 405, 9], [22.5, 375, 9], [45, 325, 9]] });
+  park('det', { name: 'Comerica Park', team: 'Tigers', div: 'AL Central', city: 'Detroit', elev: 600, lat: 42.34, az: 150, t: 76, rh: 60, d: [345, 370, 420, 365, 330], h: [8, 8, 8, 8, 8], stand: 1.0 });
+  park('kc', { name: 'Kauffman Stadium', team: 'Royals', div: 'AL Central', city: 'Kansas City', elev: 750, lat: 39.05, az: 40, t: 83, rh: 58, d: [330, 387, 410, 387, 330], h: [9, 9, 9, 9, 9], stand: 0.9 });
+  park('min', { name: 'Target Field', team: 'Twins', div: 'AL Central', city: 'Minneapolis', elev: 830, lat: 44.98, az: 90, t: 76, rh: 58, stand: 1.0,
+    pts: [[-45, 339, 8], [-22.5, 377, 8], [0, 404, 8], [10, 392, 8], [11, 392, 23], [22.5, 367, 23], [45, 328, 23]] });
+  // AL West
+  park('hou', { name: 'Daikin Park', team: 'Astros', div: 'AL West', city: 'Houston', elev: 43, lat: 29.76, az: 343, t: 84, rh: 68, roof: 1, stand: 1.1,
+    pts: [[-45, 315, 19], [-30, 340, 19], [-22.5, 362, 19], [-12, 380, 19], [-11, 380, 8], [0, 409, 8], [22.5, 373, 8], [34, 345, 7], [45, 326, 7]] });
+  park('laa', { name: 'Angel Stadium', team: 'Angels', div: 'AL West', city: 'Anaheim', elev: 160, lat: 33.80, az: 44, t: 74, rh: 55, d: [330, 387, 396, 370, 330], h: [8, 8, 8, 8, 8], stand: 1.0 });
+  park('ath', { name: 'Sutter Health Park', team: 'Athletics', div: 'AL West', city: 'West Sacramento', elev: 30, lat: 38.58, az: 60, t: 88, rh: 40, d: [330, 375, 403, 375, 325], h: [8, 8, 8, 8, 8], stand: 0.6 });
+  park('sea', { name: 'T-Mobile Park', team: 'Mariners', div: 'AL West', city: 'Seattle', elev: 10, lat: 47.59, az: 50, t: 66, rh: 60, roof: 1, d: [331, 378, 401, 381, 326], h: [8, 8, 8, 8, 8], stand: 1.1 });
+  park('tex', { name: 'Globe Life Field', team: 'Rangers', div: 'AL West', city: 'Arlington', elev: 570, lat: 32.75, az: 25, t: 78, rh: 50, roof: 1, d: [329, 372, 407, 374, 326], h: [8, 8, 8, 8, 8], stand: 1.1 });
+  // NL East
+  park('atl', { name: 'Truist Park', team: 'Braves', div: 'NL East', city: 'Atlanta', elev: 1050, lat: 33.89, az: 147, t: 83, rh: 62, stand: 1.0,
+    pts: [[-45, 335, 8], [-22.5, 385, 8], [0, 400, 8], [22.5, 375, 8], [30, 355, 8], [31, 355, 16], [45, 325, 16]] });
+  park('mia', { name: 'loanDepot park', team: 'Marlins', div: 'NL East', city: 'Miami', elev: 8, lat: 25.78, az: 125, t: 84, rh: 72, roof: 1, d: [344, 386, 407, 392, 335], h: [9, 9, 9, 9, 9], stand: 1.0 });
+  park('nym', { name: 'Citi Field', team: 'Mets', div: 'NL East', city: 'New York', elev: 10, lat: 40.76, az: 30, t: 78, rh: 60, d: [335, 379, 408, 398, 330], h: [8, 8, 8, 8, 8], stand: 1.1 });
+  park('phi', { name: 'Citizens Bank Park', team: 'Phillies', div: 'NL East', city: 'Philadelphia', elev: 20, lat: 39.91, az: 20, t: 80, rh: 62, d: [329, 374, 401, 369, 330], h: [6, 6, 6, 13, 13], stand: 1.0 });
+  park('wsh', { name: 'Nationals Park', team: 'Nationals', div: 'NL East', city: 'Washington', elev: 25, lat: 38.87, az: 28, t: 82, rh: 62, d: [336, 377, 402, 370, 335], h: [8, 8, 8, 8, 14], stand: 1.0 });
+  // NL Central
+  park('chc', { name: 'Wrigley Field', team: 'Cubs', div: 'NL Central', city: 'Chicago', elev: 600, lat: 41.95, az: 36, t: 76, rh: 62, wall: '#35703a', d: [355, 368, 400, 368, 353], h: [11.5, 11.5, 11.5, 11.5, 11.5], stand: 0.8 });
+  park('cin', { name: 'Great American Ball Park', team: 'Reds', div: 'NL Central', city: 'Cincinnati', elev: 490, lat: 39.10, az: 123, t: 80, rh: 62, d: [328, 379, 404, 370, 325], h: [8, 8, 8, 8, 8], stand: 1.0 });
+  park('mil', { name: 'American Family Field', team: 'Brewers', div: 'NL Central', city: 'Milwaukee', elev: 635, lat: 43.03, az: 135, t: 74, rh: 62, roof: 1, d: [342, 371, 400, 374, 345], h: [8, 8, 8, 8, 8], stand: 1.1 });
+  park('pit', { name: 'PNC Park', team: 'Pirates', div: 'NL Central', city: 'Pittsburgh', elev: 730, lat: 40.45, az: 115, t: 78, rh: 62, stand: 0.8,
+    pts: [[-45, 325, 6], [-22.5, 389, 6], [-8, 399, 6], [-7, 399, 10], [0, 399, 10], [8, 399, 10], [9, 399, 21], [22.5, 375, 21], [45, 320, 21]] });
+  park('stl', { name: 'Busch Stadium', team: 'Cardinals', div: 'NL Central', city: 'St. Louis', elev: 465, lat: 38.62, az: 62, t: 84, rh: 60, d: [336, 375, 400, 375, 335], h: [8, 8, 8, 8, 8], stand: 1.0 });
+  // NL West
+  park('ari', { name: 'Chase Field', team: 'Diamondbacks', div: 'NL West', city: 'Phoenix', elev: 1082, lat: 33.45, az: 23, t: 90, rh: 22, roof: 1, d: [330, 374, 407, 374, 334], h: [7.5, 7.5, 7.5, 7.5, 7.5], stand: 1.0 });
+  park('col', { name: 'Coors Field', team: 'Rockies', div: 'NL West', city: 'Denver', elev: 5190, lat: 39.76, az: 4, t: 78, rh: 35, d: [347, 390, 415, 375, 350], h: [8, 8, 8, 8, 8], stand: 1.0 });
+  park('lad', { name: 'Dodger Stadium', team: 'Dodgers', div: 'NL West', city: 'Los Angeles', elev: 515, lat: 34.07, az: 25, t: 76, rh: 50, d: [330, 375, 395, 375, 330], h: [8, 8, 8, 8, 8], stand: 1.0 });
+  park('sd', { name: 'Petco Park', team: 'Padres', div: 'NL West', city: 'San Diego', elev: 20, lat: 32.71, az: 15, t: 70, rh: 68, d: [334, 390, 396, 391, 322], h: [8, 8, 8, 8, 8], stand: 0.9 });
+  park('sf', { name: 'Oracle Park', team: 'Giants', div: 'NL West', city: 'San Francisco', elev: 10, lat: 37.78, az: 90, t: 60, rh: 72, stand: 0.9,
+    pts: [[-45, 339, 8], [-22.5, 364, 8], [0, 399, 8], [8, 405, 8], [9, 405, 24], [22, 421, 24], [45, 309, 24]] });
+  /* Traced outfield walls simplified to straight segments (feet; x toward RF, y toward CF, home plate at origin), plus foul-territory outlines.
+     Shapes derived from the open Statcast-based stadium paths in bdilday/GeomMLBStadiums (MIT); scaled so poles and center field match posted dimensions. */
+  const R2D_ = 180 / Math.PI;
+  const SHAPES = {
+    bal: { v: [[-235.5,235.5],[-243.1,274.7],[-231.4,301.6],[-126.2,377.3],[-116.1,379.6],[-97.8,365.2],[-38.9,404.5],[-24.8,406.2],[129.9,366.9],[165.8,311.8],[194.2,304.9],[224.9,224.9]], l: [[-235,235],[-60,-19],[-32,-46],[0,-58]], r: [[225,225],[232,212],[175,147],[48,-34],[27,-52],[0,-58]] },
+    bos: { v: [[-219.2,219.2],[-60.1,379.6],[-36.6,380.2],[72.2,409.5],[82.3,404.3],[93.7,375.7],[226.8,300.9],[234.4,289.5],[236.0,271.5],[213.5,213.5]], l: [[-219,219],[-139,128],[-130,68],[-55,-38],[-21,-57],[0,-58]], r: [[214,214],[150,126],[102,18],[62,-39],[24,-57],[0,-58]] },
+    nyy: { v: [[-224.9,224.9],[-218.5,255.8],[-205.9,283.4],[-123.2,368.3],[-73.8,398.1],[-46.2,405.7],[-7.1,408.5],[45.3,397.7],[80.1,376.9],[206.8,250.8],[222.0,222.0]], l: [[-225,225],[-173,158],[-133,69],[-56,-29],[-32,-51],[0,-60]], r: [[222,222],[135,78],[48,-37],[23,-56],[0,-60]] },
+    tb: { v: [[-222.7,222.7],[-224.2,253.4],[-218.4,264.9],[-95.9,384.5],[-64.3,406.1],[63.3,399.8],[85.0,383.4],[224.5,245.0],[227.7,227.7]], l: [[-223,223],[-213,164],[-120,56],[-110,24],[-50,-32],[0,-48]], r: [[228,228],[168,97],[116,48],[108,24],[45,-34],[0,-48]] },
+    tor: { v: [[-231.9,231.9],[-152.8,343.2],[-79.8,392.2],[-3.5,400.0],[83.0,390.5],[141.5,350.3],[157.1,336.9],[231.9,231.9]], l: [[-232,232],[-154,0],[-96,-45],[0,-49]], r: [[232,232],[153,20],[153,0],[109,-45],[82,-38],[0,-49]] },
+    cws: { v: [[-233.3,233.3],[-188.9,290.8],[-127.5,350.4],[-93.1,373.3],[-31.5,400.0],[38.4,399.0],[99.8,372.5],[143.9,339.1],[236.9,236.9]], l: [[-233,233],[-48,-20],[0,-47]], r: [[237,237],[133,102],[59,-13],[0,-47]] },
+    cle: { v: [[-229.8,229.8],[-188.8,302.2],[-28.8,411.5],[-14.3,410.3],[151.1,347.5],[229.8,229.8]], l: [[-230,230],[-164,150],[-42,-33],[0,-52]], r: [[230,230],[51,-24],[33,-43],[0,-52]] },
+    det: { v: [[-241.8,241.8],[-155.0,317.7],[-64.4,406.8],[58.1,413.7],[72.7,412.4],[121.9,364.2],[131.8,352.5],[141.8,326.1],[223.0,252.1],[233.3,233.3]], l: [[-242,242],[-189,173],[-114,47],[-34,-34],[0,-46]], r: [[233,233],[186,170],[176,123],[128,53],[44,-28],[0,-46]] },
+    kc: { v: [[-233.3,233.3],[-230.8,265.5],[-218.0,289.3],[-177.0,332.9],[-134.2,368.7],[-70.5,399.7],[0.0,410.1],[42.7,406.0],[83.9,394.7],[148.3,358.0],[220.7,287.6],[232.8,263.2],[233.3,233.3]], l: [[-233,233],[-116,26],[-100,18],[-60,-38],[0,-59]], r: [[233,233],[119,26],[98,13],[65,-34],[0,-59]] },
+    min: { v: [[-239.7,239.7],[-141.3,349.7],[-49.7,404.5],[-32.0,406.4],[35.1,401.4],[48.7,396.5],[131.4,342.2],[151.8,325.6],[163.0,300.3],[231.9,231.9]], l: [[-240,240],[-158,91],[-40,-28],[0,-45]], r: [[232,232],[177,163],[131,61],[38,-32],[0,-45]] },
+    hou: { v: [[-222.7,222.7],[-137.3,287.9],[-136.9,314.8],[-21.4,407.6],[3.6,407.3],[14.6,418.2],[39.9,414.3],[60.3,403.2],[121.0,332.5],[134.4,324.6],[230.5,230.5]], l: [[-223,223],[-164,150],[-153,107],[-48,-22],[0,-45]], r: [[231,231],[175,160],[160,123],[45,-21],[0,-45]] },
+    laa: { v: [[-245.4,245.4],[-242.0,273.5],[-235.2,285.3],[-147.5,356.1],[13.9,398.7],[152.0,326.0],[221.2,299.0],[239.2,280.0],[247.5,247.5]], l: [[-245,245],[-219,184],[-58,-30],[-30,-58],[0,-69]], r: [[247,247],[65,-30],[36,-57],[0,-69]] },
+    ath: { v: [[-233.3,233.3],[-198.6,311.7],[-143.5,338.0],[-83.5,376.7],[-35.1,401.2],[24.6,403.0],[77.4,380.7],[139.5,336.8],[190.9,311.5],[201.9,299.3],[229.8,229.8]], l: [[-233,233],[-240,220],[-199,167],[-176,82],[-149,33],[-117,0],[-18,-69],[0,-69]], r: [[230,230],[238,218],[201,154],[180,75],[151,27],[28,-67],[0,-69]] },
+    sea: { v: [[-234.1,234.1],[-223.1,252.2],[-140.0,346.5],[-93.6,375.4],[-17.7,404.6],[126.9,358.5],[230.5,230.5]], l: [[-234,234],[-199,183],[-149,78],[-45,-31],[0,-50]], r: [[231,231],[175,161],[128,67],[42,-32],[0,-50]] },
+    tex: { v: [[-232.6,232.6],[-217.0,277.8],[-168.2,337.3],[-129.0,374.8],[-53.5,406.3],[60.9,407.3],[78.6,404.2],[116.1,368.2],[140.6,357.0],[160.9,337.3],[226.0,260.0],[230.5,230.5]], l: [[-233,233],[-188,158],[-61,-8],[-22,-52],[0,-60]], r: [[231,231],[44,-37],[27,-53],[0,-60]] },
+    atl: { v: [[-236.9,236.9],[-197.0,315.3],[-146.7,354.2],[-41.8,397.4],[24.5,400.0],[51.9,394.2],[134.9,351.4],[147.9,340.2],[196.6,200.1],[229.8,229.8]], l: [[-237,237],[-186,143],[-36,-30],[0,-46]], r: [[230,230],[190,159],[39,-25],[0,-46]] },
+    mia: { v: [[-243.2,243.2],[-223.6,271.3],[-191.8,301.0],[-107.6,363.1],[-67.2,381.2],[-39.3,408.5],[-25.0,408.8],[52.2,396.8],[115.8,367.4],[137.5,349.0],[236.9,236.9]], l: [[-243,243],[-43,-20],[0,-47]], r: [[237,237],[214,196],[40,-25],[0,-47]] },
+    nym: { v: [[-236.9,236.9],[-216.4,276.9],[-38.8,403.1],[-21.4,407.9],[17.8,408.0],[35.2,402.5],[128.8,344.5],[176.7,325.4],[209.2,282.7],[233.3,233.3]], l: [[-237,237],[-151,139],[-135,78],[-71,-9],[-39,-35],[0,-42]], r: [[233,233],[148,136],[136,79],[64,-20],[37,-37],[0,-42]] },
+    phi: { v: [[-232.6,232.6],[-222.4,251.3],[-104.7,365.3],[-96.3,372.3],[-70.0,377.8],[-39.0,404.8],[65.8,393.1],[75.3,387.6],[233.3,233.3]], l: [[-233,233],[-132,76],[-21,-30],[0,-31]], r: [[233,233],[128,74],[31,-24],[0,-31]] },
+    wsh: { v: [[-237.6,237.6],[-197.0,303.3],[-179.2,323.3],[-95.7,370.2],[-81.9,369.3],[-21.1,402.7],[-7.1,405.1],[184.4,319.4],[196.7,308.7],[236.9,236.9]], l: [[-238,238],[-194,177],[-137,64],[-24,-38],[0,-46]], r: [[237,237],[191,175],[151,70],[35,-32],[0,-46]] },
+    chc: { v: [[-251.0,251.0],[-180.9,307.1],[-150.6,315.8],[-17.3,395.6],[24.7,403.1],[66.4,396.7],[104.6,377.3],[177.1,306.7],[190.7,299.3],[203.3,301.4],[213.2,293.4],[249.6,249.6]], l: [[-251,251],[-180,165],[-35,-49],[-21,-59],[0,-57]], r: [[250,250],[82,14],[0,-57]] },
+    cin: { v: [[-231.9,231.9],[-215.3,261.2],[-99.8,372.6],[3.5,404.4],[67.1,380.5],[128.1,342.6],[176.8,300.1],[229.8,229.8]], l: [[-232,232],[-142,130],[-119,69],[-55,-20],[-38,-35],[0,-46]], r: [[230,230],[169,155],[65,-9],[35,-38],[0,-46]] },
+    mil: { v: [[-241.8,241.8],[-226.7,275.0],[-179.8,324.4],[-75.7,372.2],[-55.4,394.0],[-42.0,400.0],[38.5,400.0],[52.0,394.9],[73.1,376.0],[137.1,348.2],[167.0,320.8],[172.5,304.9],[244.0,244.0]], l: [[-242,242],[-61,-16],[-31,-45],[0,-51]], r: [[244,244],[156,143],[122,70],[49,-20],[21,-46],[0,-51]] },
+    pit: { v: [[-229.8,229.8],[-217.3,299.2],[-114.7,387.3],[-101.2,391.5],[-88.9,384.9],[7.0,399.1],[74.7,384.0],[146.6,345.5],[226.3,226.3]], l: [[-230,230],[-185,169],[-184,154],[-48,-22],[-27,-43],[0,-52]], r: [[226,226],[186,171],[155,99],[36,-39],[0,-52]] },
+    stl: { v: [[-237.6,237.6],[-236.8,254.0],[-230.0,264.6],[-120.7,371.5],[-28.0,399.8],[28.0,400.0],[132.2,363.2],[228.3,262.7],[236.9,236.9]], l: [[-238,238],[-175,160],[-135,70],[-41,-31],[0,-49]], r: [[237,237],[178,163],[130,68],[46,-30],[0,-49]] },
+    ari: { v: [[-233.3,233.3],[-224.6,277.3],[-212.4,281.9],[-100.4,388.3],[-87.9,396.4],[-48.7,397.0],[-35.5,405.2],[-21.3,407.0],[32.0,407.0],[41.7,397.2],[84.3,396.4],[97.4,390.5],[211.1,285.3],[232.4,272.2],[236.2,236.2]], l: [[-233,233],[-173,159],[-122,70],[-26,-29],[0,-41]], r: [[236,236],[172,157],[120,69],[23,-33],[0,-41]] },
+    col: { v: [[-245.4,245.4],[-114.9,400.5],[-101.3,406.2],[40.3,418.4],[55.0,417.4],[68.3,407.9],[239.3,261.2],[247.5,247.5]], l: [[-245,245],[-194,178],[-153,97],[-39,-30],[0,-43]], r: [[247,247],[155,108],[40,-25],[0,-43]] },
+    lad: { v: [[-233.3,233.3],[-218.9,285.2],[-198.9,306.2],[-139.5,345.3],[-89.2,371.6],[-37.6,390.7],[3.4,395.0],[34.3,391.7],[98.4,367.2],[209.3,299.0],[224.8,272.7],[233.3,233.3]], l: [[-233,233],[-154,141],[-134,55],[-85,-19],[-50,-46],[0,-58]], r: [[233,233],[157,144],[139,51],[107,5],[57,-44],[0,-58]] },
+    sd: { v: [[-237.6,237.6],[-216.9,263.1],[-106.5,371.5],[-72.1,388.9],[38.2,396.5],[82.9,390.0],[119.9,368.9],[208.2,281.3],[215.0,270.3],[215.7,243.8],[227.7,227.7]], l: [[-238,238],[-175,160],[-92,20],[-31,-34],[0,-45]], r: [[228,228],[235,216],[170,142],[94,25],[55,-17],[0,-45]] },
+    sf: { v: [[-239.7,239.7],[-223.4,266.3],[-72.0,388.6],[119.5,391.0],[133.9,388.7],[158.8,325.6],[179.7,305.1],[218.5,218.5]], l: [[-240,240],[-149,105],[-39,-28],[0,-45]], r: [[218,218],[162,114],[44,-23],[0,-45]] },
+  };
+  const HS = {
+    bal: [[-45, 7], [12, 21]], bos: [[-45, 37], [-9, 17], [15, 5], [41, 3.5]], nyy: [[-45, 8]], tb: [[-45, 9]], tor: [[-45, 10]],
+    cws: [[-45, 8]], cle: [[-45, 19], [-18, 9]], det: [[-45, 8]], kc: [[-45, 9]], min: [[-45, 8], [11, 23]],
+    hou: [[-45, 19], [-16, 10], [-4, 8], [15, 7]], laa: [[-45, 8]], ath: [[-45, 8]], sea: [[-45, 8]], tex: [[-45, 8]],
+    atl: [[-45, 8], [20, 16]], mia: [[-45, 7]], nym: [[-45, 8]], phi: [[-45, 6], [15, 13]], wsh: [[-45, 8], [20, 14]],
+    chc: [[-45, 11.5]], cin: [[-45, 12], [-25, 8]], mil: [[-45, 8]], pit: [[-45, 6], [-9, 10], [8, 21]], stl: [[-45, 8]],
+    ari: [[-45, 7.5], [-14, 25], [14, 7.5]], col: [[-45, 8]], lad: [[-45, 4], [-38, 8], [38, 4]], sd: [[-45, 8]], sf: [[-45, 8], [8, 25]]
+  };
+  // Dense polar table from the straight-segment polyline: exact ray/segment intersection every 0.5 deg plus every corner.
+  Object.keys(SHAPES).forEach(k => {
+    const pk = PARKS[k], sh = SHAPES[k], spec = HS[k], V = sh.v;
+    const vang = V.map(q => Math.atan2(q[0], q[1]) * R2D_);
+    const set = {}; for (let i = -90; i <= 90; i++) set[(i / 2).toFixed(4)] = i / 2;
+    vang.forEach(a => { set[a.toFixed(4)] = a; });
+    const angs = Object.keys(set).map(x => set[x]).sort((x, y) => x - y).filter(a => a >= -45 - 1e-9 && a <= 45 + 1e-9);
+    const sp2 = spec.map((s, i) => { if (i === 0) return s; let best = s[0], bd = 4; vang.forEach(va => { if (Math.abs(va - s[0]) < bd) { bd = Math.abs(va - s[0]); best = va; } }); return [best, s[1]]; });
+    const hAt = a => { let h = sp2[0][1]; sp2.forEach(s => { if (a >= s[0] - 1e-4) h = s[1]; }); return h; };
+    pk.a = []; pk.d = []; pk.h = [];
+    angs.forEach(a => {
+      const ux = Math.sin(a / R2D_), uy = Math.cos(a / R2D_); let best = 0;
+      for (let i = 0; i < V.length - 1; i++) {
+        const x1 = V[i][0], y1 = V[i][1], dx = V[i + 1][0] - x1, dy = V[i + 1][1] - y1;
+        const det = -ux * dy + uy * dx; if (Math.abs(det) < 1e-9) continue;
+        const t = (-x1 * dy + y1 * dx) / det, s = (ux * y1 - uy * x1) / det;
+        if (s >= -1e-9 && s <= 1 + 1e-9 && t > best) best = t;
+      }
+      pk.a.push(a); pk.d.push(best); pk.h.push(hAt(a));
+    });
+    pk.vtx = V; pk.fl = { l: sh.l, r: sh.r };
+  });
+  // Outfield stands behind the wall, three sectors (LF < -14 deg, CF, RF > +14 deg).
+  // b bleachers (40 ft deep, rises 22 ft over the wall) | d decks (75 ft, to ~50 ft) | u upper decks (110 ft, to ~85 ft)
+  // p plaza/walkway (25 ft deep, flat ~6 ft) | m Monster-style seats on top of the wall (14 ft deep, +14 ft). Beyond the back edge the ball drops to the street.
+  const STANDS = { generic: 'ddd', dome: 'ddd', bal: 'dbp', bos: 'mbb', nyy: 'ubu', tb: 'ddd', tor: 'dud', cws: 'ddd', cle: 'dbd', det: 'dbd', kc: 'dpd', min: 'dbd',
+    hou: 'dbd', laa: 'dpd', ath: 'ddd', sea: 'dbd', tex: 'ddd', atl: 'dbd', mia: 'ddd', nym: 'dbd', phi: 'dpd', wsh: 'dbd', chc: 'bbb', cin: 'dpd', mil: 'ddd',
+    pit: 'dbp', stl: 'dbd', ari: 'dpd', col: 'ubu', lad: 'dbd', sd: 'dpp', sf: 'bbp' };
+  const SCODE = { b: { D: 40, rise: 22 }, d: { D: 75, top: 50, rise: 30 }, u: { D: 110, top: 85, rise: 40 }, p: { D: 25, flat: 6 }, m: { D: 14, rise: 14 } };
+  Object.keys(STANDS).forEach(k => { PARKS[k].stands = STANDS[k]; });
+  PARKS.generic.fl = PARKS.cws.fl; PARKS.dome.fl = PARKS.tb.fl;
+  // legacy keys used by presets
+  PARKS.coors = PARKS.col; PARKS.fenway = PARKS.bos; PARKS.yankee = PARKS.nyy; PARKS.wrigley = PARKS.chc;
+
+  /* ------------------------------------------------------------------ */
+  /* Default parameters                                                  */
+  /* ------------------------------------------------------------------ */
+  const DEFAULTS = {
+    mode: 'ball',            // 'ball' | 'bat'
+    // batted ball (direct)
+    ev: 102, la: 28, spray: 8,
+    autoSpin: true, backspin: 2200, sidespin: 0, dBack: 0, dSide: 0,
+    spinA0: 800, spinA1: 58, spinSide: 38,   // auto-spin model: back = A0 + A1*LA ; side = -k*spray
+    contactFt: 3.0, y0: 0.61,
+    // bat-ball collision
+    batMph: 72, pitchMph: 90, attack: 8, pitchDescent: 6, offsetIn: 0.6,
+    sweetIn: 0, swingHead: 0, faceHead: 0, pitchSpin: 0,
+    collA: 1.20, collMu: 0.50, collKt: 0.75, ballK: 0.40,
+    // atmosphere
+    tempF: 72, elevFt: 0, slpInHg: 29.92, rh: 50,
+    // wind
+    windMph: 0, windDir: 0, windExp: 0.15,
+    // earth
+    latitude: 40, cfAz: 45,
+    // ball + aerodynamics
+    massOz: 5.125, circIn: 9.125,
+    cd: 0.302, dCdLow: 0.17, vCrit: 22, wCrit: 4, clScale: 0.95, tau: 25,
+    dragOn: true, liftOn: true, windOn: true, coriolisOn: true,
+    // ground
+    groundE: 0.50, groundMu: 0.55, rollMu: 0.12, wallE: 0.35,
+    // venue
+    park: 'generic', roofClosed: false, fenceD: null, fenceH: null
+  };
+
+  /* ------------------------------------------------------------------ */
+  /* Atmosphere + gravity                                                */
+  /* ------------------------------------------------------------------ */
+  function airDensity(tempF, elevFt, slpInHg, rhPct) {
+    const tC = (tempF - 32) / 1.8, tK = tC + 273.15;
+    const hM = elevFt * FT;
+    const slp = slpInHg * 3386.389;
+    const pStn = slp * Math.pow(1 - 2.25577e-5 * hM, 5.25588);
+    const es = 610.78 * Math.pow(10, 7.5 * tC / (tC + 237.3));
+    const pv = Math.min(1, Math.max(0, rhPct / 100)) * es;
+    const pd = pStn - pv;
+    return pd / (287.058 * tK) + pv / (461.495 * tK);
+  }
+  function gravity(latDeg, elevM) {
+    const s = Math.sin(latDeg * D2R), s2 = Math.sin(2 * latDeg * D2R);
+    return 9.780327 * (1 + 0.0053024 * s * s - 0.0000058 * s2 * s2) - 3.086e-6 * elevM;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Context: everything that does not change within one flight          */
+  /* ------------------------------------------------------------------ */
+  function prepare(p) {
+    p = Object.assign({}, DEFAULTS, p);
+    const m = p.massOz * OZ;
+    const R = p.circIn * IN / (2 * Math.PI);
+    const A = Math.PI * R * R;
+    const rho0 = airDensity(p.tempF, p.elevFt, p.slpInHg, p.rh);
+    const g = gravity(p.latitude, p.elevFt * FT);
+    const ws = (p.windOn && !p.roofClosed) ? p.windMph * MPH : 0, wd = p.windDir * D2R;
+    const park = PARKS[p.park] || PARKS.generic;
+    const fa = p.fenceD ? ANG : park.a;
+    const fd = (p.fenceD || park.d).map(v => v * FT);
+    const fh = (p.fenceH || park.h).map(v => v * FT);
+    const lat = p.latitude * D2R, az = p.cfAz * D2R;
+    const on = p.coriolisOn ? 1 : 0;
+    return {
+      m, R, A, rho0, g, k: p.ballK,
+      cdHi: p.dragOn ? p.cd : 0, dCd: p.dragOn ? p.dCdLow : 0, vc: p.vCrit, vw: p.wCrit,
+      clScale: p.liftOn ? p.clScale : 0, tau: p.tau > 0 ? p.tau : Infinity,
+      wx10: ws * Math.sin(wd), wy10: ws * Math.cos(wd), alpha: p.windExp,
+      Ox: -on * OMEGA_E * Math.cos(lat) * Math.sin(az),
+      Oy: on * OMEGA_E * Math.cos(lat) * Math.cos(az),
+      Oz: on * OMEGA_E * Math.sin(lat),
+      fenceA: fa, fenceDm: fd, fenceHm: fh, stands: park.stands || 'ddd',
+      eG: p.groundE, muG: p.groundMu, muR: p.rollMu, eW: p.wallE
+    };
+  }
+
+  let _fF = 0, _fH = 0;
+  let standsOn = true;
+  function setStands(v) { standsOn = !!v; }
+  function standsAt(ctx, angDeg, dBehind, hw) {
+    if (!standsOn) return -1;
+    const code = SCODE[ctx.stands[angDeg < -14 ? 0 : (angDeg > 14 ? 2 : 1)]] || SCODE.d;
+    const D = code.D * FT; if (dBehind > D || dBehind < 0) return -1;
+    if (code.flat) return code.flat * FT;
+    const T = Math.max(hw + code.rise * FT, (code.top || 0) * FT);
+    return hw + (T - hw) * dBehind / D;
+  }
+  function standsDepth(ctx, angDeg) { if (!standsOn) return 0; return (SCODE[ctx.stands[angDeg < -14 ? 0 : (angDeg > 14 ? 2 : 1)]] || SCODE.d).D * FT; }
+  function fenceAt(ctx, angDeg) {
+    const a = ctx.fenceA, d = ctx.fenceDm, h = ctx.fenceHm, n = a.length - 1;
+    if (angDeg <= a[0]) { _fF = d[0]; _fH = h[0]; return; }
+    if (angDeg >= a[n]) { _fF = d[n]; _fH = h[n]; return; }
+    let i = 0;
+    while (i < n - 1 && angDeg > a[i + 1]) i++;
+    const w = a[i + 1] - a[i], f = w > 1e-9 ? (angDeg - a[i]) / w : 1;
+    _fF = d[i] + f * (d[i + 1] - d[i]);
+    _fH = h[i] + f * (h[i + 1] - h[i]);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Acceleration (drag + Magnus + gravity + Coriolis)                   */
+  /* ------------------------------------------------------------------ */
+  const acc = new Float64Array(3);
+  const dg = { v: 0, Cd: 0, Cl: 0, S: 0, rho: 0, drag: 0, lift: 0, dx: 0, dy: 0, dz: 0, lx: 0, ly: 0, lz: 0, wind: 0 };
+
+  function accel(c, sp, t, px, py, pz, vx, vy, vz) {
+    const zc = pz < 0.5 ? 0.5 : (pz > 80 ? 80 : pz);
+    const ws = Math.pow(zc * 0.1, c.alpha);
+    const wx = c.wx10 * ws, wy = c.wy10 * ws;
+    const rx = vx - wx, ry = vy - wy, rz = vz;
+    let v = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    if (v < 1e-6) v = 1e-6;
+    const rho = c.rho0 * Math.exp(-(pz > 0 ? pz : 0) / H_SCALE);
+    const Cd = c.cdHi + c.dCd / (1 + Math.exp((v - c.vc) / c.vw));
+    const half = 0.5 * rho * c.A / c.m;
+    const kd = half * Cd * v;
+    let ax = -kd * rx, ay = -kd * ry, az = -kd * rz;
+    dg.dx = ax; dg.dy = ay; dg.dz = az;
+    // Magnus
+    const sd = Math.exp(-(t - sp.t0) / c.tau);
+    const wsx = sp.wx * sd, wsy = sp.wy * sd, wsz = sp.wz * sd;
+    const hx = rx / v, hy = ry / v, hz = rz / v;
+    const cx = wsy * hz - wsz * hy, cy = wsz * hx - wsx * hz, cz = wsx * hy - wsy * hx;
+    const wp = Math.sqrt(cx * cx + cy * cy + cz * cz); // |omega_perp|
+    let S = 0, Cl = 0, lx = 0, ly = 0, lz = 0;
+    if (wp > 1e-9 && c.clScale > 0) {
+      S = c.R * wp / v;
+      Cl = c.clScale * S / (0.4 + 2.32 * S);
+      const fl = half * Cl * v * v / wp;
+      lx = fl * cx; ly = fl * cy; lz = fl * cz;
+    }
+    ax += lx; ay += ly; az += lz;
+    // gravity, Coriolis
+    az -= c.g;
+    ax -= 2 * (c.Oy * vz - c.Oz * vy);
+    ay -= 2 * (c.Oz * vx - c.Ox * vz);
+    az -= 2 * (c.Ox * vy - c.Oy * vx);
+    acc[0] = ax; acc[1] = ay; acc[2] = az;
+    dg.v = v; dg.Cd = Cd; dg.Cl = Cl; dg.S = S; dg.rho = rho;
+    dg.lx = lx; dg.ly = ly; dg.lz = lz;
+    dg.drag = kd * v; dg.lift = Math.sqrt(lx * lx + ly * ly + lz * lz);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Initial conditions                                                  */
+  /* ------------------------------------------------------------------ */
+  function spinVector(vx, vy, vz, backRpm, sideRpm) {
+    const sp = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+    const ux = vx / sp, uy = vy / sp, uz = vz / sp;
+    // backspin axis b = (v x z)/|..|
+    let bx = uy, by = -ux, bz = 0;
+    let bn = Math.sqrt(bx * bx + by * by);
+    if (bn < 1e-6) { bx = 1; by = 0; bn = 1; }
+    bx /= bn; by /= bn;
+    // sidespin axis s = b x v
+    const sx = by * uz - bz * uy, sy = bz * ux - bx * uz, sz = bx * uy - by * ux;
+    const wb = backRpm * RPM, ws = sideRpm * RPM;
+    return [wb * bx + ws * sx, wb * by + ws * sy, wb * bz + ws * sz];
+  }
+  function autoSpin(p, la, spray) {
+    return { back: p.spinA0 + p.spinA1 * la, side: -p.spinSide * spray * Math.max(0.25, Math.cos(la * D2R)) };
+  }
+
+  // Bat-ball collision: impulse model with normal restitution (via A), sliding/rolling friction.
+  function collide(p) {
+    p = Object.assign({}, DEFAULTS, p);
+    const R = p.circIn * IN / (2 * Math.PI), Rbat = 0.0343;
+    const vb = p.batMph * MPH, vp = p.pitchMph * MPH;
+    const al = p.attack * D2R, xp = p.swingHead * D2R, xf = p.faceHead * D2R, dsc = p.pitchDescent * D2R;
+    const bv = [vb * Math.cos(al) * Math.sin(xp), vb * Math.cos(al) * Math.cos(xp), vb * Math.sin(al)];
+    const sinPhi = Math.max(-0.95, Math.min(0.95, p.offsetIn * IN / (R + Rbat)));
+    const phi = Math.asin(sinPhi);
+    // contact normal: swing-plane tilt (attack angle) plus the offset angle from the barrel's centre line
+    const E = al + phi;
+    const n = [Math.cos(E) * Math.sin(xf), Math.cos(E) * Math.cos(xf), Math.sin(E)];
+    const vin = [0, -vp * Math.cos(dsc), -vp * Math.sin(dsc)];
+    const win = [-p.pitchSpin * RPM, 0, 0];
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const vbn = dot(bv, n), vin_n = dot(vin, n);
+    const x = p.sweetIn;
+    const A = Math.max(1.02, p.collA * (1 - 0.003 * x * x));
+    const vo_n = A * vbn - (A - 1) * vin_n;
+    const Jn = vo_n - vin_n;
+    const rc = [-R * n[0], -R * n[1], -R * n[2]];
+    const wxr = cross(win, rc);
+    const u = [vin[0] + wxr[0] - bv[0], vin[1] + wxr[1] - bv[1], vin[2] + wxr[2] - bv[2]];
+    const un = dot(u, n);
+    const s = [u[0] - un * n[0], u[1] - un * n[1], u[2] - un * n[2]];
+    const sm = Math.sqrt(dot(s, s));
+    const k = p.ballK, c = k / (1 + k);
+    let jt = [0, 0, 0];
+    if (sm > 1e-9) {
+      const mag = Math.min(p.collKt * c * sm, p.collMu * Jn);
+      jt = [-mag * s[0] / sm, -mag * s[1] / sm, -mag * s[2] / sm];
+    }
+    const vt = [vin[0] - vin_n * n[0], vin[1] - vin_n * n[1], vin[2] - vin_n * n[2]];
+    const v = [vt[0] + jt[0] + vo_n * n[0], vt[1] + jt[1] + vo_n * n[1], vt[2] + jt[2] + vo_n * n[2]];
+    const rj = cross(rc, jt);
+    const w = [win[0] + rj[0] / (k * R * R), win[1] + rj[1] / (k * R * R), win[2] + rj[2] / (k * R * R)];
+    const sp = Math.sqrt(dot(v, v));
+    return { v, w, ev: sp / MPH, la: Math.asin(v[2] / sp) * R2D, spray: Math.atan2(v[0], v[1]) * R2D,
+             phi: phi * R2D, bbsNormal: vo_n / MPH };
+  }
+
+  // Decompose a spin vector relative to the velocity direction -> rpm components
+  function decomposeSpin(v, w) {
+    const sp = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1;
+    const ux = v[0] / sp, uy = v[1] / sp, uz = v[2] / sp;
+    let bx = uy, by = -ux, bz = 0;
+    let bn = Math.sqrt(bx * bx + by * by);
+    if (bn < 1e-6) { bx = 1; by = 0; bn = 1; }
+    bx /= bn; by /= bn;
+    const sx = by * uz - bz * uy, sy = bz * ux - bx * uz, sz = bx * uy - by * ux;
+    const back = (w[0] * bx + w[1] * by + w[2] * bz) / RPM;
+    const side = (w[0] * sx + w[1] * sy + w[2] * sz) / RPM;
+    const gyro = (w[0] * ux + w[1] * uy + w[2] * uz) / RPM;
+    return { back, side, gyro, total: Math.sqrt(back * back + side * side + gyro * gyro) };
+  }
+
+  function makeIC(p) {
+    p = Object.assign({}, DEFAULTS, p);
+    let v, w, meta;
+    const z0 = p.contactFt * FT;
+    if (p.mode === 'bat') {
+      const col = collide(p);
+      v = col.v; w = col.w;
+      const sd = decomposeSpin(v, w);
+      meta = { ev: col.ev, la: col.la, spray: col.spray, back: sd.back, side: sd.side, gyro: sd.gyro, phi: col.phi };
+    } else {
+      const ev = p.ev * MPH, la = p.la * D2R, sa = p.spray * D2R;
+      v = [ev * Math.cos(la) * Math.sin(sa), ev * Math.cos(la) * Math.cos(sa), ev * Math.sin(la)];
+      let back = p.backspin, side = p.sidespin;
+      if (p.autoSpin) { const a = autoSpin(p, p.la, p.spray); back = a.back; side = a.side; }
+      back += p.dBack || 0; side += p.dSide || 0;
+      w = spinVector(v[0], v[1], v[2], back, side);
+      meta = { ev: p.ev, la: p.la, spray: p.spray, back, side, gyro: 0 };
+    }
+    return { ic: { x: p.x0 || 0, y: p.y0, z: z0, vx: v[0], vy: v[1], vz: v[2], wx: w[0], wy: w[1], wz: w[2] }, meta };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Integrator (RK4) with landing, fence, bounce, roll                  */
+  /* ------------------------------------------------------------------ */
+  const k1 = new Float64Array(6), k2 = new Float64Array(6), k3 = new Float64Array(6), k4 = new Float64Array(6);
+
+  function simulate(c, ic, o) {
+    o = o || {};
+    const dt = o.dt || 0.001;
+    const rec = !!o.record;
+    const stride = Math.max(1, Math.round((o.sampleDt || 1 / 240) / dt));
+    const fenceMode = o.fence || 'off';           // off | flag | bounce
+    const rollout = !!o.rollout;
+    const tmax = o.tmax || 40;
+    const R = c.R, kk = c.k, cs = kk / (1 + kk);
+    let x = ic.x, y = ic.y, z = ic.z, vx = ic.vx, vy = ic.vy, vz = ic.vz;
+    const sp = { wx: ic.wx, wy: ic.wy, wz: ic.wz, t0: 0 };
+    let t = 0, step = 0, mode = 0, bounces = 0, fenceDone = fenceMode === 'off';
+    const res = {
+      landing: null, apex: { z, t: 0, x, y }, hr: false, wallHit: false, wall: null, foulCross: false,
+      maxSpeed: Math.sqrt(vx * vx + vy * vy + vz * vz), rest: null, tEnd: 0, bounces: 0
+    };
+    let tr = null, qx = 0, qy = 0, qz = 0, qw = 1;
+    if (rec) tr = { t: [], x: [], y: [], z: [], vx: [], vy: [], vz: [], wx: [], wy: [], wz: [],
+                    q: [], dr: [], li: [], cd: [], cl: [], S: [], rho: [], dgx: [], dgy: [], dgz: [], lfx: [], lfy: [], lfz: [] };
+    let lastRecT = 0;
+
+    function record() {
+      // quaternion update from spin
+      const dts = t - lastRecT; lastRecT = t;
+      let wx, wy, wz;
+      if (mode === 1) { wx = sp.wx; wy = sp.wy; wz = sp.wz; }
+      else { const sd = Math.exp(-(t - sp.t0) / c.tau); wx = sp.wx * sd; wy = sp.wy * sd; wz = sp.wz * sd; }
+      const wm = Math.sqrt(wx * wx + wy * wy + wz * wz);
+      if (dts > 0 && wm > 1e-9) {
+        const a = wm * dts * 0.5, s = Math.sin(a) / wm, w0 = Math.cos(a);
+        const ax = wx * s, ay = wy * s, az = wz * s;
+        const nw = w0 * qw - ax * qx - ay * qy - az * qz;
+        const nx = w0 * qx + ax * qw + ay * qz - az * qy;
+        const ny = w0 * qy - ax * qz + ay * qw + az * qx;
+        const nz = w0 * qz + ax * qy - ay * qx + az * qw;
+        const nn = Math.sqrt(nw * nw + nx * nx + ny * ny + nz * nz);
+        qw = nw / nn; qx = nx / nn; qy = ny / nn; qz = nz / nn;
+      }
+      tr.t.push(t); tr.x.push(x); tr.y.push(y); tr.z.push(z);
+      tr.vx.push(vx); tr.vy.push(vy); tr.vz.push(vz);
+      tr.wx.push(wx); tr.wy.push(wy); tr.wz.push(wz);
+      tr.q.push(qx, qy, qz, qw);
+      if (mode === 0) {
+        accel(c, sp, t, x, y, z, vx, vy, vz);
+        tr.dr.push(dg.drag); tr.li.push(dg.lift); tr.cd.push(dg.Cd); tr.cl.push(dg.Cl); tr.S.push(dg.S); tr.rho.push(dg.rho);
+        tr.dgx.push(dg.dx); tr.dgy.push(dg.dy); tr.dgz.push(dg.dz);
+        tr.lfx.push(dg.lx); tr.lfy.push(dg.ly); tr.lfz.push(dg.lz);
+      } else {
+        tr.dr.push(0); tr.li.push(0); tr.cd.push(0); tr.cl.push(0); tr.S.push(0); tr.rho.push(0);
+        tr.dgx.push(0); tr.dgy.push(0); tr.dgz.push(0); tr.lfx.push(0); tr.lfy.push(0); tr.lfz.push(0);
+      }
+    }
+    if (rec) record();
+
+    let gPrev = 0;
+    if (!fenceDone) { fenceAt(c, Math.atan2(x, y) * R2D); gPrev = Math.hypot(x, y) - _fF; }
+
+    function setLanding(tl, lx, ly, lz, lvx, lvy, lvz, kind) {
+      const ang = Math.atan2(lx, ly) * R2D;
+      const spd = Math.sqrt(lvx * lvx + lvy * lvy + lvz * lvz);
+      res.landing = {
+        t: tl, x: lx, y: ly, z: lz, vx: lvx, vy: lvy, vz: lvz, ang, dist: Math.hypot(lx, ly) / FT,
+        speed: spd, impactAngle: Math.atan2(-lvz, Math.hypot(lvx, lvy)) * R2D, kind: kind || 'ground'
+      };
+    }
+
+    while (t < tmax) {
+      if (mode === 0) {
+        const px = x, py = y, pz = z;
+        // RK4
+        accel(c, sp, t, x, y, z, vx, vy, vz);
+        k1[0] = vx; k1[1] = vy; k1[2] = vz; k1[3] = acc[0]; k1[4] = acc[1]; k1[5] = acc[2];
+        const h2 = dt * 0.5;
+        accel(c, sp, t + h2, x + h2 * k1[0], y + h2 * k1[1], z + h2 * k1[2], vx + h2 * k1[3], vy + h2 * k1[4], vz + h2 * k1[5]);
+        k2[0] = vx + h2 * k1[3]; k2[1] = vy + h2 * k1[4]; k2[2] = vz + h2 * k1[5]; k2[3] = acc[0]; k2[4] = acc[1]; k2[5] = acc[2];
+        accel(c, sp, t + h2, x + h2 * k2[0], y + h2 * k2[1], z + h2 * k2[2], vx + h2 * k2[3], vy + h2 * k2[4], vz + h2 * k2[5]);
+        k3[0] = vx + h2 * k2[3]; k3[1] = vy + h2 * k2[4]; k3[2] = vz + h2 * k2[5]; k3[3] = acc[0]; k3[4] = acc[1]; k3[5] = acc[2];
+        accel(c, sp, t + dt, x + dt * k3[0], y + dt * k3[1], z + dt * k3[2], vx + dt * k3[3], vy + dt * k3[4], vz + dt * k3[5]);
+        k4[0] = vx + dt * k3[3]; k4[1] = vy + dt * k3[4]; k4[2] = vz + dt * k3[5]; k4[3] = acc[0]; k4[4] = acc[1]; k4[5] = acc[2];
+        const d6 = dt / 6;
+        const pvx = vx, pvy = vy, pvz = vz;
+        x += d6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]);
+        y += d6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+        z += d6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+        vx += d6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+        vy += d6 * (k1[4] + 2 * k2[4] + 2 * k3[4] + k4[4]);
+        vz += d6 * (k1[5] + 2 * k2[5] + 2 * k3[5] + k4[5]);
+        t += dt; step++;
+        const spd = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (spd > res.maxSpeed) res.maxSpeed = spd;
+        if (!res.landing && z > res.apex.z) { res.apex.z = z; res.apex.t = t; res.apex.x = x; res.apex.y = y; }
+
+        // fence
+        if (!fenceDone) {
+          const ang = Math.atan2(x, y) * R2D;
+          fenceAt(c, ang);
+          const g = Math.hypot(x, y) - _fF;
+          if (gPrev < 0 && g >= 0) {
+            const f = -gPrev / (g - gPrev);
+            const xc = px + f * (x - px), yc = py + f * (y - py), zc = pz + f * (z - pz);
+            const angc = Math.atan2(xc, yc) * R2D;
+            fenceAt(c, angc);
+            const tc = t - dt + f * dt;
+            if (res.landing) {
+              // already landed: a hop or roll into the fence. The call (HR / wall / in play) was made at first landing.
+              fenceDone = true;
+              if (fenceMode === 'bounce' && rollout && zc - R < _fH && Math.abs(angc) <= 45) {
+                const rr = Math.hypot(xc, yc), rx = xc / rr, ry = yc / rr, vr = vx * rx + vy * ry;
+                if (vr > 0) { vx -= (1 + c.eW) * vr * rx; vy -= (1 + c.eW) * vr * ry; vx *= 0.9; vy *= 0.9; vz *= 0.85; }
+                x = xc - rx * 0.03; y = yc - ry * 0.03; z = zc; res.rollWall = { t: tc, dist: rr / FT };
+              }
+            }
+            else if (Math.abs(angc) > 45) { res.foulCross = true; fenceDone = true; }
+            else if (zc - R >= _fH) { res.hr = true; fenceDone = true; res.fenceCross = { t: tc, x: xc, y: yc, z: zc }; }
+            else {
+              res.wallHit = true; fenceDone = true;
+              res.wall = { t: tc, x: xc, y: yc, z: zc, ang: angc, dist: Math.hypot(xc, yc) / FT, h: _fH };
+              if (fenceMode === 'bounce' && !res.landing) {
+                if (!rollout) {
+                  setLanding(tc, xc, yc, zc, vx, vy, vz, 'wall'); res.tEnd = tc;
+                  x = xc; y = yc; z = zc; t = tc;
+                  if (rec) record();
+                  break;
+                }
+              }
+              if (fenceMode === 'bounce') {
+                const rr = Math.hypot(xc, yc), rx = xc / rr, ry = yc / rr;
+                const vr = vx * rx + vy * ry;
+                if (vr > 0) { vx -= (1 + c.eW) * vr * rx; vy -= (1 + c.eW) * vr * ry; vx *= 0.9; vy *= 0.9; vz *= 0.85; }
+                x = xc - rx * 0.03; y = yc - ry * 0.03; z = zc;
+                sp.wx *= 0.5; sp.wy *= 0.5; sp.wz *= 0.5;
+                if (!res.landing) res.wallBeforeLanding = true;
+              }
+            }
+          }
+          gPrev = g;
+        }
+
+        // stands behind the wall: a home run lands in the seats
+        if (res.hr && !res.landing) {
+          const rr = Math.hypot(x, y), an = Math.atan2(x, y) * R2D;
+          fenceAt(c, an);
+          const db = rr - _fF;
+          if (db > 0) {
+            const sh = standsAt(c, an, db, _fH);
+            if (sh >= 0 && z - R <= sh) {
+              setLanding(t, x, y, z, vx, vy, vz, 'stands'); res.tEnd = t; res.standsH = sh; if (rec) record(); res.rest = { t, x, y, dist: rr / FT, ang: an }; break;
+            }
+          }
+        }
+        // ground contact
+        if (z <= R && vz < 0) {
+          const f = (pz - R) / (pz - z);
+          const lx = px + f * (x - px), ly = py + f * (y - py);
+          const lvx = pvx + f * (vx - pvx), lvy = pvy + f * (vy - pvy), lvz = pvz + f * (vz - pvz);
+          const tl = t - dt + f * dt;
+          if (!res.landing) setLanding(tl, lx, ly, R, lvx, lvy, lvz, 'ground');
+          if (!rollout) { x = lx; y = ly; z = R; t = tl; res.tEnd = t; if (rec) record(); break; }
+          // bounce
+          bounces++; res.bounces = bounces;
+          const sd = Math.exp(-(tl - sp.t0) / c.tau);
+          let wx = sp.wx * sd, wy = sp.wy * sd, wz = sp.wz * sd;
+          const vn = lvz;
+          let e = c.eG - 0.008 * Math.abs(vn); if (e < 0.18) e = 0.18;
+          let nvx = lvx, nvy = lvy;
+          const ux = lvx - R * wy, uy = lvy + R * wx;
+          const um = Math.sqrt(ux * ux + uy * uy);
+          if (um > 1e-6) {
+            const J = Math.min(c.muG * (1 + e) * Math.abs(vn), cs * um);
+            const Jx = -J * ux / um, Jy = -J * uy / um;
+            nvx += Jx; nvy += Jy;
+            wx += Jy / (kk * R); wy -= Jx / (kk * R);
+          }
+          x = lx; y = ly; z = R + 1e-6; t = tl;
+          vx = nvx; vy = nvy; vz = -e * vn;
+          sp.wx = wx; sp.wy = wy; sp.wz = wz; sp.t0 = t;
+          if (vz < 1.2 || bounces > 14) { vz = 0; z = R; mode = 1; }
+          if (rec) record();
+          continue;
+        }
+        if (rec && step % stride === 0) record();
+      } else {
+        // rolling on the ground with aerodynamic drag + rolling resistance
+        const rx = vx - c.wx10 * Math.pow(0.5 * 0.1, c.alpha) , ry = vy - c.wy10 * Math.pow(0.5 * 0.1, c.alpha);
+        const v = Math.sqrt(rx * rx + ry * ry);
+        const sph = Math.sqrt(vx * vx + vy * vy);
+        if (sph < 0.04) { vx = 0; vy = 0; res.rest = { t, x, y, dist: Math.hypot(x, y) / FT, ang: Math.atan2(x, y) * R2D }; res.tEnd = t; if (rec) record(); break; }
+        const Cd = c.cdHi + c.dCd / (1 + Math.exp((v - c.vc) / c.vw));
+        const kd = 0.5 * c.rho0 * c.A * Cd / c.m;
+        let ax = -kd * v * rx - c.muR * c.g * vx / sph, ay = -kd * v * ry - c.muR * c.g * vy / sph;
+        const px = x, py = y;
+        vx += ax * dt; vy += ay * dt;
+        if ((vx * ax + vy * ay) > 0 && sph < 0.2) { vx = 0; vy = 0; }
+        x += vx * dt; y += vy * dt; t += dt; step++;
+        sp.wx = -vy / R; sp.wy = vx / R; sp.wz = 0;
+        // wall while rolling
+        if (!fenceDone) {
+          fenceAt(c, Math.atan2(x, y) * R2D);
+          const g = Math.hypot(x, y) - _fF;
+          if (g >= 0 && Math.abs(Math.atan2(x, y) * R2D) <= 45) {
+            const rr = Math.hypot(x, y), nx = x / rr, ny = y / rr;
+            const vr = vx * nx + vy * ny;
+            if (vr > 0) { vx -= (1 + c.eW) * vr * nx; vy -= (1 + c.eW) * vr * ny; }
+            x = nx * (_fF - 0.03); y = ny * (_fF - 0.03);
+            if (!res.rollWall) res.rollWall = { t, dist: _fF / FT };
+            fenceDone = true;
+          } else if (g >= 0) fenceDone = true;
+        }
+        if (rec && step % (stride * 2) === 0) record();
+      }
+    }
+    if (!res.tEnd) res.tEnd = t;
+    if (!res.rest && mode === 1) res.rest = { t, x, y, dist: Math.hypot(x, y) / FT, ang: Math.atan2(x, y) * R2D };
+    // outcome
+    const L = res.landing;
+    if (L) {
+      if (res.foulCross) res.outcome = 'foul';
+      else if (res.hr) res.outcome = Math.abs(L.ang) > 45 ? 'foul' : 'hr';
+      else if (res.wallHit && Math.abs(res.wall.ang) <= 45) res.outcome = 'wall';
+      else res.outcome = Math.abs(L.ang) > 45 ? 'foul' : 'inplay';
+      res.hang = L.t;
+    } else { res.outcome = 'none'; res.hang = t; }
+    res.apexFt = (res.apex.z) / FT;
+    res.apexDistFt = Math.hypot(res.apex.x, res.apex.y) / FT;
+    res.tr = tr;
+    return res;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* High level run                                                      */
+  /* ------------------------------------------------------------------ */
+  function run(p, o) {
+    p = Object.assign({}, DEFAULTS, p);
+    const c = prepare(p);
+    const { ic, meta } = makeIC(p);
+    const res = simulate(c, ic, o);
+    res.meta = meta; res.ctx = c; res.ic = ic;
+    return res;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Random + stats                                                      */
+  /* ------------------------------------------------------------------ */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function gauss(rnd) {
+    for (;;) {
+      const u = rnd() * 2 - 1, v = rnd() * 2 - 1, s = u * u + v * v;
+      if (s > 0 && s < 1) { const z = u * Math.sqrt(-2 * Math.log(s) / s); if (Math.abs(z) <= 3) return z; }
+    }
+  }
+  function pct(sorted, q) {
+    if (!sorted.length) return NaN;
+    const i = (sorted.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+  }
+  function stats(a) {
+    const n = a.length;
+    if (!n) return { n: 0, mean: NaN, sd: NaN, min: NaN, max: NaN, p5: NaN, p25: NaN, p50: NaN, p75: NaN, p95: NaN };
+    let s = 0; for (let i = 0; i < n; i++) s += a[i];
+    const mean = s / n; let v = 0; for (let i = 0; i < n; i++) v += (a[i] - mean) * (a[i] - mean);
+    const sd = n > 1 ? Math.sqrt(v / (n - 1)) : 0;
+    const so = Float64Array.from(a).sort();
+    return { n, mean, sd, min: so[0], max: so[n - 1], p5: pct(so, .05), p25: pct(so, .25), p50: pct(so, .5), p75: pct(so, .75), p95: pct(so, .95) };
+  }
+  function corr(a, b) {
+    const n = a.length; if (n < 3) return 0;
+    let ma = 0, mb = 0; for (let i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+    ma /= n; mb /= n;
+    let sab = 0, saa = 0, sbb = 0;
+    for (let i = 0; i < n; i++) { const da = a[i] - ma, db = b[i] - mb; sab += da * db; saa += da * da; sbb += db * db; }
+    return saa > 0 && sbb > 0 ? sab / Math.sqrt(saa * sbb) : 0;
+  }
+  // confidence ellipse (chi2 for 2 dof): 0.683 -> 2.296, 0.95 -> 5.991
+  function ellipse(xs, ys, chi2) {
+    const n = xs.length; if (n < 3) return null;
+    let mx = 0, my = 0; for (let i = 0; i < n; i++) { mx += xs[i]; my += ys[i]; }
+    mx /= n; my /= n;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (let i = 0; i < n; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    sxx /= n - 1; syy /= n - 1; sxy /= n - 1;
+    const tr = sxx + syy, det = sxx * syy - sxy * sxy;
+    const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+    const l1 = tr / 2 + disc, l2 = Math.max(0, tr / 2 - disc);
+    const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    return { cx: mx, cy: my, a: Math.sqrt(l1 * chi2), b: Math.sqrt(l2 * chi2), ang };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Monte Carlo                                                         */
+  /* ------------------------------------------------------------------ */
+  function createMC(base, spec, n, seed, o) {
+    o = o || {};
+    const rnd = mulberry32(seed >>> 0);
+    const keys = Object.keys(spec).filter(k => spec[k].sd > 0);
+    const c0 = prepare(base);
+    const out = {
+      n, done: 0, keys, inputs: {}, landX: new Float64Array(n), landY: new Float64Array(n), dist: new Float64Array(n),
+      ang: new Float64Array(n), hang: new Float64Array(n), apex: new Float64Array(n), outcome: new Array(n),
+      ev: new Float64Array(n), la: new Float64Array(n), sprayL: new Float64Array(n), back: new Float64Array(n), side: new Float64Array(n),
+      tracks: [], maxT: 0
+    };
+    keys.forEach(k => out.inputs[k] = new Float64Array(n));
+    function step(count) {
+      const end = Math.min(n, out.done + count);
+      for (let i = out.done; i < end; i++) {
+        const p = Object.assign({}, base);
+        for (const k of keys) {
+          const s = spec[k];
+          const dev = s.dist === 'uniform' ? (rnd() * 2 - 1) * Math.sqrt(3) * s.sd : gauss(rnd) * s.sd;
+          const b = (k === 'dBack' || k === 'dSide') ? 0 : base[k];
+          p[k] = b + dev;
+          out.inputs[k][i] = p[k];
+        }
+        if (p.cd !== base.cd || p.tempF !== base.tempF || p.windMph !== base.windMph || p.windDir !== base.windDir) {
+          // environment/ball changes require a fresh context
+        }
+        const c = (p.cd !== base.cd || p.tempF !== base.tempF || p.windMph !== base.windMph || p.windDir !== base.windDir) ? prepare(p) : c0;
+        if (p.windMph < 0) p.windMph = 0;
+        const { ic, meta } = makeIC(p);
+        const r = simulate(c, ic, { dt: o.dt || 0.002, fence: 'bounce', record: !!o.tracks, sampleDt: o.sampleDt || 1 / 30 });
+        const L = r.landing;
+        out.landX[i] = L ? L.x / FT : NaN; out.landY[i] = L ? L.y / FT : NaN;
+        out.dist[i] = L ? L.dist : NaN; out.ang[i] = L ? L.ang : NaN;
+        out.hang[i] = r.hang; out.apex[i] = r.apexFt; out.outcome[i] = r.outcome;
+        out.ev[i] = meta.ev; out.la[i] = meta.la; out.sprayL[i] = meta.spray; out.back[i] = meta.back; out.side[i] = meta.side;
+        if (r.hang > out.maxT) out.maxT = r.hang;
+        if (o.tracks && r.tr) {
+          const T = r.tr, K = T.t.length, arr = new Float32Array(K * 3), ts = new Float32Array(K);
+          for (let j = 0; j < K; j++) { arr[3 * j] = T.x[j]; arr[3 * j + 1] = T.y[j]; arr[3 * j + 2] = T.z[j]; ts[j] = T.t[j]; }
+          out.tracks.push({ p: arr, t: ts });
+        }
+      }
+      out.done = end;
+      return out.done >= n;
+    }
+    out.step = step;
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Reverse solver: which hits land on a target spot                    */
+  /* ------------------------------------------------------------------ */
+  function evalShot(ctx, base, ev, la, psi, dt) {
+    const p = Object.assign({}, base, { mode: 'ball', ev, la, spray: psi });
+    const { ic } = makeIC(p);
+    return simulate(ctx, ic, { dt, fence: 'flag' });
+  }
+  function wrapDeg(a) { while (a > 180) a -= 360; while (a < -180) a += 360; return a; }
+  // Find the launch azimuth that brings the ball down on a given landing azimuth (step-limited secant iteration).
+  function azimuthFor(ctx, base, ev, la, tAng, psi0, dt) {
+    const f = psi => { const r = evalShot(ctx, base, ev, la, psi, dt); return { psi, r, dev: r.landing ? wrapDeg(r.landing.ang - tAng) : NaN }; };
+    let a = f(Math.max(tAng - 45, Math.min(tAng + 45, psi0))), slope = 1.3;
+    for (let i = 0; i < 9; i++) {
+      if (!isFinite(a.dev)) break;
+      if (Math.abs(a.dev) < 0.02) return { psi: a.psi, r: a.r, ok: true };
+      let step = -a.dev / slope; step = Math.max(-12, Math.min(12, step));
+      const b = f(Math.max(-88, Math.min(88, a.psi + step)));
+      if (!isFinite(b.dev)) break;
+      const sl = (b.dev - a.dev) / (b.psi - a.psi);
+      if (isFinite(sl) && sl > 0.3 && sl < 6) slope = sl;
+      a = b;
+    }
+    return { psi: a.psi, r: a.r, ok: isFinite(a.dev) && Math.abs(a.dev) < 0.2 };
+  }
+  function solveRow(ctx, base, ev, tAng, D, tolFt, o) {
+    o = o || {};
+    const dt = o.dt || 0.004;
+    const LAmin = -25, LAmax = 78;
+    // peak of range vs LA (golden section on [6, 62])
+    const rng = la => { const r = evalShot(ctx, base, ev, la, tAng, dt); return r.landing ? r.landing.dist : 0; };
+    let a = 4, b = 64; const gr = 0.6180339887;
+    let c1 = b - gr * (b - a), d1 = a + gr * (b - a), fc = rng(c1), fd = rng(d1);
+    for (let i = 0; i < 14; i++) {
+      if (fc > fd) { b = d1; d1 = c1; fd = fc; c1 = b - gr * (b - a); fc = rng(c1); }
+      else { a = c1; c1 = d1; fc = fd; d1 = a + gr * (b - a); fd = rng(d1); }
+    }
+    const laPk = (a + b) / 2, rPk = Math.max(fc, fd);
+    const row = { ev, peakLA: laPk, peakDist: rPk, low: null, high: null, band: null };
+    if (rPk < D - tolFt) return row;
+    let psiG = tAng;
+    function branch(loLA, hiLA, increasing) {
+      // find la in [loLA, hiLA] with dist(la) = D ; dist monotone in this interval
+      let lo = loLA, hi = hiLA, last = null;
+      const f = la => { const az = azimuthFor(ctx, base, ev, la, tAng, psiG, dt); psiG = az.ok ? az.psi : tAng; last = az; return (az.r.landing ? az.r.landing.dist : 0) - D; };
+      const flo = f(lo), fhi = f(hi);
+      if (increasing ? !(flo <= 0 && fhi >= 0) : !(flo >= 0 && fhi <= 0)) return null;
+      let best = null;
+      for (let i = 0; i < 16; i++) {
+        const mid = (lo + hi) / 2, fm = f(mid);
+        best = { la: mid, az: last, res: fm };
+        if (Math.abs(fm) < 0.15) break;
+        if ((fm < 0) === increasing) lo = mid; else hi = mid;
+      }
+      const az = best.az, r = az.r;
+      if (!az.ok || Math.abs(best.res) > Math.max(1.5, tolFt * 0.5)) return null; // a jump in landing distance (e.g. the stands' back edge) has no solution here
+      const clear = !(r.wallHit && D > (function () { fenceAt(ctx, tAng); return _fF / FT; })());
+      return { la: best.la, psi: az.psi, hang: r.hang, apex: r.apexFt, impact: r.landing ? r.landing.impactAngle : 0,
+               landSpeed: r.landing ? r.landing.speed / MPH : 0, valid: clear, wallHit: r.wallHit, hr: r.hr };
+    }
+    row.low = branch(LAmin, laPk, true);
+    row.high = branch(laPk, LAmax, false);
+    if (tolFt > 0 && (row.low || row.high)) {
+      const band = {};
+      const edge = (Dt, loLA, hiLA, inc, psi0) => {
+        let lo = loLA, hi = hiLA;
+        const f = la => { const r = evalShot(ctx, base, ev, la, psi0, dt); return (r.landing ? r.landing.dist : 0) - Dt; };
+        const flo = f(lo), fhi = f(hi);
+        if (inc ? !(flo <= 0 && fhi >= 0) : !(flo >= 0 && fhi <= 0)) return null;
+        for (let i = 0; i < 12; i++) { const mid = (lo + hi) / 2, fm = f(mid); if ((fm < 0) === inc) lo = mid; else hi = mid; }
+        return (lo + hi) / 2;
+      };
+      if (row.low) { band.lowA = edge(D - tolFt, LAmin, laPk, true, row.low.psi); band.lowB = edge(D + tolFt, LAmin, laPk, true, row.low.psi); }
+      if (row.high) { band.highA = edge(D + tolFt, laPk, LAmax, false, row.high.psi); band.highB = edge(D - tolFt, laPk, LAmax, false, row.high.psi); }
+      row.band = band;
+    }
+    return row;
+  }
+
+  function sweepGrid(ctx, base, evs, las, dt) {
+    const out = new Float64Array(evs.length * las.length), hr = new Uint8Array(evs.length * las.length);
+    for (let i = 0; i < evs.length; i++) for (let j = 0; j < las.length; j++) {
+      const r = evalShot(ctx, base, evs[i], las[j], base.spray, dt || 0.004);
+      out[i * las.length + j] = r.landing ? r.landing.dist : 0;
+      hr[i * las.length + j] = r.outcome === 'hr' ? 1 : 0;
+    }
+    return { dist: out, hr, evs, las };
+  }
+
+  return { FT, MPH, IN, RPM, D2R, R2D, DEFAULTS, PARKS, ANG, standsAt, standsDepth, setStands, airDensity, gravity, prepare, fenceAt, fence: () => [_fF, _fH],
+           makeIC, collide, decomposeSpin, spinVector, autoSpin, simulate, run, mulberry32, gauss, stats, corr, ellipse,
+           createMC, solveRow, evalShot, sweepGrid, accel, dg };
+});
+
+</script>
+<script>
+(function () {
+'use strict';
+/* ===== Core: state, inputs, compute, playback ===== */
+const E = BFL, FT = E.FT, MPH = E.MPH, D2R = E.D2R, R2D = E.R2D;
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmt = (v, d) => (v === null || v === undefined || !isFinite(v)) ? '–' : Number(v).toFixed(d || 0);
+const sgn = (v, d) => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d || 0);
+function el(tag, attrs, kids) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    if (k === 'class') e.className = attrs[k];
+    else if (k === 'html') e.innerHTML = attrs[k];
+    else if (k === 'text') e.textContent = attrs[k];
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  (kids || []).forEach(c => e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c));
+  return e;
+}
+
+/* ---------- theme tokens for canvas drawing ---------- */
+const T = {};
+const TOKENS = ['sky-top', 'sky-bot', 'outside', 'stand', 'stand-2', 'grass-a', 'grass-b', 'foul', 'dirt', 'dirt-2', 'track', 'wall', 'chalk',
+  'path', 'path-2', 'ghost', 'c-hr', 'c-wall', 'c-in', 'c-foul', 'c-good', 'ink', 'ink-2', 'muted', 'line', 'surface', 'surface-2', 'accent', 'bg',
+  'heat-0', 'heat-1', 'heat-2', 'heat-3', 'heat-4'];
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  TOKENS.forEach(n => { T[n] = cs.getPropertyValue('--' + n).trim(); });
+}
+const OUTCOME = {
+  hr: { label: 'Home run', col: 'c-hr' }, wall: { label: 'Off the wall', col: 'c-wall' },
+  inplay: { label: 'In play', col: 'c-in' }, foul: { label: 'Foul', col: 'c-foul' }, none: { label: '—', col: 'c-foul' }
+};
+
+/* ---------- state ---------- */
+const S = {
+  p: Object.assign({}, E.DEFAULTS, { ev: 96, la: 28, spray: 6 }),
+  sim: null, ctx: null, fencePts: null, dur: 1, bud: null,
+  view: '3d', tab: 'flight',
+  opt: { trail: true, forces: false, compare: false, ens: true },
+  cam: { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 },
+  play: { t: 0, playing: false, speed: 1, last: 0 },
+  mc: null, mcStale: false,
+  target: null, hf: { rows: null, job: 0, spin: 'auto', tol: 8, busy: false, sel: null },
+  sw: { data: null, job: 0, stale: true }, showSpread: true, mcAuto: true
+};
+S.p0 = Object.assign({}, S.p);
+
+const PRESETS = [
+  { name: 'Barrel to the gap', set: { mode: 'ball', ev: 96, la: 28, spray: 6, park: 'generic', elevFt: 0, windMph: 0, tempF: 72, autoSpin: true } },
+  { name: 'A-Rod benchmark (Tropicana, 470 ft)', set: { mode: 'ball', ev: 107.3, la: 26.1, spray: 0, park: 'dome', elevFt: 0, tempF: 72, rh: 50, windMph: 0, autoSpin: false, backspin: 1860, sidespin: 0, contactFt: 3.5, tau: 1e6, clScale: 0.95 } },
+  { name: 'Coors Field: same swing, thin air', set: { mode: 'ball', ev: 96, la: 28, spray: 6, park: 'coors', elevFt: 5190, tempF: 72, windMph: 0, autoSpin: true } },
+  { name: 'Wrigley: 15 mph wind blowing out', set: { mode: 'ball', ev: 98, la: 30, spray: -12, park: 'wrigley', elevFt: 600, windMph: 15, windDir: 0, tempF: 78, autoSpin: true } },
+  { name: 'Wrigley: 15 mph wind blowing in', set: { mode: 'ball', ev: 98, la: 30, spray: -12, park: 'wrigley', elevFt: 600, windMph: 15, windDir: 180, tempF: 55, autoSpin: true } },
+  { name: 'Fenway: off the Green Monster', set: { mode: 'ball', ev: 100, la: 20, spray: -32, park: 'fenway', elevFt: 20, windMph: 0, tempF: 70, autoSpin: true } },
+  { name: 'Foul-pole hook', set: { mode: 'ball', ev: 100, la: 30, spray: -37, park: 'generic', elevFt: 0, windMph: 0, autoSpin: true } },
+  { name: 'Line drive in the gap', set: { mode: 'ball', ev: 106, la: 13, spray: 18, park: 'generic', elevFt: 0, windMph: 0, autoSpin: true } },
+  { name: 'Pop fly behind the plate', set: { mode: 'ball', ev: 78, la: 62, spray: -4, park: 'generic', elevFt: 0, windMph: 0, autoSpin: true } },
+  { name: 'Crosswind slice', set: { mode: 'ball', ev: 101, la: 29, spray: 14, park: 'generic', elevFt: 0, windMph: 18, windDir: 90, autoSpin: true } },
+  { name: 'Bat–ball: well-struck barrel', set: { mode: 'bat', batMph: 75, pitchMph: 92, attack: 8, offsetIn: 0.6, sweetIn: 0, faceHead: 4, swingHead: 4, pitchSpin: 0, park: 'generic', elevFt: 0, windMph: 0 } },
+  { name: 'Bat–ball: jammed, 4 in. off the sweet spot', set: { mode: 'bat', batMph: 72, pitchMph: 92, attack: 8, offsetIn: 0.7, sweetIn: 4, faceHead: -6, swingHead: 0, park: 'generic', elevFt: 0, windMph: 0 } }
+];
+
+/* ---------- control schema ---------- */
+const GROUPS = [
+  { id: 'contact', title: 'Contact', open: true, items: [
+    { type: 'mode' },
+    { type: 'spreadtoggle' },
+    { type: 'mcstrip' },
+    { key: 'ev', label: 'Exit velocity', unit: 'mph', min: 40, max: 125, step: 0.5, d: 1, m: 'ball' },
+    { key: 'la', label: 'Launch angle', unit: '°', min: -25, max: 75, step: 0.5, d: 1, m: 'ball' },
+    { key: 'spray', label: 'Spray angle', unit: '°', min: -50, max: 50, step: 0.5, d: 1, m: 'ball', hint: '− toward left field · 0 center · + toward right field' },
+    { key: 'autoSpin', label: 'Estimate spin from launch angle and spray', type: 'check', m: 'ball' },
+    { key: 'backspin', label: 'Backspin', unit: 'rpm', min: -1500, max: 5000, step: 25, d: 0, m: 'ball', spin: true },
+    { key: 'sidespin', label: 'Sidespin', unit: 'rpm', min: -3000, max: 3000, step: 25, d: 0, m: 'ball', spin: true, hint: '+ hooks toward left field · − slices toward right field' },
+    { key: 'batMph', label: 'Bat speed at the sweet spot', unit: 'mph', min: 40, max: 95, step: 0.5, d: 1, m: 'bat' },
+    { key: 'pitchMph', label: 'Pitch speed', unit: 'mph', min: 50, max: 105, step: 0.5, d: 1, m: 'bat' },
+    { key: 'attack', label: 'Attack angle', unit: '°', min: -10, max: 35, step: 0.5, d: 1, m: 'bat', hint: 'Swing-plane tilt at contact' },
+    { key: 'offsetIn', label: 'Vertical contact offset', unit: 'in', min: -2, max: 2.5, step: 0.05, d: 2, m: 'bat', hint: '+ bat below ball centre (more loft, more backspin) · − bat above (topspin)' },
+    { key: 'sweetIn', label: 'Distance from sweet spot', unit: 'in', min: 0, max: 8, step: 0.1, d: 1, m: 'bat', hint: 'Along the barrel. Costs bat-ball speed' },
+    { key: 'faceHead', label: 'Face heading (horizontal)', unit: '°', min: -45, max: 45, step: 0.5, d: 1, m: 'bat', hint: 'Where the barrel faces; + toward right field' },
+    { key: 'swingHead', label: 'Swing path heading', unit: '°', min: -30, max: 30, step: 0.5, d: 1, m: 'bat', hint: 'When it differs from the face, the ball picks up sidespin' },
+    { key: 'pitchDescent', label: 'Pitch descent angle', unit: '°', min: 0, max: 14, step: 0.5, d: 1, m: 'bat' },
+    { key: 'pitchSpin', label: 'Incoming pitch backspin', unit: 'rpm', min: 0, max: 3500, step: 50, d: 0, m: 'bat' },
+    { type: 'derived', m: 'bat' },
+    { key: 'contactFt', label: 'Contact height', unit: 'ft', min: 1.5, max: 5, step: 0.1, d: 1 }
+  ] },
+  { id: 'venue', title: 'Ballpark', open: true, items: [
+    { type: 'park' },
+    { key: 'latitude', label: 'Latitude (Coriolis, gravity)', unit: '°N', min: -60, max: 65, step: 0.5, d: 1 },
+    { key: 'cfAz', label: 'Compass bearing of center field', unit: '°', min: 0, max: 359, step: 1, d: 0, hint: '0 = north · 90 = east. Sets the Coriolis direction' }
+  ] },
+  { id: 'air', title: 'Atmosphere', open: true, items: [
+    { key: 'tempF', label: 'Temperature', unit: '°F', min: 20, max: 115, step: 1, d: 0 },
+    { key: 'elevFt', label: 'Elevation', unit: 'ft', min: 0, max: 8000, step: 10, d: 0 },
+    { key: 'rh', label: 'Relative humidity', unit: '%', min: 0, max: 100, step: 1, d: 0 },
+    { key: 'slpInHg', label: 'Sea-level pressure', unit: 'inHg', min: 28.5, max: 31, step: 0.01, d: 2 }
+  ] },
+  { id: 'wind', title: 'Wind', open: true, items: [
+    { type: 'wind' },
+    { key: 'windMph', label: 'Speed at 10 m', unit: 'mph', min: 0, max: 45, step: 0.5, d: 1 },
+    { key: 'windDir', label: 'Direction blowing toward', unit: '°', min: 0, max: 359, step: 1, d: 0, hint: '0 = out to center · 90 = toward right field · 180 = in from center' },
+    { key: 'windExp', label: 'Height gradient exponent', unit: '', min: 0, max: 0.4, step: 0.01, d: 2, hint: 'Wind(z) = wind(10 m) × (z / 10 m)^α. Open ground is about 0.15; 0 means no gradient' }
+  ] },
+  { id: 'aero', title: 'Ball and aerodynamics', open: false, items: [
+    { key: 'cd', label: 'Drag coefficient (high speed)', unit: '', min: 0.25, max: 0.42, step: 0.002, d: 3 },
+    { key: 'dCdLow', label: 'Extra drag at low speed', unit: '', min: 0, max: 0.3, step: 0.01, d: 2, hint: 'Drag rises as the ball slows through the drag crisis near 50 mph' },
+    { key: 'clScale', label: 'Lift scale', unit: '×', min: 0.5, max: 1.5, step: 0.01, d: 2, hint: 'Multiplies Nathan’s Cl = S/(0.4 + 2.32 S)' },
+    { key: 'tau', label: 'Spin decay time constant', unit: 's', min: 5, max: 200, step: 1, d: 0 },
+    { key: 'massOz', label: 'Ball mass', unit: 'oz', min: 5.0, max: 5.25, step: 0.005, d: 3 },
+    { key: 'circIn', label: 'Ball circumference', unit: 'in', min: 9.0, max: 9.25, step: 0.005, d: 3 },
+    { key: 'groundE', label: 'Ground bounce restitution', unit: '', min: 0.2, max: 0.7, step: 0.01, d: 2 },
+    { key: 'rollMu', label: 'Rolling resistance', unit: '', min: 0.04, max: 0.3, step: 0.01, d: 2 },
+    { type: 'switches' }
+  ] },
+  { id: 'coll', title: 'Collision model', open: false, m: 'bat', items: [
+    { key: 'collA', label: 'Bat-ball speed transfer (1 + q)', unit: '', min: 1.05, max: 1.4, step: 0.005, d: 3, hint: 'Ball speed off the bat = A·(bat speed) + (A − 1)·(pitch speed)' },
+    { key: 'collMu', label: 'Friction coefficient cap', unit: '', min: 0.1, max: 0.9, step: 0.01, d: 2 },
+    { key: 'collKt', label: 'Tangential coupling', unit: '', min: 0.2, max: 1.0, step: 0.01, d: 2, hint: 'How much of the ideal spin transfer actually happens' }
+  ] }
+];
+const CTL = {}; // key -> {set(v), sync()}
+const SIGKEY = { backspin: 'dBack', sidespin: 'dSide' };
+const SPREAD = [];
+function refreshSpread() {
+  SPREAD.forEach(r => {
+    const sd = S.sigma[r.sk] || 0, v = S.p[r.it.key], span = r.it.max - r.it.min;
+    if (document.activeElement !== r.si) r.si.value = sd;
+    const lo = Math.max(r.it.min, v - 2 * sd), hi = Math.min(r.it.max, v + 2 * sd);
+    r.bar.style.left = (100 * (lo - r.it.min) / span) + '%'; r.bar.style.width = sd > 0 ? Math.max(1.2, 100 * (hi - lo) / span) + '%' : '0';
+  });
+  $$('#mc-spec input[data-sg]').forEach(i => { if (document.activeElement !== i) i.value = S.sigma[i.dataset.sg]; });
+}
+function sigmaChanged() { S.inVer = (S.inVer || 0) + 1; refreshSpread(); S.mcStale = true; updateMcStaleNote(); updateMcStrip(); scheduleAutoMC(); }
+let scheduled = false;
+
+function buildInputs() {
+  const root = $('#inputs'); root.innerHTML = '';
+  GROUPS.forEach(g => {
+    const det = el('details', g.open ? { open: '' } : {});
+    if (g.m) det.dataset.m = g.m;
+    det.appendChild(el('summary', { text: g.title }));
+    const body = el('div', { class: 'grp' });
+    g.items.forEach(it => body.appendChild(buildItem(it)));
+    det.appendChild(body); root.appendChild(det);
+  });
+  applyMode();
+}
+
+function buildItem(it) {
+  if (it.type === 'mode') {
+    const box = el('div', { class: 'seg', role: 'group', 'aria-label': 'Input mode' });
+    [['ball', 'Ball launch'], ['bat', 'Bat–ball contact']].forEach(([m, t]) => {
+      const b = el('button', { type: 'button', 'data-mode': m, text: t, onclick: () => { S.p.mode = m; applyMode(); changed(); } });
+      box.appendChild(b);
+    });
+    CTL.mode = { sync() { $$('button', box).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === S.p.mode))); } };
+    return box;
+  }
+  if (it.type === 'spreadtoggle') {
+    const cb = el('input', { type: 'checkbox', id: 'show-spread' });
+    cb.checked = S.showSpread;
+    cb.addEventListener('change', () => { S.showSpread = cb.checked; $('#inputs').classList.toggle('nospread', !cb.checked); });
+    const w = el('label', { class: 'chk', title: 'Each slider gets a random spread: one standard deviation, shared with the Monte Carlo tab' }, [cb, 'Randomness: show ± spread on inputs']);
+    setTimeout(() => $('#inputs').classList.toggle('nospread', !S.showSpread));
+    return w;
+  }
+  if (it.type === 'mcstrip') return el('div', { class: 'mcstrip', id: 'mc-strip', hidden: '' });
+  if (it.type === 'derived') {
+    const d = el('div', { class: 'derived', 'data-m': 'bat', id: 'derived' });
+    return d;
+  }
+  if (it.type === 'wind') {
+    const w = el('div', { class: 'wind-dial', html:
+      '<svg viewBox="0 0 60 60" aria-hidden="true"><path d="M30 52 L10 34 L30 14 L50 34 Z" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.5"/>' +
+      '<text x="30" y="9" text-anchor="middle" font-size="8" fill="currentColor" opacity=".6">CF</text>' +
+      '<g id="wind-arrow" style="transform-origin:30px 34px"><path d="M30 34 L30 12 M24 19 L30 11 L36 19" stroke="var(--accent)" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></svg>' +
+      '<div class="note" id="wind-note"></div>' });
+    CTL.wind = { sync() {
+      $('#wind-arrow').style.transform = 'rotate(' + S.p.windDir + 'deg)';
+      const s = S.p.windMph, d = ((S.p.windDir % 360) + 360) % 360, out = Math.cos(d * D2R) * s, cross = Math.sin(d * D2R) * s;
+      $('#wind-note').textContent = S.p.roofClosed ? 'Roof closed: no wind' : s < 0.05 ? 'Calm' : fmt(Math.abs(out), 1) + ' mph ' + (out >= 0 ? 'out' : 'in') + ', ' + fmt(Math.abs(cross), 1) + ' mph toward ' + (cross >= 0 ? 'right' : 'left') + ' field';
+    } };
+    return w;
+  }
+  if (it.type === 'park') {
+    const sel = el('select', { id: 'park', 'aria-label': 'Ballpark' });
+    const groups = {};
+    Object.keys(E.PARKS).forEach(k => { const pk = E.PARKS[k]; if (pk.key !== k) return; const g = pk.div || 'Reference'; (groups[g] = groups[g] || []).push(k); });
+    ['Reference', 'AL East', 'AL Central', 'AL West', 'NL East', 'NL Central', 'NL West'].forEach(g => {
+      if (!groups[g]) return;
+      const og = el('optgroup', { label: g });
+      groups[g].forEach(k => og.appendChild(el('option', { value: k, text: E.PARKS[k].name + (E.PARKS[k].team ? ' · ' + E.PARKS[k].team : '') })));
+      sel.appendChild(og);
+    });
+    sel.addEventListener('change', () => { applyPark(sel.value); syncAll(); changed(); });
+    const roofCb = el('input', { type: 'checkbox', id: 'roof-closed' });
+    roofCb.addEventListener('change', () => { S.p.roofClosed = roofCb.checked; syncAll(); changed(); });
+    const roofRow = el('label', { class: 'chk', id: 'roof-row' }, [roofCb, el('span', { id: 'roof-txt', text: 'Roof closed' })]);
+    const note = el('div', { class: 'fence-note', id: 'fence-note' });
+    CTL.park = { sync() {
+      sel.value = S.p.park; const pk = E.PARKS[S.p.park];
+      const wmin = Math.min.apply(null, pk.h), wmax = Math.max.apply(null, pk.h);
+      const at = a => { let best = 0; pk.a.forEach((x, i) => { if (Math.abs(x - a) < Math.abs(pk.a[best] - a)) best = i; }); return pk.d[best]; };
+      roofRow.hidden = !pk.roof; roofCb.disabled = pk.roof === 2; roofCb.checked = !!S.p.roofClosed;
+      $('#roof-txt').textContent = pk.roof === 2 ? 'Fixed roof: indoors, no wind' : 'Roof closed (no wind)';
+      note.innerHTML = (pk.team ? '<b>' + pk.name + '</b> · ' + pk.city + '<br>' : '') +
+        'Fence LF → RF: ' + [-45, -22.5, 0, 22.5, 45].map(at).join(' · ') + ' ft<br>Wall ' + (wmin === wmax ? fmt(wmin, 1).replace('.0', '') : fmt(wmin, 0) + '–' + fmt(wmax, 0)) + ' ft · elevation ' + pk.elevFt.toLocaleString('en-US') + ' ft<br>Choosing a park also sets elevation, latitude, orientation and typical game-time weather (' + pk.tempF + ' °F, ' + pk.rh + '% humidity). Dimensions approximate.';
+    } };
+    return el('div', { class: 'ctl' }, [el('label', { for: 'park', text: 'Ballpark', style: 'grid-column:1/-1' }), sel, roofRow, note]);
+  }
+  if (it.type === 'switches') {
+    const box = el('div', { style: 'display:grid;gap:6px' });
+    [['dragOn', 'Air drag'], ['liftOn', 'Magnus lift'], ['windOn', 'Wind'], ['coriolisOn', 'Coriolis force']].forEach(([k, t]) => {
+      const cb = el('input', { type: 'checkbox', id: 'sw-' + k });
+      cb.addEventListener('change', () => { S.p[k] = cb.checked; changed(); });
+      CTL[k] = { sync() { cb.checked = !!S.p[k]; } };
+      box.appendChild(el('label', { class: 'chk' }, [cb, t]));
+    });
+    box.insertBefore(el('div', { class: 'note', text: 'Switch effects off to see what each one does.' }), box.firstChild);
+    return box;
+  }
+  if (it.type === 'check') {
+    const cb = el('input', { type: 'checkbox', id: 'c-' + it.key });
+    cb.addEventListener('change', () => { S.p[it.key] = cb.checked; syncSpinState(); changed(); });
+    CTL[it.key] = { sync() { cb.checked = !!S.p[it.key]; } };
+    const w = el('label', { class: 'chk' }, [cb, it.label]); if (it.m) w.dataset.m = it.m; return w;
+  }
+  // slider + number
+  const id = 'n-' + it.key;
+  const rg = el('input', { type: 'range', min: it.min, max: it.max, step: it.step, 'aria-label': it.label });
+  const nb = el('input', { type: 'number', id, min: it.min, max: it.max, step: it.step });
+  const u = el('span', { class: 'unit', text: it.unit || '' });
+  const wrap = el('div', { class: 'ctl' }, [el('label', { for: id, text: it.label }), el('span', { class: 'num' }, [nb, u]), rg]);
+  if (it.hint) wrap.appendChild(el('div', { class: 'hint', text: it.hint }));
+  if (it.m) wrap.dataset.m = it.m;
+  const sk = SIGKEY[it.key] || it.key;
+  if (S.sigma && sk in S.sigma) {
+    const si = el('input', { type: 'number', min: 0, step: sk === 'cd' ? 0.001 : (it.step >= 1 ? 1 : 0.1), 'aria-label': 'Random spread, one standard deviation, for ' + it.label });
+    const bar = el('i');
+    const sp = el('div', { class: 'sp' }, [el('span', { class: 'sp-l', text: 'random ±' }), si, el('span', { class: 'unit', text: it.unit || '' }), el('span', { class: 'band', title: 'Shaded: the ±2σ range the Monte Carlo draws from (95% of balls)' }, [bar])]);
+    si.addEventListener('input', () => { S.sigma[sk] = Math.max(0, parseFloat(si.value) || 0); sigmaChanged(); });
+    wrap.appendChild(sp);
+    SPREAD.push({ sk, it, si, bar });
+  }
+  const set = (v, fromUI) => {
+    if (!isFinite(v)) return;
+    S.p[it.key] = v; if (fromUI) { rg.value = v; if (document.activeElement !== nb) nb.value = v.toFixed(it.d || 0); }
+    if (fromUI) changed();
+  };
+  rg.addEventListener('input', () => set(parseFloat(rg.value), true));
+  nb.addEventListener('input', () => { const v = parseFloat(nb.value); if (isFinite(v)) { S.p[it.key] = v; rg.value = v; changed(); } });
+  nb.addEventListener('blur', () => { nb.value = (+S.p[it.key]).toFixed(it.d || 0); });
+  CTL[it.key] = { spin: it.spin, wrap, sync() { const v = S.p[it.key]; rg.value = v; if (document.activeElement !== nb) nb.value = (+v).toFixed(it.d || 0); } };
+  return wrap;
+}
+
+function applyMode() {
+  const m = S.p.mode;
+  $$('#inputs [data-m]').forEach(n => { if (n.dataset.m === 'ball' || n.dataset.m === 'bat') n.hidden = n.dataset.m !== m; });
+  const det = $$('#inputs details').find(d => d.dataset.m);
+  if (CTL.mode) CTL.mode.sync();
+  syncSpinState();
+}
+function syncSpinState() {
+  const auto = S.p.mode === 'ball' && S.p.autoSpin;
+  ['backspin', 'sidespin'].forEach(k => {
+    const c = CTL[k]; if (!c) return;
+    c.wrap.classList.toggle('disabled', auto);
+    $$('input', c.wrap).forEach(i => { if (!i.closest('.sp')) i.disabled = auto; });
+  });
+}
+function syncAll() {
+  Object.keys(CTL).forEach(k => CTL[k].sync && CTL[k].sync());
+  refreshSpread();
+  syncSpinState();
+}
+function applyPark(key, skip) {
+  const pk = E.PARKS[key]; if (!pk) return;
+  skip = skip || {};
+  const v = { park: key, elevFt: pk.elevFt, latitude: pk.lat, cfAz: pk.cfAz, tempF: pk.roof === 2 ? 72 : pk.tempF, rh: pk.roof === 2 ? 50 : pk.rh, roofClosed: pk.roof === 2 };
+  Object.keys(v).forEach(k => { if (!(k in skip)) S.p[k] = v[k]; });
+}
+function applyPreset(i) {
+  const pr = PRESETS[i]; if (!pr) return;
+  const keep = {}; ['tau', 'clScale', 'contactFt'].forEach(k => { keep[k] = E.DEFAULTS[k]; });
+  Object.assign(S.p, keep, { windMph: 0, windDir: 0, tempF: 72, rh: 50, mode: 'ball', autoSpin: true, sweetIn: 0 }, pr.set);
+  S.p.roofClosed = false; S.p.latitude = E.DEFAULTS.latitude; S.p.cfAz = E.DEFAULTS.cfAz;
+  if (pr.set.park) applyPark(pr.set.park, pr.set);
+  applyMode(); syncAll(); changed();
+}
+
+/* ---------- compute ---------- */
+function changed() {
+  S.mcStale = true; S.sw.stale = true; S.bud = null; S.inVer = (S.inVer || 0) + 1; refreshSpread(); updateMcStrip(); scheduleAutoMC();
+  if (scheduled) return; scheduled = true;
+  requestAnimationFrame(() => { scheduled = false; recompute(true); });
+}
+function buildFencePts() {
+  const sig = S.p.park + '|' + (S.p.fenceD || '') + '|' + (S.p.fenceH || '');
+  if (S.fenceSig === sig && S.fencePts) return;
+  S.fenceSig = sig;
+  const set = {};
+  if (S.ctx.fenceA.length < 20) for (let k = -36; k <= 36; k++) set[(k * 1.25).toFixed(3)] = k * 1.25;
+  S.ctx.fenceA.forEach(a => { set[a.toFixed(3)] = a; });
+  [-22.5, 22.5].forEach(a => { set[a.toFixed(3)] = a; });
+  const angs = Object.keys(set).map(k => set[k]).sort((x, y) => x - y), pts = [];
+  angs.forEach(a => {
+    E.fenceAt(S.ctx, a); const f = E.fence();
+    pts.push({ a, F: f[0], H: f[1], x: f[0] * Math.sin(a * D2R), y: f[0] * Math.cos(a * D2R) });
+  });
+  S.fencePts = pts;
+}
+function totalDur() {
+  let d = S.dur;
+  if (S.mc && S.mc.tracks.length && S.opt.ens && S.mc.visible) d = S.mc.maxT + 0.4;
+  return Math.max(0.5, d);
+}
+function recompute(toEnd) {
+  const sim = E.run(S.p, { dt: 0.001, record: true, rollout: true, fence: 'bounce', sampleDt: 1 / 240, tmax: 30 });
+  S.sim = sim; S.ctx = sim.ctx; buildFencePts();
+  const L = sim.landing;
+  S.dur = Math.min(25, sim.tEnd);
+  if (sim.outcome === 'hr' && L) S.dur = Math.min(S.dur, L.t + 1.0);
+  if (toEnd) { S.play.t = totalDur(); S.play.playing = false; updatePlayButton(); }
+  // auto spin readout
+  if (S.p.mode === 'ball' && S.p.autoSpin) { S.p.backspin = Math.round(sim.meta.back); S.p.sidespin = Math.round(sim.meta.side); CTL.backspin.sync(); CTL.sidespin.sync(); }
+  CTL.wind && CTL.wind.sync(); CTL.mode && CTL.mode.sync();
+  updateDerived(); updateHud(); updateTiles(); updateEnvNote();
+  clearTimeout(S.budT); S.budT = setTimeout(computeBudget, 140);
+  if (S.target && !S.hf.skip) { if (S.tab === 'hit') { clearTimeout(S.hfT); S.hfT = setTimeout(startSolve, 450); } else S.hfStale = true; }
+  if (S.tab === 'phys') fillPhysics();
+  if (S.tab === 'sweep' && S.sw.data) markSweepStale();
+  if (S.mc) updateMcStaleNote();
+  requestRender();
+}
+
+function updateDerived() {
+  const d = $('#derived'); if (!d || S.p.mode !== 'bat') return;
+  const m = S.sim.meta;
+  d.innerHTML = '<span>Exit velocity <b>' + fmt(m.ev, 1) + ' mph</b></span><span>Launch angle <b>' + fmt(m.la, 1) + '°</b></span>' +
+    '<span>Spray <b>' + sgn(m.spray, 1) + '°</b></span><span>Offset angle <b>' + fmt(m.phi, 1) + '°</b></span>' +
+    '<span>Backspin <b>' + fmt(m.back, 0) + ' rpm</b></span><span>Sidespin <b>' + sgn(m.side, 0) + ' rpm</b></span>';
+  if (S.mc && S.mc.visible && !S.mcStale) {
+    const a = E.stats(S.mc.ev), b = E.stats(S.mc.la), c = E.stats(S.mc.back);
+    d.innerHTML += '<span class="mcline">Across ' + S.mc.n + ' swings <b>' + fmt(a.mean, 1) + ' ± ' + fmt(a.sd, 1) + ' mph</b> · <b>' + fmt(b.mean, 1) + ' ± ' + fmt(b.sd, 1) + '°</b> · <b>' + fmt(c.mean, 0) + ' ± ' + fmt(c.sd, 0) + ' rpm</b></span>';
+  }
+}
+function describeOutcome(sim) {
+  const L = sim.landing; if (!L) return '';
+  if (sim.outcome === 'hr') {
+    const f = sim.fenceCross; E.fenceAt(sim.ctx, Math.atan2(f.x, f.y) * R2D); const fh = E.fence()[1];
+    return 'Clears the ' + fmt(fh / FT, 0) + ' ft wall by ' + fmt((f.z - sim.ctx.R - fh) / FT, 0) + ' ft' + (L.kind === 'stands' ? ' · lands in the seats ' + fmt((L.z - sim.ctx.R) / FT, 0) + ' ft up, ' + fmt(L.dist, 0) + ' ft out' : ' · lands on the street ' + fmt(L.dist, 0) + ' ft out');
+  }
+  if (sim.outcome === 'wall' && sim.wall) return 'Hits the wall ' + fmt((sim.wall.h - (sim.wall.z - sim.ctx.R)) / FT, 0) + ' ft below the top, ' + fmt(sim.wall.dist, 0) + ' ft out';
+  if (sim.outcome === 'foul') return 'Lands ' + fmt(Math.abs(L.ang) - 45, 0) + '° outside the foul line';
+  return '';
+}
+function updateHud() {
+  const sim = S.sim, L = sim.landing, hud = $('#hud'); hud.innerHTML = '';
+  if (!L) return;
+  const pk = E.PARKS[S.p.park];
+  if (S.mc && S.mc.visible && S.opt.ens && S.mc.tracks.length) {
+    const mc = S.mc, ds = E.stats(mc.dist), cnt = { hr: 0, wall: 0, inplay: 0, foul: 0 }; mc.outcome.forEach(o => { cnt[o] = (cnt[o] || 0) + 1; });
+    hud.appendChild(el('span', { class: 'chip out', style: 'background:var(--accent)', text: 'Monte Carlo' + (S.mcStale ? ' · updating' : '') }));
+    hud.appendChild(el('span', { class: 'chip', html: '<b>Balls</b>' + mc.n }));
+    hud.appendChild(el('span', { class: 'chip', html: '<b>Carry</b>' + fmt(ds.mean, 0) + ' ± ' + fmt(ds.sd, 0) + ' ft' }));
+    ['hr', 'wall', 'inplay', 'foul'].forEach(k => { if (cnt[k]) hud.appendChild(el('span', { class: 'chip', style: 'border-left:4px solid ' + T[OUTCOME[k].col], html: '<b>' + OUTCOME[k].label + '</b>' + fmt(cnt[k] / mc.n * 100, 0) + '%' })); });
+    if (pk && pk.team) hud.appendChild(el('span', { class: 'chip', text: pk.name }));
+    return;
+  }
+  const oc = OUTCOME[sim.outcome] || OUTCOME.inplay;
+  hud.appendChild(el('span', { class: 'chip out', style: 'background:' + T[oc.col], text: oc.label }));
+  hud.appendChild(el('span', { class: 'chip', html: '<b>Dist</b>' + fmt(L.dist, 0) + ' ft' }));
+  hud.appendChild(el('span', { class: 'chip', html: '<b>Hang</b>' + fmt(sim.hang, 2) + ' s' }));
+  hud.appendChild(el('span', { class: 'chip', html: '<b>Apex</b>' + fmt(sim.apexFt, 0) + ' ft' }));
+  if (pk && pk.team) hud.appendChild(el('span', { class: 'chip', text: pk.name }));
+}
+
+/* ---------- distance budget and comparison paths ---------- */
+function computeBudget() {
+  const p = S.p, steps = [
+    { name: 'Vacuum', f: { dragOn: false, liftOn: false, windOn: false, coriolisOn: false } },
+    { name: 'Air drag', f: { dragOn: p.dragOn, liftOn: false, windOn: false, coriolisOn: false } },
+    { name: 'Magnus lift', f: { dragOn: p.dragOn, liftOn: p.liftOn, windOn: false, coriolisOn: false } },
+    { name: 'Wind', f: { dragOn: p.dragOn, liftOn: p.liftOn, windOn: p.windOn, coriolisOn: false } },
+    { name: 'Coriolis', f: { dragOn: p.dragOn, liftOn: p.liftOn, windOn: p.windOn, coriolisOn: p.coriolisOn } }
+  ];
+  const meta = S.sim.meta;
+  const base = Object.assign({}, p);
+  if (p.mode === 'bat') Object.assign(base, { mode: 'ball', ev: meta.ev, la: meta.la, spray: meta.spray, autoSpin: false, backspin: meta.back, sidespin: meta.side });
+  else if (p.autoSpin) Object.assign(base, { autoSpin: false, backspin: meta.back, sidespin: meta.side });
+  const out = [];
+  steps.forEach(s => {
+    const r = E.run(Object.assign({}, base, s.f), { dt: 0.002, record: true, sampleDt: 1 / 60, fence: 'off' });
+    out.push({ name: s.name, dist: r.landing ? r.landing.dist : 0, tr: r.tr, hang: r.hang });
+  });
+  S.bud = out; updateBudget(); requestRender();
+}
+function updateBudget() {
+  const box = $('#budget'); if (!box) return; box.innerHTML = '';
+  if (!S.bud) return;
+  const b = S.bud, max = Math.max.apply(null, b.map(x => x.dist)) * 1.04;
+  b.forEach((it, i) => {
+    const prev = i ? b[i - 1].dist : 0, d = it.dist - prev;
+    const lo = Math.min(prev, it.dist), hi = Math.max(prev, it.dist);
+    const col = i === 0 ? 'var(--ink-2)' : (d < 0 ? 'var(--c-hr)' : 'var(--c-good)');
+    const row = el('div', { class: 'brow' }, [
+      el('span', { text: i === 0 ? 'Vacuum range' : it.name }),
+      el('div', { class: 'bar' }, [el('i', { style: 'left:' + (lo / max * 100) + '%;width:' + Math.max(0.6, (hi - lo) / max * 100) + '%;background:' + col })]),
+      el('span', { class: 'val', text: i === 0 ? fmt(it.dist, 0) + ' ft' : sgn(d, 1) + ' ft' })]);
+    box.appendChild(row);
+  });
+  box.appendChild(el('div', { class: 'brow' }, [el('span', { html: '<b>Lands at</b>' }), el('div'), el('span', { class: 'val', html: '<b>' + fmt(b[b.length - 1].dist, 0) + ' ft</b>' })]));
+}
+function updateEnvNote() {
+  const c = S.ctx, p = S.p;
+  const std = 1.225;
+  $('#env-note').textContent = 'Air density ' + c.rho0.toFixed(3) + ' kg/m³ (' + (c.rho0 / std * 100).toFixed(1) + '% of standard sea level) · g = ' + c.g.toFixed(4) + ' m/s² · ball ' + (c.m * 1000).toFixed(1) + ' g, radius ' + (c.R * 1000).toFixed(1) + ' mm.' +
+    (p.windMph > 0 && p.windOn ? ' Wind at 25 m is ' + (p.windMph * Math.pow(2.5, p.windExp)).toFixed(1) + ' mph.' : '');
+}
+
+/* ---------- track sampling ---------- */
+function trackAt(tr, t) {
+  const ts = tr.t, n = ts.length;
+  if (t <= ts[0]) return mk(0, 0);
+  if (t >= ts[n - 1]) return mk(n - 1, 0);
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (ts[mid] <= t) lo = mid; else hi = mid; }
+  return mk(lo, (t - ts[lo]) / (ts[hi] - ts[lo]));
+  function mk(i, f) {
+    const j = Math.min(n - 1, i + 1), L = (a) => a[i] + f * (a[j] - a[i]);
+    return { i, f, t, x: L(tr.x), y: L(tr.y), z: L(tr.z), vx: L(tr.vx), vy: L(tr.vy), vz: L(tr.vz),
+      wx: L(tr.wx), wy: L(tr.wy), wz: L(tr.wz), dgx: L(tr.dgx), dgy: L(tr.dgy), dgz: L(tr.dgz), lfx: L(tr.lfx), lfy: L(tr.lfy), lfz: L(tr.lfz),
+      q: [tr.q[4 * i], tr.q[4 * i + 1], tr.q[4 * i + 2], tr.q[4 * i + 3]] };
+  }
+}
+
+/* ---------- playback ---------- */
+function updatePlayButton() {
+  const b = $('#btn-play'), pl = S.play.playing;
+  b.innerHTML = (pl ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg>' : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg>') + '<span>' + (pl ? 'Pause' : 'Play') + '</span>';
+}
+function startPlay(fromStart) {
+  if (fromStart || S.play.t >= totalDur() - 0.01) S.play.t = 0;
+  S.play.playing = true; S.play.last = performance.now(); updatePlayButton(); requestRender();
+}
+function stopPlay() { S.play.playing = false; updatePlayButton(); }
+let rafId = 0;
+function requestRender() { if (!rafId) rafId = requestAnimationFrame(loop); }
+function loop(ts) {
+  rafId = 0;
+  if (S.play.playing) {
+    const dt = Math.min(0.1, (ts - S.play.last) / 1000); S.play.last = ts;
+    S.play.t += dt * S.play.speed;
+    const d = totalDur();
+    if (S.play.t >= d) { S.play.t = d; S.play.playing = false; updatePlayButton(); }
+  }
+  render();
+  if (S.play.playing) rafId = requestAnimationFrame(loop);
+}
+
+/* ===== Stage rendering: field geometry, three views, trails, ensemble ===== */
+const stage = $('#stage'), stageWrap = $('#stagewrap');
+let SG = null, SW = 0, SH = 0, DPR = 1;
+function sizeStage() {
+  const r = stage.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(2, Math.round(r.width * DPR)), h = Math.max(2, Math.round(r.height * DPR));
+  if (stage.width !== w || stage.height !== h) { stage.width = w; stage.height = h; }
+  SG = stage.getContext('2d'); SG.setTransform(DPR, 0, 0, DPR, 0, 0); SW = r.width; SH = r.height;
+}
+const NEAR = 0.6;
+
+/* ---------- world geometry (cached per fence) ---------- */
+function ringPoly(r0, r1, a0, a1, step, inset) {
+  // annular sector clipped inside the fence
+  const out = [], inn = [];
+  const angs = S.fencePts.map(q => q.a).filter(a => a >= a0 - 1e-6 && a <= a1 + 1e-6);
+  for (const a of angs) {
+    E.fenceAt(S.ctx, a); const F = E.fence()[0] - (inset || 0), r = a * D2R;
+    const ro = Math.min(r1, F), ri = Math.min(r0, F);
+    out.push([ro * Math.sin(r), ro * Math.cos(r), 0]); inn.push([ri * Math.sin(r), ri * Math.cos(r), 0]);
+  }
+  return out.concat(inn.reverse());
+}
+function circlePoly(cx, cy, r, n) {
+  const o = []; for (let i = 0; i < n; i++) { const a = i / n * 2 * Math.PI; o.push([cx + r * Math.cos(a), cy + r * Math.sin(a), 0]); }
+  return o;
+}
+function buildGeo() {
+  const P = S.fencePts, first = P[0], last = P[P.length - 1];
+  const PK0 = E.PARKS[S.p.park] || {};
+  const chain = arr => arr.slice(1).map(q => ({ x: q[0] * FT, y: q[1] * FT, a: Math.atan2(q[0], q[1]) * R2D }));
+  let chL, chR;
+  if (PK0.fl) { chL = chain(PK0.fl.l); chR = chain(PK0.fl.r); }
+  else { chL = [{ x: first.x - 60, y: first.y - 4, a: -60 }, { x: -25, y: -14, a: -150 }]; chR = [{ x: last.x + 60, y: last.y - 4, a: 60 }, { x: 25, y: -14, a: 150 }]; }
+  S.chains = { l: chL, r: chR };
+  const bx = Math.max.apply(null, chL.concat(chR).concat([first, last]).map(q => Math.abs(q.x))) + 20;
+  const g = { foul: null, bands: [], track: null, dirt: null, diamond: null, mound: null, plate: null, bases: [], lines: [], arcs: [], wall: [], stands: [], fenceLine: [], maxF: 0 };
+  g.maxF = Math.max.apply(null, P.map(p => p.F));
+  g.bx = bx;
+  g.foul = P.map(q => [q.x, q.y, 0]).concat(chR.map(q => [q.x, q.y, 0]), chL.slice().reverse().map(q => [q.x, q.y, 0]));
+  g.minY = Math.min.apply(null, chL.concat(chR).map(q => q.y));
+  const trackW = 4.6;
+  for (let r = 0, k = 0; r < g.maxF; r += 6.096, k++) {
+    g.bands.push({ pts: ringPoly(r, r + 6.096, -45, 45, 3, trackW), fill: k % 2 ? 'grass-b' : 'grass-a' });
+  }
+  g.track = ringPoly(0, 1e4, -45, 45, 2.5, 0).slice(0);
+  // warning track = full fair area minus (inset by trackW): draw full then grass on top
+  g.trackFull = P.map(q => [q.x, q.y, 0]).concat([[0, 0, 0]]);
+  g.dirt = circlePoly(0, 18.44, 28.96, 48);
+  const k = 0.86, cy = 19.4, V = [[0, 0], [19.4, 19.4], [0, 38.8], [-19.4, 19.4]];
+  g.diamond = V.map(v => [k * v[0], cy + k * (v[1] - cy), 0]);
+  g.homeDirt = circlePoly(0, 0.2, 3.96, 28);
+  g.mound = circlePoly(0, 18.44, 2.74, 20);
+  g.plate = [[0, 0, 0], [-0.216, 0.216, 0], [-0.216, 0.432, 0], [0.216, 0.432, 0], [0.216, 0.216, 0]];
+  [[19.4, 19.4], [0, 38.8], [-19.4, 19.4]].forEach(b => {
+    const s = 0.27; g.bases.push([[b[0], b[1] - s, 0], [b[0] + s, b[1], 0], [b[0], b[1] + s, 0], [b[0] - s, b[1], 0]]);
+  });
+  g.lines = [[[0, 0, 0], [first.x, first.y, 0]], [[0, 0, 0], [last.x, last.y, 0]]];
+  [100, 200, 300, 400, 500].forEach(ft => {
+    const r = ft * FT; if (r > g.maxF + 5) return;
+    const pts = []; for (let a = -45; a <= 45.001; a += 3) { E.fenceAt(S.ctx, a); if (r < E.fence()[0] - 1) pts.push([r * Math.sin(a * D2R), r * Math.cos(a * D2R), 0]); }
+    if (pts.length > 1) g.arcs.push({ ft, pts });
+  });
+  // wall + stands quads (including foul-territory returns)
+  const segs = [], FH = 1.3;
+  const full = [];
+  chL.slice().reverse().forEach(q => full.push({ x: q.x, y: q.y, H: FH, a: q.a, f: 1 }));
+  P.forEach(q => full.push({ x: q.x, y: q.y, H: q.H, a: q.a }));
+  chR.forEach(q => full.push({ x: q.x, y: q.y, H: FH, a: q.a, f: 1 }));
+  const segN = [];
+  for (let i = 0; i < full.length - 1; i++) {
+    const A = full[i], B = full[i + 1];
+    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
+    let ox = (B.y - A.y), oy = -(B.x - A.x); const ol = Math.hypot(ox, oy) || 1; ox /= ol; oy /= ol;
+    if (ox * mx + oy * my < 0) { ox = -ox; oy = -oy; }
+    segN.push([ox, oy]);
+  }
+  const vN = full.map((_, i) => {
+    const a = segN[Math.max(0, i - 1)], b = segN[Math.min(segN.length - 1, i)];
+    let x = a[0] + b[0], y = a[1] + b[1]; const l = Math.hypot(x, y) || 1; return [x / l, y / l];
+  });
+  for (let i = 0; i < full.length - 1; i++) {
+    const A = full[i], B = full[i + 1];
+    segs.push({ a: [A.x, A.y, A.H], b: [B.x, B.y, B.H], na: vN[i], nb: vN[i + 1], f: A.f || B.f, aa: A.a, ab: B.a });
+  }
+  g.full = full;
+  segs.forEach(sg => {
+    g.wall.push([[sg.a[0], sg.a[1], 0], [sg.b[0], sg.b[1], 0], [sg.b[0], sg.b[1], sg.b[2]], [sg.a[0], sg.a[1], sg.a[2]]]);
+    if (sg.f) {
+      const d = 12, hh = 5;
+      g.stands.push([[sg.a[0], sg.a[1], sg.a[2]], [sg.b[0], sg.b[1], sg.b[2]], [sg.b[0] + sg.nb[0] * d, sg.b[1] + sg.nb[1] * d, hh], [sg.a[0] + sg.na[0] * d, sg.a[1] + sg.na[1] * d, hh]]);
+    } else if (S.standsOn !== false) {
+      const ca = S.ctx, Da = E.standsDepth(ca, sg.aa), Db = E.standsDepth(ca, sg.ab);
+      const Ta = E.standsAt(ca, sg.aa, Da, sg.a[2]), Tb = E.standsAt(ca, sg.ab, Db, sg.b[2]);
+      const A2 = [sg.a[0] + sg.na[0] * Da, sg.a[1] + sg.na[1] * Da, Ta], B2 = [sg.b[0] + sg.nb[0] * Db, sg.b[1] + sg.nb[1] * Db, Tb];
+      g.stands.push([[sg.a[0], sg.a[1], sg.a[2]], [sg.b[0], sg.b[1], sg.b[2]], B2, A2]);
+      g.stands.push([A2, B2, [B2[0], B2[1], 0], [A2[0], A2[1], 0]]);
+    }
+  });
+  g.fenceLine = P.map(p => [p.x, p.y, 0]);
+  S.geo = g;
+}
+function radial(a) { return [Math.sin(a * D2R), Math.cos(a * D2R)]; }
+
+/* ---------- view factory ---------- */
+function camFrame() {
+  const c = S.cam, cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
+  const C = [c.tx - c.dist * Math.sin(c.yaw) * cp, c.ty - c.dist * Math.cos(c.yaw) * cp, c.tz + c.dist * sp];
+  let f = [c.tx - C[0], c.ty - C[1], c.tz - C[2]]; let n = Math.hypot(f[0], f[1], f[2]); f = f.map(v => v / n);
+  let r = [f[1], -f[0], 0]; n = Math.hypot(r[0], r[1]); r = [r[0] / n, r[1] / n, 0];
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const fpx = SW / (2 * Math.tan(27.5 * D2R));
+  return { C, f, r, u, fpx };
+}
+function makeView(kind) {
+  const g = SG, v = { kind, g, persp: kind === '3d' };
+  if (kind === 'top') {
+    const P = S.fencePts, geo = S.geo;
+    let minX = -geo.bx, maxX = geo.bx, minY = geo.minY - 16, maxY = Math.max.apply(null, P.map(p => p.y)) + 52;
+    const pad = 10, s = Math.min((SW - 2 * pad) / (maxX - minX), (SH - 2 * pad - 14) / (maxY - minY));
+    const ox = SW / 2 - (minX + maxX) / 2 * s, oy = SH - pad - (SH - 2 * pad - (maxY - minY) * s) / 2 + minY * s;
+    v.s = s; v.ox = ox; v.oy = oy;
+    v.pt = (x, y, z) => [ox + x * s, oy - y * s, 1];
+    v.rpx = r => r * s;
+    v.inv = (sx, sy) => ({ x: (sx - ox) / s, y: (oy - sy) / s });
+  } else if (kind === '3d') {
+    const cf = camFrame(); v.cf = cf;
+    v.cam = (x, y, z) => { const d0 = x - cf.C[0], d1 = y - cf.C[1], d2 = z - cf.C[2]; return [d0 * cf.r[0] + d1 * cf.r[1] + d2 * cf.r[2], d0 * cf.u[0] + d1 * cf.u[1] + d2 * cf.u[2], d0 * cf.f[0] + d1 * cf.f[1] + d2 * cf.f[2]]; };
+    v.pt = (x, y, z) => { const c = v.cam(x, y, z); if (c[2] < NEAR) return null; return [SW / 2 + cf.fpx * c[0] / c[2], SH / 2 - cf.fpx * c[1] / c[2], c[2]]; };
+    v.rpx = (r, x, y, z) => { const c = v.cam(x, y, z); return c[2] < NEAR ? 0 : cf.fpx * r / c[2]; };
+    v.inv = (sx, sy) => {
+      const dx = (sx - SW / 2) / cf.fpx, dy = -(sy - SH / 2) / cf.fpx;
+      const d = [cf.f[0] + dx * cf.r[0] + dy * cf.u[0], cf.f[1] + dx * cf.r[1] + dy * cf.u[1], cf.f[2] + dx * cf.r[2] + dy * cf.u[2]];
+      if (d[2] >= -1e-4) return null;
+      const t = -cf.C[2] / d[2], tg = Math.hypot(d[0], d[1], d[2]);
+      // march the ray first: it may meet the stands behind the fence before reaching the ground
+      if (S.ctx && S.tab === 'hit') {
+        for (let u = 2; u < t; u += 0.35) {
+          const X = cf.C[0] + u * d[0], Y = cf.C[1] + u * d[1], Z = cf.C[2] + u * d[2];
+          const ang = Math.atan2(X, Y) * R2D; if (Math.abs(ang) > 45) continue;
+          E.fenceAt(S.ctx, ang); const F = E.fence(), rr = Math.hypot(X, Y);
+          if (rr > F[0]) { const sh = E.standsAt(S.ctx, ang, rr - F[0], F[1]); if (sh >= 0 && Z <= sh) return { x: X, y: Y, z: Z }; }
+        }
+      }
+      return { x: cf.C[0] + t * d[0], y: cf.C[1] + t * d[1] };
+    };
+  }
+  v.poly = (pts, fill, stroke, lw) => {
+    let sp;
+    if (!v.persp) sp = pts.map(p => [v.ox + p[0] * v.s, v.oy - p[1] * v.s]);
+    else {
+      let pc = pts.map(p => v.cam(p[0], p[1], p[2])), out = [];
+      for (let i = 0; i < pc.length; i++) {
+        const a = pc[i], b = pc[(i + 1) % pc.length], ain = a[2] >= NEAR, bin = b[2] >= NEAR;
+        if (ain) out.push(a);
+        if (ain !== bin) { const t = (NEAR - a[2]) / (b[2] - a[2]); out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), NEAR]); }
+      }
+      if (out.length < 3) return;
+      sp = out.map(c => [SW / 2 + v.cf.fpx * c[0] / c[2], SH / 2 - v.cf.fpx * c[1] / c[2]]);
+    }
+    g.beginPath(); for (let i = 0; i < sp.length; i++) i ? g.lineTo(sp[i][0], sp[i][1]) : g.moveTo(sp[i][0], sp[i][1]); g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.lineWidth = lw || 1; g.strokeStyle = stroke; g.stroke(); }
+  };
+  v.line = (pts, stroke, lw, dash) => {
+    g.beginPath(); let any = false;
+    for (let i = 0; i < pts.length - 1; i++) {
+      let a, b;
+      if (!v.persp) { a = [v.ox + pts[i][0] * v.s, v.oy - pts[i][1] * v.s]; b = [v.ox + pts[i + 1][0] * v.s, v.oy - pts[i + 1][1] * v.s]; }
+      else {
+        let ca = v.cam(pts[i][0], pts[i][1], pts[i][2]), cb = v.cam(pts[i + 1][0], pts[i + 1][1], pts[i + 1][2]);
+        if (ca[2] < NEAR && cb[2] < NEAR) continue;
+        if (ca[2] < NEAR) { const t = (NEAR - ca[2]) / (cb[2] - ca[2]); ca = [ca[0] + t * (cb[0] - ca[0]), ca[1] + t * (cb[1] - ca[1]), NEAR]; }
+        if (cb[2] < NEAR) { const t = (NEAR - cb[2]) / (ca[2] - cb[2]); cb = [cb[0] + t * (ca[0] - cb[0]), cb[1] + t * (ca[1] - cb[1]), NEAR]; }
+        a = [SW / 2 + v.cf.fpx * ca[0] / ca[2], SH / 2 - v.cf.fpx * ca[1] / ca[2]]; b = [SW / 2 + v.cf.fpx * cb[0] / cb[2], SH / 2 - v.cf.fpx * cb[1] / cb[2]];
+      }
+      g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); any = true;
+    }
+    if (!any) return;
+    g.lineWidth = lw || 1; g.strokeStyle = stroke; g.setLineDash(dash || []); g.stroke(); g.setLineDash([]);
+  };
+  return v;
+}
+
+/* ---------- field ---------- */
+function drawField(v) {
+  const G = S.geo, g = v.g;
+  if (v.kind === '3d') {
+    const gr = g.createLinearGradient(0, 0, 0, SH); gr.addColorStop(0, T['sky-top']); gr.addColorStop(1, T['sky-bot']);
+    g.fillStyle = gr; g.fillRect(0, 0, SW, SH);
+    v.poly([[-4000, -2000, 0], [4000, -2000, 0], [4000, 5000, 0], [-4000, 5000, 0]], T.outside);
+    G.stands.forEach(q => v.poly(q, T.stand, T['stand-2'], 0.6));
+  } else {
+    g.fillStyle = T.outside; g.fillRect(0, 0, SW, SH);
+    // stands ring in the overhead view
+    const F = G.full, out = [], inn = [];
+    F.forEach(p => { const m = Math.hypot(p.x, p.y) || 1, dd = p.f ? 9 : 15; out.push([p.x + p.x / m * dd, p.y + p.y / m * dd, 0]); inn.push([p.x, p.y, 0]); });
+    const ring = out.concat(inn.reverse());
+    v.poly(ring, T.stand);
+  }
+  v.poly(G.foul, T.foul, T.foul, 0.7);
+  v.poly(G.trackFull, T.track, T.track, 0.7);
+  G.bands.forEach(b => v.poly(b.pts, T[b.fill], T[b.fill], 0.7));
+  v.poly(G.dirt, T.dirt, T.dirt, 0.7);
+  v.poly(G.diamond, T['grass-b'], T['grass-b'], 0.7);
+  v.poly(G.homeDirt, T.dirt, T.dirt, 0.7);
+  v.poly(G.mound, T['dirt-2'], T['dirt-2'], 0.7);
+  G.arcs.forEach(a => v.line(a.pts, 'rgba(255,255,255,0.16)', 1));
+  G.lines.forEach(l => v.line(l, T.chalk, 1.6));
+  G.bases.forEach(b => v.poly(b, T.chalk));
+  v.poly(G.plate, T.chalk);
+  if (v.kind === '3d') {
+    { const wc = (E.PARKS[S.p.park] || {}).wall || T.wall; G.wall.forEach(q => v.poly(q, wc, wc, 0.6)); }
+    const top = S.fencePts.map(p => [p.x, p.y, p.H]);
+    v.line(top, T.chalk, 1.4);
+  } else {
+    v.line(G.fenceLine, T.wall, 3.2);
+    // distance labels along the fence
+    g.font = '600 11px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    S.fencePts.forEach(p => {
+      if ([-45, -22.5, 0, 22.5, 45].some(a => Math.abs(a - p.a) < 0.01)) {
+        const q = v.pt(p.x + Math.sin(p.a * D2R) * 7, p.y + Math.cos(p.a * D2R) * 7, 0);
+        g.fillStyle = T.chalk; g.fillText(fmt(p.F / FT, 0), q[0], q[1]);
+      }
+    });
+    g.fillStyle = 'rgba(255,255,255,0.45)'; g.font = '10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono');
+    G.arcs.forEach(a => { const mid = a.pts[Math.floor(a.pts.length / 2)], q = v.pt(mid[0], mid[1], 0); g.fillText(a.ft, q[0], q[1] + 9); });
+  }
+}
+
+/* ---------- trails, ball, forces ---------- */
+function ballState(t) { return trackAt(S.sim.tr, t); }
+function drawPath(v, tr, t, col, lw, dash, alpha) {
+  // draws the track up to time t
+  const ts = tr.t; if (!ts.length) return;
+  const cur = trackAt(tr, t), pts = [];
+  const step = Math.max(1, Math.floor(ts.length / 700));
+  for (let i = 0; i <= cur.i; i += step) pts.push([tr.x[i], tr.y[i], tr.z[i]]);
+  pts.push([cur.x, cur.y, cur.z]);
+  if (alpha !== undefined) v.g.globalAlpha = alpha;
+  v.line(pts, col, lw, dash);
+  v.g.globalAlpha = 1;
+}
+function drawMainTrail(v, t) {
+  const sim = S.sim, tr = sim.tr, L = sim.landing;
+  const cur = trackAt(tr, t);
+  const lt = L ? L.t : Infinity;
+  const a = [], b = [];
+  const step = Math.max(1, Math.floor(tr.t.length / 900));
+  for (let i = 0; i <= cur.i; i += step) { (tr.t[i] <= lt ? a : b).push([tr.x[i], tr.y[i], tr.z[i]]); }
+  const cp = [cur.x, cur.y, cur.z];
+  if (t <= lt) a.push(cp); else { if (a.length && L) a.push([L.x, L.y, L.z]); b.push(cp); }
+  if (b.length && L) b.unshift([L.x, L.y, L.z]);
+  // shadow on the ground in 3-D
+  if (v.kind === '3d' && a.length > 1) v.line(a.map(p => [p[0], p[1], 0]), 'rgba(0,0,0,0.22)', 2);
+  v.line(a, T.path, 2.6);
+  if (b.length > 1) v.line(b, T['path-2'], 2, [4, 4]);
+}
+function drawBall(v, st) {
+  const g = v.g;
+  let p;
+  if (v.kind === 'side') p = v.pt(st.x, st.y, st.z); else p = v.pt(st.x, st.y, st.z);
+  if (!p) return;
+  let r;
+  if (v.kind === '3d') r = Math.max(3.2, Math.min(11, v.rpx(0.55, st.x, st.y, st.z)));
+  else if (v.kind === 'top') r = 4 + Math.min(12, st.z * 0.13);
+  else r = Math.max(3.5, v.rpx ? v.rpx(0.5) : 4);
+  if (v.kind === '3d') { const sp = v.pt(st.x, st.y, 0); if (sp) { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(sp[0], sp[1], r * 1.2, r * 0.45, 0, 0, 7); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.12)'; g.beginPath(); g.moveTo(sp[0], sp[1]); g.lineTo(p[0], p[1]); g.stroke(); } }
+  if (v.kind === 'top') { g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1; g.beginPath(); g.arc(p[0], p[1], r + 3, 0, 7); g.stroke(); }
+  g.fillStyle = '#fff'; g.strokeStyle = T.ink; g.lineWidth = 1.4;
+  g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.stroke();
+  g.strokeStyle = T.accent; g.lineWidth = Math.max(1, r * 0.22);
+  g.beginPath(); g.arc(p[0] - r * 0.55, p[1], r * 0.62, -0.9, 0.9); g.stroke();
+}
+function arrow(g, x0, y0, dx, dy, col, label) {
+  const L = Math.hypot(dx, dy); if (L < 3) return;
+  const x1 = x0 + dx, y1 = y0 + dy, ux = dx / L, uy = dy / L, hs = Math.min(8, L * 0.5);
+  g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 2.2;
+  g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+  g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 - ux * hs - uy * hs * 0.5, y1 - uy * hs + ux * hs * 0.5); g.lineTo(x1 - ux * hs + uy * hs * 0.5, y1 - uy * hs - ux * hs * 0.5); g.closePath(); g.fill();
+  if (label) { g.font = '600 11px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(label, x1 + ux * 5 + 2, y1 + uy * 5); }
+}
+function drawForces(v, st) {
+  if (v.kind === 'top') return;
+  const g = v.g, g0 = S.ctx.g;
+  const inAir = st.dgx !== 0 || st.dgy !== 0 || st.dgz !== 0 || st.lfx !== 0 || st.lfy !== 0 || st.lfz !== 0;
+  if (!inAir) return;
+  const F = [
+    { n: 'weight', f: [0, 0, -g0], c: T.ink },
+    { n: 'drag', f: [st.dgx, st.dgy, st.dgz], c: T['c-hr'] },
+    { n: 'lift', f: [st.lfx, st.lfy, st.lfz], c: T['c-in'] }
+  ];
+  F.forEach(o => { o.m = Math.hypot(o.f[0], o.f[1], o.f[2]); });
+  const mx = Math.max.apply(null, F.map(o => o.m));
+  const p0 = v.pt(st.x, st.y, st.z);
+  if (p0) {
+    const probe = 4, full = v.kind === 'side' ? probe * v.s : (v.persp ? v.rpx(probe, st.x, st.y, st.z) : probe);
+    F.forEach(o => {
+      if (o.m < 0.02) return;
+      const u = [o.f[0] / o.m, o.f[1] / o.m, o.f[2] / o.m];
+      let e;
+      if (v.kind === 'side') { const r = Math.max(1, Math.hypot(st.x, st.y)); e = v.pt(st.x + u[0] * probe * st.x / r + u[1] * probe * st.y / r, st.y, st.z + u[2] * probe); }
+      else e = v.pt(st.x + u[0] * probe, st.y + u[1] * probe, st.z + u[2] * probe);
+      if (!e) return;
+      const dx = e[0] - p0[0], dy = e[1] - p0[1], dl = Math.hypot(dx, dy);
+      const full0 = Math.max(full, 1e-6), fore = Math.min(1, dl / full0);
+      const len = Math.max(7, 70 * o.m / mx * Math.max(0.18, fore));
+      if (dl < 1e-6) { g.fillStyle = o.c; g.beginPath(); g.arc(p0[0], p0[1], 3, 0, 7); g.fill(); return; }
+      arrow(g, p0[0], p0[1], dx / dl * len, dy / dl * len, o.c, o.n);
+    });
+  }
+  drawFBD(g, st, F, g0);
+}
+// Free-body diagram: the true force picture in the plane of flight (forward = along the horizontal velocity).
+function drawFBD(g, st, F, g0) {
+  const w = 176, h = 172, x0 = 10, y0 = SH - h - 10, cx = x0 + 78, cy = y0 + 72, sc = 50;
+  const vh = Math.hypot(st.vx, st.vy) || 1, ux = st.vx / vh, uy = st.vy / vh;
+  g.save();
+  g.globalAlpha = 0.9; g.fillStyle = T.surface; g.strokeStyle = T.line; g.lineWidth = 1;
+  g.beginPath(); g.rect(x0, y0, w, h); g.fill(); g.stroke(); g.globalAlpha = 1;
+  const mono = getComputedStyle(document.body).getPropertyValue('--font-mono');
+  g.font = '600 10px ' + mono; g.fillStyle = T.muted; g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillText('FORCES · plane of flight', x0 + 7, y0 + 6);
+  g.strokeStyle = T.line; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(x0 + 6, cy); g.lineTo(x0 + w - 6, cy); g.moveTo(cx, y0 + 20); g.lineTo(cx, y0 + h - 6); g.stroke(); g.setLineDash([]);
+  g.fillStyle = T.muted; g.textAlign = 'right'; g.fillText('forward →', x0 + w - 6, cy + 3);
+  let netF = 0, netZ = 0;
+  const rows = [];
+  F.forEach(o => {
+    const fw = o.f[0] * ux + o.f[1] * uy, side = o.f[0] * uy - o.f[1] * ux, up = o.f[2];
+    netF += fw; netZ += up;
+    const dx = fw / g0 * sc, dy = -up / g0 * sc;
+    if (Math.hypot(dx, dy) > 3) arrow(g, cx, cy, dx, dy, o.c, '');
+    rows.push({ n: o.n, c: o.c, m: o.m / g0, side: side / g0 });
+  });
+  const nl = Math.hypot(netF, netZ) / g0 * sc;
+  if (nl > 3) { g.save(); g.setLineDash([4, 3]); g.strokeStyle = T.ink; g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + netF / g0 * sc, cy - netZ / g0 * sc); g.stroke(); g.restore(); }
+  g.fillStyle = T.ink; g.beginPath(); g.arc(cx, cy, 3.2, 0, 7); g.fill();
+  g.textAlign = 'left'; g.textBaseline = 'middle'; g.font = '600 10px ' + mono;
+  rows.forEach((r, i) => {
+    const yy = y0 + h - 11 - (rows.length - 1 - i) * 12;
+    g.fillStyle = r.c; g.fillRect(x0 + 7, yy - 3, 8, 6);
+    g.fillStyle = T.ink; g.fillText(r.n + ' ' + r.m.toFixed(2) + ' g' + (Math.abs(r.side) >= 0.005 ? '  side ' + (r.side >= 0 ? '+' : '') + r.side.toFixed(2) : ''), x0 + 20, yy);
+  });
+  g.restore();
+}
+
+/* ---------- Monte Carlo ensemble ---------- */
+function drawEnsemble(v, t) {
+  const mc = S.mc; if (!mc || !mc.tracks.length || !mc.visible || !S.opt.ens) return;
+  const g = v.g, n = mc.tracks.length;
+  const colOf = o => T[(OUTCOME[o] || OUTCOME.inplay).col];
+  const done = t >= mc.maxT - 1e-3;
+  if (v.kind !== 'top') {
+    g.globalAlpha = done ? 0.10 : 0.05; g.lineWidth = 1;
+    for (let i = 0; i < n; i++) {
+      const tk = mc.tracks[i], K = tk.t.length, pts = [];
+      let end = K - 1; if (!done) { end = idxAt(tk.t, t); }
+      for (let j = 0; j <= end; j += 2) pts.push([tk.p[3 * j], tk.p[3 * j + 1], tk.p[3 * j + 2]]);
+      if (end % 2) pts.push([tk.p[3 * end], tk.p[3 * end + 1], tk.p[3 * end + 2]]);
+      if (v.kind === 'side') { if (pts.length > 1) { g.strokeStyle = colOf(mc.outcome[i]); g.beginPath(); pts.forEach((q, k) => { const s = v.pt(q[0], q[1], q[2]); k ? g.lineTo(s[0], s[1]) : g.moveTo(s[0], s[1]); }); g.stroke(); } }
+      else { v.line(pts, colOf(mc.outcome[i]), 1); }
+    }
+    g.globalAlpha = 1;
+  }
+  const rr = v.kind === 'top' ? 2.4 : 2.6;
+  for (let i = 0; i < n; i++) {
+    const tk = mc.tracks[i], k = idxAt(tk.t, t);
+    const x = tk.p[3 * k], y = tk.p[3 * k + 1], z = tk.p[3 * k + 2];
+    const p = v.pt(x, y, z); if (!p) continue;
+    g.fillStyle = colOf(mc.outcome[i]); g.globalAlpha = 0.85;
+    g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
+  if (v.kind === 'top' && mc.done >= mc.n) {
+    [[mc.ell95, true], [mc.ell68, false]].forEach(([e, dash]) => {
+      if (!e) return; g.strokeStyle = T.ink; g.lineWidth = 1.4; g.setLineDash(dash ? [5, 4] : []); g.beginPath();
+      for (let k = 0; k <= 64; k++) {
+        const a = k / 64 * 2 * Math.PI, ex = e.a * Math.cos(a), ey = e.b * Math.sin(a);
+        const x = e.cx + ex * Math.cos(e.ang) - ey * Math.sin(e.ang), y = e.cy + ex * Math.sin(e.ang) + ey * Math.cos(e.ang);
+        const p = v.pt(x, y, 0); k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]);
+      }
+      g.stroke(); g.setLineDash([]);
+    });
+  }
+}
+function idxAt(ts, t) {
+  const n = ts.length; if (t >= ts[n - 1]) return n - 1; if (t <= ts[0]) return 0;
+  let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ts[m] <= t) lo = m; else hi = m; } return lo;
+}
+
+/* ---------- target marker ---------- */
+function drawTarget(v) {
+  if (S.tab !== 'hit') return;
+  const tg = S.target; if (!tg) return;
+  const g = v.g, p = v.pt(tg.x, tg.y, 0); if (!p) return;
+  const tolM = S.hf.tol * FT;
+  const rr = v.kind === 'top' ? Math.max(5, v.rpx(tolM)) : Math.max(5, v.rpx(tolM, tg.x, tg.y, 0));
+  g.strokeStyle = '#fff'; g.lineWidth = 3.4; g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke();
+  g.strokeStyle = T.accent; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke();
+  g.beginPath(); g.moveTo(p[0] - rr - 6, p[1]); g.lineTo(p[0] + rr + 6, p[1]); g.moveTo(p[0], p[1] - rr - 6); g.lineTo(p[0], p[1] + rr + 6); g.stroke();
+}
+function drawLanding(v) {
+  const L = S.sim.landing; if (!L || S.play.t < L.t) return;
+  const g = v.g, p = v.pt(L.x, L.y, L.kind === 'stands' ? L.z : 0); if (!p) return;
+  g.strokeStyle = T['c-hr']; g.lineWidth = 2.4; const r = 5;
+  g.beginPath(); g.moveTo(p[0] - r, p[1] - r); g.lineTo(p[0] + r, p[1] + r); g.moveTo(p[0] + r, p[1] - r); g.lineTo(p[0] - r, p[1] + r); g.stroke();
+}
+
+/* ---------- compare ghosts ---------- */
+function drawGhosts(v, t) {
+  if (!S.opt.compare || !S.bud) return;
+  const g = v.g, labels = ['Vacuum', 'Drag only', 'Drag + Magnus', 'With wind'];
+  const cols = [T.ghost, T['c-wall'], T['c-in'], T['c-good']];
+  for (let i = 0; i < 4; i++) {
+    const b = S.bud[i]; if (!b || !b.tr) continue;
+    const tt = Math.min(t, b.tr.t[b.tr.t.length - 1]);
+    drawPath(v, b.tr, tt, cols[i], 1.6, [6, 4], 0.9);
+    if (v.kind === 'side') {
+      const n = b.tr.t.length, end = b.tr; const q = v.pt(end.x[n - 1], end.y[n - 1], 0);
+      if (q && t >= b.tr.t[n - 1] - 0.01) { g.fillStyle = cols[i]; g.font = '11px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.fillText(labels[i] + ' ' + fmt(b.dist, 0), q[0], q[1] - 8 - i * 12); }
+    }
+  }
+}
+
+/* ---------- views ---------- */
+function mcOn() { const mc = S.mc; return !!(mc && mc.tracks.length && mc.visible && S.opt.ens); }
+function draw3D(t, st) {
+  const v = makeView('3d'); drawField(v);
+  if (mcOn()) { drawEnsemble(v, t); drawTarget(v); return v; }
+  drawGhosts(v, t); drawTarget(v);
+  if (S.opt.trail) drawMainTrail(v, t);
+  drawLanding(v); drawBall(v, st); if (S.opt.forces) drawForces(v, st);
+  return v;
+}
+function drawTop(t, st) {
+  const v = makeView('top'); drawField(v);
+  if (mcOn()) { drawEnsemble(v, t); drawTarget(v); return v; }
+  drawGhosts(v, t); drawTarget(v);
+  if (S.opt.trail) drawMainTrail(v, t);
+  drawLanding(v); drawBall(v, st);
+  const rest = S.sim.rest;
+  if (rest && t >= S.sim.tEnd - 0.01) { const p = v.pt(rest.x, rest.y, 0); const g = v.g; g.strokeStyle = T.ink; g.lineWidth = 1.6; g.beginPath(); g.arc(p[0], p[1], 5, 0, 7); g.stroke(); }
+  return v;
+}
+function drawSide(t, st) {
+  const g = SG, sim = S.sim, L = sim.landing;
+  const tr = sim.tr; let maxR = 0, maxZ = 0;
+  for (let i = 0; i < tr.t.length; i += 4) { const r = Math.hypot(tr.x[i], tr.y[i]); if (r > maxR) maxR = r; if (tr.z[i] > maxZ) maxZ = tr.z[i]; }
+  const angEnd = L ? L.ang : S.p.spray; E.fenceAt(S.ctx, clamp(angEnd, -45, 45)); const fz = E.fence();
+  maxR = Math.max(maxR, fz[0] + 8, 130 * FT); maxZ = Math.max(maxZ, fz[1] * 1.6, 25 * FT) * 1.18;
+  if (S.opt.compare && S.bud) S.bud.slice(0, 4).forEach(b => { if (!b.tr) return; for (let i = 0; i < b.tr.t.length; i += 4) { maxR = Math.max(maxR, Math.hypot(b.tr.x[i], b.tr.y[i])); maxZ = Math.max(maxZ, b.tr.z[i] * 1.12); } });
+  const MC = mcOn();
+  if (MC) {
+    const mc = S.mc;
+    if (mc.rz === undefined) { mc.rr = 0; mc.rz = 0; mc.tracks.forEach(tk => { for (let j = 0; j < tk.t.length; j += 2) { const r = Math.hypot(tk.p[3 * j], tk.p[3 * j + 1]); if (r > mc.rr) mc.rr = r; if (tk.p[3 * j + 2] > mc.rz) mc.rz = tk.p[3 * j + 2]; } }); }
+    maxR = Math.max(maxR, mc.rr * 1.02); maxZ = Math.max(maxZ, mc.rz * 1.18);
+  }
+  const padL = 40, padB = 34, padR = 16, padT = 14;
+  const s = Math.min((SW - padL - padR) / maxR, (SH - padB - padT) / maxZ);
+  const ox = padL, oy = SH - padB;
+  const v = { kind: 'side', g, persp: false, s, ox, oy };
+  v.pt = (x, y, z) => [ox + Math.hypot(x, y) * s, oy - z * s, 1];
+  v.rpx = r => r * s;
+  v.line = (pts, stroke, lw, dash) => {
+    g.beginPath(); pts.forEach((q, i) => { const p = v.pt(q[0], q[1], q[2]); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); });
+    g.lineWidth = lw || 1; g.strokeStyle = stroke; g.setLineDash(dash || []); g.stroke(); g.setLineDash([]);
+  };
+  const gr = g.createLinearGradient(0, 0, 0, oy); gr.addColorStop(0, T['sky-top']); gr.addColorStop(1, T['sky-bot']);
+  g.fillStyle = gr; g.fillRect(0, 0, SW, SH);
+  g.fillStyle = T['grass-a']; g.fillRect(0, oy, SW, SH - oy);
+  g.fillStyle = T.track; g.fillRect(ox + (fz[0] - 4.6) * s, oy, 4.6 * s, 5);
+  // grid
+  const mono = getComputedStyle(document.body).getPropertyValue('--font-mono');
+  g.font = '11px ' + mono; g.textAlign = 'center'; g.textBaseline = 'top';
+  const stepFt = maxR / FT > 450 ? 100 : 50;
+  for (let ft = 0; ft * FT <= maxR; ft += stepFt) {
+    const x = ox + ft * FT * s; g.strokeStyle = 'rgba(128,140,134,0.25)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, padT); g.lineTo(x, oy); g.stroke();
+    g.fillStyle = T.chalk; g.fillText(ft, x, oy + 6);
+  }
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let ft = 0; ft * FT <= maxZ; ft += 50) { const y = oy - ft * FT * s; if (ft) { g.strokeStyle = 'rgba(128,140,134,0.25)'; g.beginPath(); g.moveTo(ox, y); g.lineTo(SW - padR, y); g.stroke(); } g.fillStyle = T['ink-2']; g.fillText(ft, ox - 6, y); }
+  g.textAlign = 'left'; g.fillStyle = T.chalk; g.textBaseline = 'alphabetic'; g.fillText('feet from home plate', ox + 4, oy + 28);
+  // fence
+  const fx = ox + fz[0] * s, fh = fz[1] * s;
+  g.fillStyle = T.wall; g.fillRect(fx - 2, oy - fh, 4, fh);
+  if (S.standsOn !== false) {
+    const an = clamp(angEnd, -45, 45), D = E.standsDepth(S.ctx, an), h0 = E.standsAt(S.ctx, an, 0, fz[1]), h1 = E.standsAt(S.ctx, an, D, fz[1]);
+    g.fillStyle = T.stand; g.beginPath(); g.moveTo(fx, oy); g.lineTo(fx, oy - h0 * s); g.lineTo(fx + D * s, oy - h1 * s); g.lineTo(fx + D * s, oy); g.closePath(); g.fill();
+    g.strokeStyle = T['stand-2']; g.lineWidth = 1; g.beginPath(); g.moveTo(fx, oy - h0 * s); g.lineTo(fx + D * s, oy - h1 * s); g.stroke();
+  }
+  g.fillStyle = T.ink; g.textAlign = 'right'; g.textBaseline = 'alphabetic'; g.fillText('fence ' + fmt(fz[0] / FT, 0) + ' ft · ' + fmt(fz[1] / FT, 0) + ' ft wall', fx - 8, oy - fh - 22);
+  if (MC) { drawEnsemble(v, t); return v; }
+  drawGhosts(v, t);
+  if (S.opt.trail) {
+    const cur = trackAt(tr, t), lt = L ? L.t : Infinity, a = [], b = [];
+    const step = Math.max(1, Math.floor(tr.t.length / 900));
+    for (let i = 0; i <= cur.i; i += step) (tr.t[i] <= lt ? a : b).push([tr.x[i], tr.y[i], tr.z[i]]);
+    if (t <= lt) a.push([cur.x, cur.y, cur.z]); else { if (L) a.push([L.x, L.y, L.z]); b.push([cur.x, cur.y, cur.z]); if (L) b.unshift([L.x, L.y, L.z]); }
+    v.line(a, T.path, 2.8); if (b.length > 1) v.line(b, T['path-2'], 2, [4, 4]);
+  }
+  // apex marker
+  if (t >= sim.apex.t) {
+    const ap = v.pt(sim.apex.x, sim.apex.y, sim.apex.z); g.strokeStyle = T.ink; g.setLineDash([3, 3]); g.lineWidth = 1; g.beginPath(); g.moveTo(ap[0], ap[1]); g.lineTo(ap[0], oy); g.stroke(); g.setLineDash([]);
+    g.fillStyle = T.ink; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText('apex ' + fmt(sim.apexFt, 0) + ' ft', ap[0], ap[1] - 6);
+  }
+  if (L && t >= L.t) { const p = v.pt(L.x, L.y, 0), py = L.kind === 'stands' ? oy - L.z * s : oy; g.fillStyle = T['c-hr']; g.beginPath(); g.arc(p[0], py, 4.5, 0, 7); g.fill(); g.fillStyle = T.chalk; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(fmt(L.dist, 0) + ' ft', p[0], oy + 14); }
+  drawBall(v, st); if (S.opt.forces) drawForces(v, st);
+  return v;
+}
+
+/* ---------- render ---------- */
+let lastView = null;
+function render() {
+  if (!S.sim) return;
+  sizeStage(); if (!S.geo || S.geoKey !== S.fencePts) { buildGeo(); S.geoKey = S.fencePts; }
+  readTokensIfNeeded();
+  const g = SG; g.clearRect(0, 0, SW, SH);
+  const d = totalDur(), t = clamp(S.play.t, 0, d), st = trackAt(S.sim.tr, Math.min(t, S.sim.tr.t[S.sim.tr.t.length - 1]));
+  S.curState = st;
+  lastView = S.view === 'top' ? drawTop(t, st) : S.view === 'side' ? drawSide(t, st) : draw3D(t, st);
+  $('#scrub').value = Math.round(t / d * 1000);
+  $('#tread').textContent = t.toFixed(2) + ' / ' + d.toFixed(2) + ' s';
+  updateLive(st, t);
+  if (S.tab === 'flight') { drawFlightCharts(t); drawSpin(st); }
+  stageWrap.classList.toggle('wide', S.view === 'side');
+  const hf = S.tab === 'hit';
+  $('#stagehint').textContent = S.view === 'side' ? 'Side profile along the line from home plate' : S.view === 'top' ? (hf ? 'Hit finder: click the field to find hits that land there' : 'Overhead view') : (hf ? 'Hit finder: click the ground to pick a spot · drag to orbit · scroll to zoom' : 'Drag to orbit · scroll to zoom');
+}
+let tokenVersion = '';
+function readTokensIfNeeded() {
+  const key = document.documentElement.dataset.theme + '|' + (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'd' : 'l');
+  if (key !== tokenVersion) { tokenVersion = key; readTokens(); }
+}
+
+function updateLive(st, t) {
+  const box = $('#live');
+  if (!box.firstChild) {
+    ['Time', 'Speed', 'Height', 'Distance', 'Spin'].forEach(n => box.appendChild(el('div', { html: '<small>' + n + '</small><span>–</span>' })));
+  }
+  if (mcOn()) {
+    const mc = S.mc, n = mc.tracks.length; let sv = 0, sz = 0, sd = 0;
+    // cached velocity-free estimate: finite difference on the sampled track
+    for (let i = 0; i < n; i++) {
+      const tk = mc.tracks[i], k = idxAt(tk.t, t), k0 = Math.max(0, k - 1), k1 = Math.min(tk.t.length - 1, k + 1);
+      const dtk = (tk.t[k1] - tk.t[k0]) || 1;
+      const vx = (tk.p[3 * k1] - tk.p[3 * k0]) / dtk, vy = (tk.p[3 * k1 + 1] - tk.p[3 * k0 + 1]) / dtk, vz = (tk.p[3 * k1 + 2] - tk.p[3 * k0 + 2]) / dtk;
+      sv += Math.hypot(vx, vy, vz); sz += tk.p[3 * k + 2]; sd += Math.hypot(tk.p[3 * k], tk.p[3 * k + 1]);
+    }
+    const mv = [t.toFixed(2) + ' s', (sv / n / MPH).toFixed(1) + ' mph', ((sz / n - S.ctx.R) / FT).toFixed(1) + ' ft', (sd / n / FT).toFixed(0) + ' ft', n + ' balls'];
+    $$('small', box).forEach((e, i) => { const nm = ['Time', 'Mean speed', 'Mean height', 'Mean distance', 'Flying'][i]; if (e.textContent !== nm) e.textContent = nm; });
+    $$('span', box).forEach((e, i) => { if (e.textContent !== mv[i]) e.textContent = mv[i]; });
+    return;
+  }
+  $$('small', box).forEach((e, i) => { const nm = ['Time', 'Speed', 'Height', 'Distance', 'Spin'][i]; if (e.textContent !== nm) e.textContent = nm; });
+  const v = Math.hypot(st.vx, st.vy, st.vz) / MPH, sp = Math.hypot(st.wx, st.wy, st.wz) / E.RPM;
+  const vals = [t.toFixed(2) + ' s', v.toFixed(1) + ' mph', ((st.z - S.ctx.R) / FT).toFixed(1) + ' ft', (Math.hypot(st.x, st.y) / FT).toFixed(0) + ' ft', sp.toFixed(0) + ' rpm'];
+  $$('span', box).forEach((s, i) => { if (s.textContent !== vals[i]) s.textContent = vals[i]; });
+}
+
+/* ---------- interaction ---------- */
+const ptr = { down: false, x: 0, y: 0, moved: 0, id: null };
+function stagePos(e) { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+stage.addEventListener('pointerdown', e => { const p = stagePos(e); ptr.down = true; ptr.x = p.x; ptr.y = p.y; ptr.moved = 0; ptr.id = e.pointerId; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointermove', e => {
+  const p = stagePos(e);
+  if (ptr.down && S.view === '3d') {
+    const dx = p.x - ptr.x, dy = p.y - ptr.y; ptr.moved += Math.abs(dx) + Math.abs(dy);
+    S.cam.yaw -= dx * 0.006; S.cam.pitch = clamp(S.cam.pitch + dy * 0.005, 0.03, 1.45);
+    ptr.x = p.x; ptr.y = p.y; requestRender();
+  } else if (ptr.down) { ptr.moved += Math.abs(p.x - ptr.x) + Math.abs(p.y - ptr.y); ptr.x = p.x; ptr.y = p.y; }
+  showHover(p);
+});
+stage.addEventListener('pointerup', e => {
+  const p = stagePos(e);
+  if (ptr.down && ptr.moved < 6 && S.tab === 'hit' && (S.view === 'top' || S.view === '3d')) setTargetFromScreen(p.x, p.y);
+  ptr.down = false;
+});
+stage.addEventListener('pointerleave', () => { $('#tip').hidden = true; });
+function resetCamera() {
+  Object.assign(S.cam, { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 });
+  const b = $('#views button[data-view="3d"]'); if (S.view !== '3d' && b) b.click();
+  requestRender();
+}
+$('#btn-cam').addEventListener('click', resetCamera);
+stage.addEventListener('dblclick', () => { if (S.view === '3d') { Object.assign(S.cam, { yaw: 0.55, pitch: 0.36, dist: 215 }); requestRender(); } });
+stage.addEventListener('wheel', e => {
+  if (S.view !== '3d') return; e.preventDefault();
+  S.cam.dist = clamp(S.cam.dist * Math.exp(e.deltaY * 0.0012), 35, 420); requestRender();
+}, { passive: false });
+function groundAt(p) { if (!lastView || !lastView.inv) return null; if (S.view === 'side') return null; return lastView.inv(p.x, p.y); }
+function describeSpot(g) {
+  const d = Math.hypot(g.x, g.y) / FT, a = Math.atan2(g.x, g.y) * R2D;
+  return fmt(d, 0) + ' ft · ' + (Math.abs(a) < 0.5 ? 'center' : fmt(Math.abs(a), 0) + '° toward ' + (a < 0 ? 'left' : 'right') + ' field');
+}
+function showHover(p) {
+  if (S.tab !== 'hit' || S.view === 'side') { $('#tip').hidden = true; return; }
+  const tip = $('#tip'), g = groundAt(p);
+  if (!g || g.y < -6 || Math.hypot(g.x, g.y) > 190) { tip.hidden = true; return; }
+  tip.hidden = false; tip.textContent = describeSpot(g);
+  const w = stageWrap.getBoundingClientRect().width;
+  tip.style.left = Math.min(w - 170, p.x) + 'px'; tip.style.top = p.y + 'px';
+}
+function setTargetFromScreen(sx, sy) {
+  const g = groundAt({ x: sx, y: sy }); if (!g) return;
+  const d = Math.hypot(g.x, g.y) / FT; if (d < 15 || d > 560 || g.y < 0) return;
+  S.target = { x: g.x, y: g.y };
+  showTab('hit'); startSolve(); requestRender();
+}
+$('#views').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return; S.view = b.dataset.view;
+  $$('#views button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); requestRender();
+});
+[['t-trail', 'trail'], ['t-forces', 'forces'], ['t-compare', 'compare'], ['t-ens', 'ens']].forEach(([id, k]) => $('#' + id).addEventListener('change', e => { S.opt[k] = e.target.checked; if (k === 'ens') { S.play.t = 0; S.play.playing = false; updatePlayButton(); S.play.t = totalDur(); updateHud(); updateDerived(); } requestRender(); }));
+$('#t-stands').addEventListener('change', e => {
+  S.standsOn = e.target.checked; E.setStands(S.standsOn); S.fenceSig = null; S.fencePts = null;
+  S.inVer = (S.inVer || 0) + 1; S.mcStale = true;
+  recompute(); if (typeof scheduleAutoMC === 'function') scheduleAutoMC(); requestRender();
+});
+$('#btn-play').addEventListener('click', () => { if (S.play.playing) stopPlay(); else startPlay(false); });
+$('#btn-replay').addEventListener('click', () => startPlay(true));
+$('#scrub').addEventListener('input', e => { stopPlay(); S.play.t = parseFloat(e.target.value) / 1000 * totalDur(); requestRender(); });
+$('#speed').addEventListener('change', e => { S.play.speed = parseFloat(e.target.value); });
+new ResizeObserver(() => requestRender()).observe(stageWrap);
+
+/* ===== Panels: flight data, Monte Carlo, hit finder, sweep, physics ===== */
+function setupCv(cv, h) {
+  if (!cv.dataset.h) cv.dataset.h = h || cv.getAttribute('height') || 200;
+  const hh = parseInt(cv.dataset.h, 10), r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.style.height = hh + 'px';
+  const w = Math.max(10, Math.round(r.width));
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(hh * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr); }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, hh);
+  return { g, W: w, H: hh };
+}
+function monoFont(px) { return px + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); }
+function niceStep(range, n) {
+  const raw = range / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * mag;
+}
+function axes(g, W, H, m, x0, x1, y0, y1, xl, yl, o) {
+  o = o || {};
+  const px = v => m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r), py = v => H - m.b - (v - y0) / (y1 - y0) * (H - m.t - m.b);
+  g.font = monoFont(10.5); g.fillStyle = T.muted; g.strokeStyle = T.line; g.lineWidth = 1;
+  const xs = niceStep(x1 - x0, Math.max(3, Math.floor((W - m.l - m.r) / 70))), ys = niceStep(y1 - y0, Math.max(3, Math.floor((H - m.t - m.b) / 38)));
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let v = Math.ceil(x0 / xs) * xs; v <= x1 + 1e-9; v += xs) { const x = px(v); g.beginPath(); g.moveTo(x, m.t); g.lineTo(x, H - m.b); g.stroke(); g.fillText((+v.toFixed(6)).toString(), x, H - m.b + 4); }
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let v = Math.ceil(y0 / ys) * ys; v <= y1 + 1e-9; v += ys) { const y = py(v); g.beginPath(); g.moveTo(m.l, y); g.lineTo(W - m.r, y); g.stroke(); g.fillText((+v.toFixed(6)).toString(), m.l - 5, y); }
+  g.fillStyle = T['ink-2']; g.textAlign = 'center'; g.textBaseline = 'bottom'; if (xl) g.fillText(xl, m.l + (W - m.l - m.r) / 2, H - 1);
+  if (yl) { g.save(); g.translate(10, m.t + (H - m.t - m.b) / 2); g.rotate(-Math.PI / 2); g.textBaseline = 'top'; g.fillText(yl, 0, -4); g.restore(); }
+  return { px, py };
+}
+function lineChart(cv, o) {
+  const { g, W, H } = setupCv(cv), m = { l: 44, r: 12, t: 10, b: 30 };
+  let y0 = o.y0 !== undefined ? o.y0 : Infinity, y1 = -Infinity;
+  o.series.forEach(s => s.y.forEach(v => { if (o.y0 === undefined && v < y0) y0 = v; if (v > y1) y1 = v; }));
+  if (o.y0 === undefined) y0 = Math.min(0, y0); y1 = y1 * 1.08 + 1e-6;
+  const a = axes(g, W, H, m, 0, o.xmax, y0, y1, o.xl, o.yl);
+  o.series.forEach(s => {
+    g.strokeStyle = s.color; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i < o.x.length; i++) { const x = a.px(o.x[i]), y = a.py(s.y[i]); i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+  });
+  if (o.cursor !== undefined && o.cursor <= o.xmax) {
+    const cx = a.px(o.cursor); g.strokeStyle = T.accent; g.lineWidth = 1.4; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(cx, m.t); g.lineTo(cx, H - m.b); g.stroke(); g.setLineDash([]);
+    const idx = idxAt(o.x, o.cursor);
+    o.series.forEach(s => { g.fillStyle = s.color; g.beginPath(); g.arc(cx, a.py(s.y[idx]), 3.4, 0, 7); g.fill(); });
+  }
+  g.font = monoFont(11); g.textAlign = 'left'; g.textBaseline = 'top'; let lx = m.l + 8;
+  o.series.forEach(s => { g.fillStyle = s.color; g.fillRect(lx, m.t + 5, 10, 3); g.fillStyle = T['ink-2']; g.fillText(s.label, lx + 14, m.t); lx += 22 + g.measureText(s.label).width; });
+}
+
+/* ---------- Flight data ---------- */
+function tileWide(label, val) { return '<div class="tile key" style="grid-column:span 2"><small>' + label + '</small><div class="v" style="font-size:16px">' + val + '</div></div>'; }
+function tile(label, val, unit, key) {
+  return '<div class="tile' + (key ? ' key' : '') + '"><small>' + label + '</small><div class="v">' + val + (unit ? '<i>' + unit + '</i>' : '') + '</div></div>';
+}
+function updateTiles() {
+  const sim = S.sim, L = sim.landing, m = sim.meta, tr = sim.tr; if (!L) return;
+  const oc = OUTCOME[sim.outcome] || OUTCOME.inplay;
+  const html = [
+    tile('Distance', fmt(L.dist, 1), 'ft', 1), tile('Hang time', fmt(sim.hang, 2), 's', 1),
+    tile('Apex height', fmt(sim.apexFt, 1), 'ft'), tile('Apex at', fmt(sim.apexDistFt, 0), 'ft out'),
+    tile('Exit velocity', fmt(m.ev, 1), 'mph'), tile('Launch angle', fmt(m.la, 1), '°'),
+    tile('Spray angle', sgn(m.spray, 1), '°'), tile('Landing angle', sgn(L.ang, 1), '°'),
+    tile('Backspin', fmt(m.back, 0), 'rpm'), tile('Sidespin', sgn(m.side, 0), 'rpm'),
+    tile('Lands at', fmt(L.speed / MPH, 1), 'mph'), tile('Descent angle', fmt(L.impactAngle, 1), '°'),
+    tile('Curve off launch line', sgn((L.x * Math.cos(m.spray * D2R) - L.y * Math.sin(m.spray * D2R)) / FT, 1), 'ft'),
+    sim.rest ? tile('Comes to rest', fmt(sim.rest.dist, 0), 'ft') : ''
+  ].join('');
+  const desc = describeOutcome(sim);
+  $('#tiles').innerHTML = html + '<div class="tile" style="grid-column:1/-1;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="pill" style="background:' + T[oc.col] + '">' + oc.label + '</span><span>' + desc + '</span></div>';
+  // chart data
+  const ts = [], sp = [], dr = [], li = [], gg = S.ctx.g;
+  for (let i = 0; i < tr.t.length; i += 2) {
+    if (tr.t[i] > L.t + 1e-6) break;
+    ts.push(tr.t[i]); sp.push(Math.hypot(tr.vx[i], tr.vy[i], tr.vz[i]) / MPH); dr.push(tr.dr[i] / gg); li.push(tr.li[i] / gg);
+  }
+  S.cd = { ts, sp, dr, li, tEnd: L.t };
+}
+function drawFlightCharts(t) {
+  if (!S.cd || !S.cd.ts.length) return;
+  const d = S.cd;
+  lineChart($('#ch-speed'), { x: d.ts, series: [{ y: d.sp, color: T.path, label: 'speed (mph)' }], xmax: d.tEnd, xl: 'time (s)', cursor: t, y0: 0 });
+  lineChart($('#ch-force'), { x: d.ts, series: [{ y: d.dr, color: T['c-hr'], label: 'drag (g)' }, { y: d.li, color: T['c-in'], label: 'Magnus (g)' }], xmax: d.tEnd, xl: 'time (s)', cursor: t, y0: 0 });
+}
+
+/* ---------- Spin ball ---------- */
+const SEAM = (function () {
+  const b = 0.4, pts = [], n = 160;
+  for (let i = 0; i <= n; i++) { const a = i / n * 2 * Math.PI; const x = Math.cos(a) + b * Math.cos(3 * a), y = Math.sin(a) - b * Math.sin(3 * a), z = 2 * Math.sqrt(b) * Math.sin(2 * a); const l = 1 + b; pts.push([x / l, y / l, z / l]); }
+  return pts;
+})();
+function qrot(q, v) {
+  const x = q[0], y = q[1], z = q[2], w = q[3];
+  const tx = 2 * (y * v[2] - z * v[1]), ty = 2 * (z * v[0] - x * v[2]), tz = 2 * (x * v[1] - y * v[0]);
+  return [v[0] + w * tx + (y * tz - z * ty), v[1] + w * ty + (z * tx - x * tz), v[2] + w * tz + (x * ty - y * tx)];
+}
+function drawSpin(st) {
+  const cv = $('#spin-cv'), g = cv.getContext('2d'), W = cv.width, c = W / 2, R = W * 0.38;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W);
+  const gr = g.createRadialGradient(c - R * 0.3, c - R * 0.35, R * 0.1, c, c, R);
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#d8d8d2');
+  g.fillStyle = gr; g.beginPath(); g.arc(c, c, R, 0, 7); g.fill(); g.strokeStyle = T['ink-2']; g.lineWidth = 2; g.stroke();
+  // view from the first-base side: right = +y (travel), up = +z, nearer where x > 0
+  const pts = SEAM.map(p => qrot(st.q, p));
+  g.lineWidth = 3.2; g.lineCap = 'round';
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1], front = a[0] > 0 && b[0] > 0;
+    if (!front) continue;
+    g.strokeStyle = '#c0392b'; g.beginPath(); g.moveTo(c + a[1] * R, c - a[2] * R); g.lineTo(c + b[1] * R, c - b[2] * R); g.stroke();
+  }
+  const wm = Math.hypot(st.wx, st.wy, st.wz);
+  if (wm > 1) {
+    const ax = [st.wx / wm, st.wy / wm, st.wz / wm], L = R * 1.18;
+    const p1 = [c + ax[1] * L, c - ax[2] * L], p0 = [c - ax[1] * L, c + ax[2] * L];
+    g.strokeStyle = T['c-in']; g.fillStyle = T['c-in']; g.lineWidth = 2.5; g.setLineDash(ax[0] > 0 ? [] : [4, 3]);
+    g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); g.setLineDash([]);
+    const dx = p1[0] - p0[0], dy = p1[1] - p0[1], dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
+    g.beginPath(); g.moveTo(p1[0] + ux * 6, p1[1] + uy * 6); g.lineTo(p1[0] - uy * 5, p1[1] + ux * 5); g.lineTo(p1[0] + uy * 5, p1[1] - ux * 5); g.closePath(); g.fill();
+  }
+  const sp = Math.hypot(st.vy, st.vz) + 1e-6;
+  g.strokeStyle = T['c-hr']; g.fillStyle = T['c-hr']; g.lineWidth = 2.5;
+  const ex = c + st.vy / sp * (R + 22), ey = c - st.vz / sp * (R + 22), sx0 = c + st.vy / sp * (R + 6), sy0 = c - st.vz / sp * (R + 6);
+  g.beginPath(); g.moveTo(sx0, sy0); g.lineTo(ex, ey); g.stroke();
+  // text
+  const sd = E.decomposeSpin([st.vx, st.vy, st.vz], [st.wx, st.wy, st.wz]);
+  const i = st.i, tr = S.sim.tr;
+  $('#spin-read').innerHTML = '<span><b class="mono">' + fmt(sd.back, 0) + '</b> rpm backspin</span><span><b class="mono">' + sgn(sd.side, 0) + '</b> rpm sidespin</span><span><b class="mono">' + sgn(sd.gyro, 0) + '</b> rpm gyro</span>' +
+    '<span style="color:var(--muted)">spin factor S = <span class="mono">' + fmt(tr.S[i], 3) + '</span>, C<sub>L</sub> = <span class="mono">' + fmt(tr.cl[i], 3) + '</span>, C<sub>D</sub> = <span class="mono">' + fmt(tr.cd[i], 3) + '</span></span>' +
+    '<span style="color:var(--muted)"><i style="color:var(--c-in)">blue</i> spin axis · <i style="color:var(--c-hr)">red</i> travel</span>';
+}
+
+/* ---------- Tabs ---------- */
+function showTab(name) {
+  S.tab = name; if (name !== 'hit') $('#tip').hidden = true;
+  $$('#tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  $$('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + name));
+  if (name === 'phys') fillPhysics();
+  if (name === 'mc') renderMcSpec();
+  if (name === 'sweep' && (S.sw.stale || !S.sw.data)) runSweep();
+  if (name === 'hit') { renderHF(); if (S.hfStale && S.target) { S.hfStale = false; startSolve(); } }
+  requestRender();
+}
+$('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+
+/* ---------- Monte Carlo ---------- */
+const MC_ROWS = {
+  ball: [['ev', 'Exit velocity', 'mph', 2], ['la', 'Launch angle', '°', 3], ['spray', 'Spray angle', '°', 3], ['dBack', 'Backspin', 'rpm', 250], ['dSide', 'Sidespin', 'rpm', 250]],
+  bat: [['batMph', 'Bat speed', 'mph', 2], ['pitchMph', 'Pitch speed', 'mph', 1.5], ['attack', 'Attack angle', '°', 2.5], ['offsetIn', 'Vertical contact offset', 'in', 0.25], ['sweetIn', 'Distance from sweet spot', 'in', 0.6], ['faceHead', 'Face heading', '°', 3], ['swingHead', 'Swing path heading', '°', 2]],
+  env: [['windMph', 'Wind speed', 'mph', 0], ['windDir', 'Wind direction', '°', 0], ['tempF', 'Temperature', '°F', 0], ['cd', 'Ball-to-ball drag coefficient', '', 0.008]]
+};
+S.sigma = {}; Object.keys(MC_ROWS).forEach(g => MC_ROWS[g].forEach(r => { S.sigma[r[0]] = r[3]; })); S.sigma0 = Object.assign({}, S.sigma);
+function renderMcSpec() {
+  const box = $('#mc-spec'); const rows = MC_ROWS[S.p.mode].concat(MC_ROWS.env);
+  box.innerHTML = '<h3>Randomness <small>one standard deviation per input, shared with the ± boxes on the sliders · 0 turns an input off</small></h3>';
+  const grid = el('div', { class: 'field-row' });
+  rows.forEach(r => {
+    const inp = el('input', { type: 'number', min: 0, step: r[0] === 'cd' ? 0.001 : 0.1, value: S.sigma[r[0]], id: 'sg-' + r[0], 'data-sg': r[0] });
+    inp.addEventListener('input', () => { S.sigma[r[0]] = Math.max(0, parseFloat(inp.value) || 0); sigmaChanged(); });
+    grid.appendChild(el('label', {}, [r[1] + (r[2] ? ' (' + r[2] + ')' : ''), inp]));
+  });
+  box.appendChild(grid);
+  const auto = el('input', { type: 'checkbox', id: 'mc-auto' }); auto.checked = S.mcAuto;
+  auto.addEventListener('change', () => { S.mcAuto = auto.checked; if (S.mcAuto) scheduleAutoMC(); });
+  box.appendChild(el('label', { class: 'chk', style: 'margin-top:8px' }, [auto, 'Keep the cloud live: re-run automatically when any input changes']));
+}
+function updateMcStrip() {
+  const n = $('#mc-strip'); if (!n) return;
+  const mc = S.mc; if (!mc || !mc.visible) { n.hidden = true; return; }
+  n.hidden = false;
+  const ev = E.stats(mc.ev), la = E.stats(mc.la), sp = E.stats(mc.sprayL), ds = E.stats(mc.dist);
+  const hr = mc.outcome.filter(o => o === 'hr').length / mc.n * 100;
+  n.classList.toggle('stale', !!S.mcStale);
+  n.innerHTML = '<b>' + mc.n + ' random swings around yours</b><span>Exit velocity ' + fmt(ev.mean, 1) + ' ± ' + fmt(ev.sd, 1) + ' mph</span><span>Launch angle ' + fmt(la.mean, 1) + ' ± ' + fmt(la.sd, 1) + '°</span><span>Spray ' + fmt(sp.mean, 1) + ' ± ' + fmt(sp.sd, 1) + '°</span><span>Carry ' + fmt(ds.mean, 0) + ' ± ' + fmt(ds.sd, 0) + ' ft · ' + fmt(hr, 0) + '% home runs</span>' + (S.mcStale ? '<em>updating…</em>' : '');
+}
+function scheduleAutoMC() {
+  if (!S.mcAuto || !S.mc) return;
+  clearTimeout(S.mcAutoT); S.mcAutoT = setTimeout(() => runMC(true), 500);
+}
+function runMC(quiet) {
+  quiet = quiet === true;
+  const n = clamp(parseInt($('#mc-n').value, 10) || 500, 10, 5000), seed = parseInt($('#mc-seed').value, 10) || 1, dist = $('#mc-dist').value;
+  const spec = {};
+  MC_ROWS[S.p.mode].concat(MC_ROWS.env).forEach(r => { const sd = S.sigma[r[0]]; if (sd > 0) spec[r[0]] = { sd, dist }; });
+  const base = Object.assign({}, S.p);
+  const mc = E.createMC(base, spec, n, seed, { tracks: true, dt: quiet ? 0.003 : 0.002, sampleDt: 1 / 30 });
+  mc.visible = false; mc.spec = spec; mc.base = base; mc.ver = S.inVer;
+  const job = S.mcJob = (S.mcJob || 0) + 1;
+  const prog = $('#mc-prog');
+  if (!quiet) {
+    S.mc = mc; S.mcStale = false;
+    prog.hidden = false; $('i', prog).style.width = '0%';
+    $('#mc-run').disabled = true; $('#mc-play').disabled = true; stopPlay();
+    $('#mc-out').innerHTML = '';
+  }
+  (function next() {
+    if (job !== S.mcJob) return;
+    const t0 = performance.now();
+    while (mc.done < mc.n && performance.now() - t0 < 24) mc.step(10);
+    if (!quiet) $('i', prog).style.width = (mc.done / mc.n * 100) + '%';
+    if (mc.done < mc.n) { setTimeout(next, 0); return; }
+    finishMC(mc, quiet);
+  })();
+}
+function finishMC(mc, quiet) {
+  S.mc = mc; S.mcStale = mc.ver !== S.inVer; if (S.mcStale) scheduleAutoMC();
+  mc.visible = true; $('#mc-prog').hidden = true; $('#mc-run').disabled = false; $('#mc-play').disabled = false;
+  $('#t-ens-wrap').hidden = false; if (!quiet) { $('#t-ens').checked = true; S.opt.ens = true; }
+  const xs = Array.from(mc.landX, v => v * FT), ys = Array.from(mc.landY, v => v * FT);
+  mc.ell68 = E.ellipse(xs, ys, 2.296); mc.ell95 = E.ellipse(xs, ys, 5.991);
+  if (quiet) S.play.t = Math.max(S.play.t, totalDur()); else S.play.t = 0;
+  renderMcResults(); updateMcStrip(); updateDerived(); updateHud();
+  if (!quiet) startPlay(true); else requestRender();
+}
+function updateMcStaleNote() {
+  const n = $('#mc-stale'); if (!n) return; n.hidden = !S.mcStale;
+}
+function renderMcResults() {
+  const mc = S.mc, out = $('#mc-out'), n = mc.n;
+  const cnt = { hr: 0, wall: 0, inplay: 0, foul: 0 }; mc.outcome.forEach(o => { cnt[o] = (cnt[o] || 0) + 1; });
+  const ds = E.stats(mc.dist), hs = E.stats(mc.hang), as = E.stats(mc.apex), es = E.stats(mc.ev), ls = E.stats(mc.la);
+  const row = (name, s, d, u) => '<tr><td>' + name + '</td><td>' + fmt(s.mean, d) + ' ± ' + fmt(s.sd, d) + '</td><td>' + fmt(s.p50, d) + '</td><td>' + fmt(s.p5, d) + ' – ' + fmt(s.p95, d) + '</td><td>' + u + '</td></tr>';
+  const pctOf = k => (cnt[k] / n * 100);
+  const e = mc.ell68;
+  const sig = e ? { a: e.a / Math.sqrt(2.296) / FT, b: e.b / Math.sqrt(2.296) / FT } : null;
+  out.innerHTML =
+    '<div id="mc-stale" class="note" style="color:var(--accent)" hidden>Inputs changed since this run. Press Run to refresh.</div>' +
+    '<div class="tiles">' +
+    tile('Home runs', fmt(pctOf('hr'), 1), '%', 1) + tile('Off the wall', fmt(pctOf('wall'), 1), '%') + tile('In play', fmt(pctOf('inplay'), 1), '%') + tile('Foul', fmt(pctOf('foul'), 1), '%') +
+    tile('Mean distance', fmt(ds.mean, 0), 'ft') + tile('Spread (1σ)', fmt(ds.sd, 1), 'ft') +
+    (sig ? tile('Landing ellipse', fmt(sig.a, 0) + ' × ' + fmt(sig.b, 0), 'ft 1σ') : '') + tile('Balls flown', n, '') + '</div>' +
+    '<div class="legend">' + ['hr', 'wall', 'inplay', 'foul'].map(k => '<span><i style="background:' + T[OUTCOME[k].col] + '"></i>' + OUTCOME[k].label + '</span>').join('') +
+    '<span>Overhead view: solid ellipse = 68%, dashed = 95% of landings</span></div>' +
+    '<div class="tablewrap"><table class="dt"><thead><tr><th>Measure</th><th>mean ± sd</th><th>median</th><th>5th – 95th pct.</th><th></th></tr></thead><tbody>' +
+    row('Distance', ds, 1, 'ft') + row('Hang time', hs, 2, 's') + row('Apex height', as, 1, 'ft') + row('Exit velocity', es, 1, 'mph') + row('Launch angle', ls, 1, '°') + '</tbody></table></div>' +
+    '<div class="two"><div><h3>Distance <small>stacked by outcome</small></h3><canvas class="plot" id="mc-h1" height="190"></canvas></div><div><h3>Hang time</h3><canvas class="plot" id="mc-h2" height="190"></canvas></div></div>' +
+    '<div><h3>What drives the spread <small>share of distance variance explained by each random input</small></h3><div class="budget" id="mc-sens"></div></div>';
+  histogram($('#mc-h1'), mc.dist, mc.outcome, 'ft'); histogram($('#mc-h2'), mc.hang, mc.outcome, 's');
+  // sensitivity
+  const keys = mc.keys, items = keys.map(k => { const r = E.corr(mc.inputs[k], mc.dist); return { k, r, v: r * r }; }).sort((a, b) => b.v - a.v);
+  const sum = items.reduce((s, x) => s + x.v, 0), box = $('#mc-sens');
+  const label = k => { for (const g in MC_ROWS) for (const r of MC_ROWS[g]) if (r[0] === k) return r[1]; return k; };
+  items.forEach(it => box.appendChild(el('div', { class: 'brow' }, [el('span', { text: label(it.k) }),
+    el('div', { class: 'bar' }, [el('i', { style: 'left:0;width:' + Math.min(100, it.v * 100) + '%;background:' + (it.r >= 0 ? 'var(--c-in)' : 'var(--c-wall)') })]),
+    el('span', { class: 'val', text: fmt(it.v * 100, 0) + '% ' + (it.r >= 0 ? '↑' : '↓') })])));
+  box.appendChild(el('div', { class: 'brow' }, [el('span', { text: 'Interactions, other' }), el('div', { class: 'bar' }, [el('i', { style: 'left:0;width:' + Math.max(0, 100 - sum * 100) + '%;background:var(--ghost)' })]), el('span', { class: 'val', text: fmt(Math.max(0, 1 - sum) * 100, 0) + '%' })]));
+  box.appendChild(el('p', { class: 'note', text: '↑ more of the input gives more distance, ↓ less. The correlation uses all ' + n + ' balls.' }));
+}
+function histogram(cv, vals, outs, unit) {
+  const { g, W, H } = setupCv(cv), m = { l: 38, r: 10, t: 8, b: 28 };
+  const a = Array.from(vals).filter(isFinite); if (!a.length) return;
+  let lo = Math.min.apply(null, a), hi = Math.max.apply(null, a); if (hi - lo < 1e-6) { hi = lo + 1; }
+  const nb = clamp(Math.round(Math.sqrt(a.length) * 1.1), 8, 40), bw = (hi - lo) / nb;
+  const keys = ['hr', 'wall', 'inplay', 'foul'], bins = Array.from({ length: nb }, () => ({ hr: 0, wall: 0, inplay: 0, foul: 0, t: 0 }));
+  for (let i = 0; i < vals.length; i++) { if (!isFinite(vals[i])) continue; const b = Math.min(nb - 1, Math.floor((vals[i] - lo) / bw)); const o = outs[i] in bins[b] ? outs[i] : 'inplay'; bins[b][o]++; bins[b].t++; }
+  const mx = Math.max.apply(null, bins.map(b => b.t)) * 1.1;
+  const ax = axes(g, W, H, m, lo, hi, 0, mx, unit, 'balls');
+  bins.forEach((b, i) => {
+    let acc = 0; keys.forEach(k => { if (!b[k]) return; const y0 = ax.py(acc), y1 = ax.py(acc + b[k]); g.fillStyle = T[OUTCOME[k].col]; g.fillRect(ax.px(lo + i * bw) + 0.5, y1, ax.px(lo + bw) - ax.px(lo) - 1, y0 - y1); acc += b[k]; });
+  });
+  const s = E.stats(a); g.strokeStyle = T.ink; g.lineWidth = 1.6; g.beginPath(); g.moveTo(ax.px(s.mean), m.t); g.lineTo(ax.px(s.mean), H - m.b); g.stroke();
+}
+$('#mc-run').addEventListener('click', () => runMC(false));
+$('#mc-play').addEventListener('click', () => { if (!S.mc) return; S.mc.visible = true; S.opt.ens = true; $('#t-ens').checked = true; startPlay(true); });
+
+/* ---------- Hit finder ---------- */
+function ensureHF() {
+  const out = $('#hf-out');
+  if ($('#hf-cv')) return;
+  out.innerHTML = '<div class="tiles" id="hf-sum"></div><div id="hf-status" class="note"></div><div class="prog" id="hf-prog"><i></i></div>' +
+    '<h3>Swings that land there <small>exit velocity on the horizontal axis, launch angle on the vertical. Hover or click a curve.</small></h3>' +
+    '<canvas class="plot" id="hf-cv" height="320"></canvas>' +
+    '<div class="legend"><span><i style="background:var(--c-in)"></i>Line drive branch (lower angle)</span><span><i style="background:var(--c-wall)"></i>Fly ball branch (higher angle)</span><span><i style="background:var(--ghost)"></i>Angle for maximum carry</span><span>Shaded: lands within the tolerance</span></div>' +
+    '<div class="tablewrap"><table class="dt" id="hf-tbl"></table></div>';
+  const cv = $('#hf-cv');
+  cv.addEventListener('pointermove', e => hfHover(e)); cv.addEventListener('pointerleave', () => { S.hf.hover = null; drawHF(); });
+  cv.addEventListener('click', e => { const h = hfNearest(e); if (h) applySolution(h.row, h.br); });
+}
+function hfScales(W, H) {
+  const rows = S.hf.rows || []; let lo = -5, hi = 75;
+  rows.forEach(r => ['low', 'high'].forEach(b => { if (r[b]) { lo = Math.min(lo, r[b].la - 4); hi = Math.max(hi, r[b].la + 4); } }));
+  return { x0: 55, x1: 125, y0: Math.max(-30, Math.floor(lo / 5) * 5), y1: Math.min(85, Math.ceil(hi / 5) * 5) };
+}
+function hfCurves() {
+  const rows = (S.hf.rows || []).filter(r => r.low || r.high), low = [], high = [];
+  rows.forEach(r => { if (r.low) low.push({ ev: r.ev, la: r.low.la, row: r, br: 'low' }); if (r.high) high.push({ ev: r.ev, la: r.high.la, row: r, br: 'high' }); });
+  // closing tip where the two branches meet
+  const all = S.hf.rows || [], D = S.hf.D; let tip = null;
+  for (let i = 1; i < all.length; i++) {
+    if (all[i - 1].peakDist < D && all[i].peakDist >= D) { const f = (D - all[i - 1].peakDist) / (all[i].peakDist - all[i - 1].peakDist); tip = { ev: all[i - 1].ev + f * 2.5, la: all[i - 1].peakLA + f * (all[i].peakLA - all[i - 1].peakLA) }; break; }
+  }
+  return { low, high, tip, all };
+}
+function drawHF() {
+  const cv = $('#hf-cv'); if (!cv) return;
+  const { g, W, H } = setupCv(cv), m = { l: 44, r: 12, t: 10, b: 32 };
+  const sc = hfScales(W, H), a = axes(g, W, H, m, sc.x0, sc.x1, sc.y0, sc.y1, 'exit velocity (mph)', 'launch angle (°)');
+  const c = hfCurves();
+  if (S.hf.tol > 0) {
+    g.fillStyle = 'rgba(128,140,134,0.2)';
+    const strip = (k1, k2) => {
+      const pts1 = [], pts2 = [];
+      (S.hf.rows || []).forEach(r => { if (r.band && r.band[k1] !== undefined && r.band[k1] !== null && r.band[k2] !== undefined && r.band[k2] !== null) { pts1.push([a.px(r.ev), a.py(r.band[k1])]); pts2.push([a.px(r.ev), a.py(r.band[k2])]); } });
+      if (pts1.length < 2) return; g.beginPath(); pts1.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); pts2.reverse().forEach(p => g.lineTo(p[0], p[1])); g.closePath(); g.fill();
+    };
+    strip('lowA', 'lowB'); strip('highA', 'highB');
+  }
+  g.setLineDash([5, 4]); g.strokeStyle = T.ghost; g.lineWidth = 1.4; g.beginPath(); let st0 = false;
+  (S.hf.rows || []).forEach(r => { if (r.peakDist >= S.hf.D - S.hf.tol) { const x = a.px(r.ev), y = a.py(r.peakLA); st0 ? g.lineTo(x, y) : g.moveTo(x, y); st0 = true; } }); g.stroke(); g.setLineDash([]);
+  const draw = (arr, col) => {
+    if (!arr.length) return; g.strokeStyle = col; g.lineWidth = 2.6; g.beginPath();
+    if (c.tip) g.moveTo(a.px(c.tip.ev), a.py(c.tip.la));
+    arr.forEach((p, i) => { const x = a.px(p.ev), y = a.py(p.la); (i || c.tip) ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.stroke();
+    arr.forEach(p => { g.fillStyle = col; const ok = (p.row[p.br].valid !== false); g.globalAlpha = ok ? 1 : 0.35; g.beginPath(); g.arc(a.px(p.ev), a.py(p.la), 2.6, 0, 7); g.fill(); g.globalAlpha = 1; });
+  };
+  draw(c.low, T['c-in']); draw(c.high, T['c-wall']);
+  if (c.tip) { g.fillStyle = T.ink; g.beginPath(); g.arc(a.px(c.tip.ev), a.py(c.tip.la), 4, 0, 7); g.fill(); g.font = monoFont(11); g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('min ' + fmt(c.tip.ev, 0) + ' mph', a.px(c.tip.ev) + 8, a.py(c.tip.la)); }
+  // current swing
+  const mp = S.sim.meta; if (mp.ev >= sc.x0 && mp.ev <= sc.x1) { g.strokeStyle = T.accent; g.lineWidth = 2; g.beginPath(); g.arc(a.px(mp.ev), a.py(mp.la), 6, 0, 7); g.stroke(); }
+  if (S.hf.sel) { const s = S.hf.sel; g.strokeStyle = T.ink; g.lineWidth = 2; g.beginPath(); g.arc(a.px(s.ev), a.py(s.la), 7, 0, 7); g.stroke(); }
+  if (S.hf.hover) { const h = S.hf.hover; g.fillStyle = T.accent; g.beginPath(); g.arc(a.px(h.ev), a.py(h.la), 5, 0, 7); g.fill(); }
+  cv._a = a; cv._m = m;
+}
+function hfNearest(e) {
+  const cv = $('#hf-cv'), a = cv._a; if (!a) return null;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, c = hfCurves();
+  let best = null, bd = 28 * 28;
+  c.low.concat(c.high).forEach(p => { const dx = a.px(p.ev) - x, dy = a.py(p.la) - y, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = p; } });
+  return best;
+}
+function hfHover(e) {
+  const h = hfNearest(e), cv = $('#hf-cv'), tip = $('#tip');
+  S.hf.hover = h; drawHF();
+  cv.style.cursor = h ? 'pointer' : 'default';
+  if (h) {
+    const s = h.row[h.br], tg = S.hf.tAng;
+    cv.title = fmt(h.ev, 1) + ' mph at ' + fmt(h.la, 1) + '° · aim ' + sgn(s.psi, 1) + '° · hang ' + fmt(s.hang, 2) + ' s';
+  } else cv.title = '';
+}
+function startSolve() {
+  if (!S.target) return;
+  ensureHF();
+  const job = ++S.hf.job, tgt = S.target, D = Math.hypot(tgt.x, tgt.y) / FT, tAng = Math.atan2(tgt.x, tgt.y) * R2D;
+  const meta = S.sim.meta;
+  const base = Object.assign({}, S.p, { mode: 'ball', dBack: 0, dSide: 0 });
+  if (S.hf.spin === 'auto') base.autoSpin = true; else Object.assign(base, { autoSpin: false, backspin: meta.back, sidespin: meta.side });
+  const ctx = E.prepare(base), evs = []; for (let ev = 55; ev <= 125.01; ev += 2.5) evs.push(ev);
+  Object.assign(S.hf, { rows: [], D, tAng, base, busy: true, n: evs.length, sel: null });
+  renderHF();
+  let i = 0;
+  (function next() {
+    if (job !== S.hf.job) return;
+    const t0 = performance.now();
+    while (i < evs.length && performance.now() - t0 < 35) { S.hf.rows.push(E.solveRow(ctx, base, evs[i], tAng, D, S.hf.tol)); i++; }
+    renderHF();
+    if (i < evs.length) setTimeout(next, 0); else { S.hf.busy = false; renderHF(); requestRender(); }
+  })();
+}
+function renderHF() {
+  if (!S.target) return;
+  ensureHF();
+  const hf = S.hf, rows = hf.rows || [], D = hf.D, tA = hf.tAng;
+  const where = fmt(D, 0) + ' ft · ' + (Math.abs(tA) < 0.5 ? 'dead center' : fmt(Math.abs(tA), 1) + '° toward ' + (tA < 0 ? 'left' : 'right') + ' field') + (Math.abs(tA) > 45 ? ' (foul territory)' : '');
+  $('#hf-prog').hidden = !hf.busy; $('#hf-prog i').style.width = (rows.length / (hf.n || 1) * 100) + '%';
+  const c = hfCurves();
+  let sum = '';
+  const any = rows.some(r => r.low || r.high);
+  if (!hf.busy || any) {
+    if (!any && !hf.busy) sum = tileWide('Target', where) + '<div class="tile" style="grid-column:span 3"><small>Result</small><div class="v" style="font-size:15px">No swing up to 125 mph reaches this spot with the current weather.</div></div>';
+    else if (any) {
+      const first = rows.find(r => r.low || r.high), reachable = rows.filter(r => r.low || r.high);
+      const atFloor = first === rows[0];
+      sum = tileWide('Target', where) + tile('Minimum exit velocity', (atFloor ? '≤ ' : '≈ ') + fmt(c.tip ? c.tip.ev : first.ev, 0), 'mph', 1) + (c.tip ? tile('At launch angle', fmt(c.tip.la, 0), '°') : '') +
+        tile('Line-drive angles', reachable.length ? fmt(Math.min.apply(null, reachable.filter(r => r.low).map(r => r.low.la)), 0) + ' – ' + fmt(Math.max.apply(null, reachable.filter(r => r.low).map(r => r.low.la).concat([-99])), 0) : '–', '°') +
+        tile('Fly-ball angles', reachable.some(r => r.high) ? fmt(Math.min.apply(null, reachable.filter(r => r.high).map(r => r.high.la)), 0) + ' – ' + fmt(Math.max.apply(null, reachable.filter(r => r.high).map(r => r.high.la)), 0) : '–', '°');
+    }
+  } else sum = tileWide('Target', where);
+  $('#hf-sum').innerHTML = sum;
+  $('#hf-status').textContent = hf.busy ? 'Solving… ' + rows.length + ' of ' + hf.n + ' exit velocities' : (hf.sel && S.sim.landing ? 'Selected swing lands ' + fmt(Math.hypot(S.sim.landing.x - S.target.x, S.sim.landing.y - S.target.y) / FT, 1) + ' ft from the spot (' + fmt(hf.sel.ev, 1) + ' mph at ' + fmt(hf.sel.la, 1) + '°).' : 'Click a point on a curve, or press Fly in the table, to play that swing.');
+  drawHF();
+  // table
+  const pick = rows.filter(r => [60, 70, 80, 90, 95, 100, 105, 110, 115, 120].includes(r.ev));
+  const cell = (s, r, br) => s ? '<td>' + fmt(s.la, 1) + '°</td><td>' + sgn(s.psi, 1) + '°</td><td>' + fmt(s.hang, 2) + ' s</td><td>' + (s.valid === false ? '<span title="Would hit the wall">wall</span>' : '<button class="btn sm" data-ev="' + r.ev + '" data-br="' + br + '">Fly</button>') + '</td>' : '<td colspan="4" style="text-align:center;color:var(--muted)">–</td>';
+  $('#hf-tbl').innerHTML = '<thead><tr><th>Exit velo.</th><th colspan="4" style="text-align:center">Line-drive branch</th><th colspan="4" style="text-align:center">Fly-ball branch</th></tr><tr><th></th><th>Angle</th><th>Aim</th><th>Hang</th><th></th><th>Angle</th><th>Aim</th><th>Hang</th><th></th></tr></thead><tbody>' +
+    pick.map(r => '<tr><td>' + fmt(r.ev, 0) + ' mph</td>' + cell(r.low, r, 'low') + cell(r.high, r, 'high') + '</tr>').join('') + '</tbody>';
+  $$('#hf-tbl button').forEach(b => b.addEventListener('click', () => { const r = rows.find(x => x.ev === +b.dataset.ev); applySolution(r, b.dataset.br); }));
+}
+function applySolution(row, br) {
+  const s = row && row[br]; if (!s) return;
+  const hf = S.hf;
+  S.p.mode = 'ball'; S.p.ev = row.ev; S.p.la = +s.la.toFixed(2); S.p.spray = +s.psi.toFixed(2);
+  if (hf.spin === 'auto') S.p.autoSpin = true; else { S.p.autoSpin = false; S.p.backspin = Math.round(hf.base.backspin); S.p.sidespin = Math.round(hf.base.sidespin); }
+  hf.sel = { ev: row.ev, la: s.la, br };
+  applyMode(); syncAll(); hf.skip = true; recompute(false); hf.skip = false;
+  startPlay(true); renderHF();
+}
+$('#hf-spin').addEventListener('change', e => { S.hf.spin = e.target.value; if (S.target) startSolve(); });
+$('#hf-tol').addEventListener('input', e => { S.hf.tol = clamp(parseFloat(e.target.value) || 0, 0, 40); clearTimeout(S.hfT2); S.hfT2 = setTimeout(() => { if (S.target) startSolve(); }, 400); requestRender(); });
+$('#hf-view').addEventListener('click', () => { S.view = 'top'; $$('#views button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.view === 'top'))); requestRender(); $('#stagewrap').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); });
+
+/* ---------- EV x LA map ---------- */
+function hex(c) { const m = /^#([0-9a-f]{6})$/i.exec(c.trim()); if (!m) return [128, 128, 128]; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function ramp(f) {
+  const stops = ['heat-0', 'heat-1', 'heat-2', 'heat-3', 'heat-4'].map(k => hex(T[k])), x = clamp(f, 0, 1) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), u = x - i;
+  return stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * u));
+}
+function runSweep() {
+  const job = ++S.sw.job; S.sw.stale = false;
+  const meta = S.sim.meta, base = Object.assign({}, S.p, { mode: 'ball', dBack: 0, dSide: 0, spray: S.sim.meta.spray });
+  if (S.p.mode === 'bat' || !S.p.autoSpin) Object.assign(base, { autoSpin: false, backspin: meta.back, sidespin: meta.side });
+  const ctx = E.prepare(base), evs = [], las = [];
+  for (let v = 50; v <= 125.01; v += 2.5) evs.push(v); for (let v = -10; v <= 70.01; v += 2.5) las.push(v);
+  const dist = new Float64Array(evs.length * las.length), hr = new Uint8Array(dist.length);
+  S.sw.data = { evs, las, dist, hr, done: 0, base, spray: base.spray };
+  $('#sw-status').textContent = 'Computing…';
+  let i = 0;
+  (function next() {
+    if (job !== S.sw.job) return;
+    const t0 = performance.now();
+    while (i < evs.length && performance.now() - t0 < 30) {
+      for (let j = 0; j < las.length; j++) { const r = E.evalShot(ctx, base, evs[i], las[j], base.spray, 0.004); dist[i * las.length + j] = r.landing ? r.landing.dist : 0; hr[i * las.length + j] = r.outcome === 'hr' ? 1 : 0; }
+      i++;
+    }
+    S.sw.data.done = i; drawSweep();
+    if (i < evs.length) setTimeout(next, 0); else $('#sw-status').textContent = 'Spray angle ' + sgn(base.spray, 1) + '° · ' + (base.autoSpin ? 'spin follows launch angle' : 'spin held at ' + fmt(base.backspin, 0) + ' rpm back, ' + fmt(base.sidespin, 0) + ' side');
+  })();
+}
+function markSweepStale() { $('#sw-status').textContent = 'Inputs changed. Press Compute map to refresh.'; S.sw.stale = true; }
+function drawSweep() {
+  const d = S.sw.data, cv = $('#sw-cv'); if (!d) return;
+  const { g, W, H } = setupCv(cv), m = { l: 44, r: 12, t: 10, b: 32 };
+  const a = axes(g, W, H, m, 47.5, 127.5, -11.25, 71.25, 'exit velocity (mph)', 'launch angle (°)');
+  const nL = d.las.length, maxD = 560, band = 50;
+  const cw = a.px(d.evs[1]) - a.px(d.evs[0]), ch = a.py(d.las[0]) - a.py(d.las[1]);
+  for (let i = 0; i < d.done; i++) for (let j = 0; j < nL; j++) {
+    const v = d.dist[i * nL + j], c = ramp(Math.floor(v / band) * band / maxD);
+    g.fillStyle = 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; g.fillRect(a.px(d.evs[i]) - cw / 2, a.py(d.las[j]) - ch / 2, cw + 0.6, ch + 0.6);
+  }
+  g.lineWidth = 2; g.strokeStyle = T['c-hr'];
+  for (let i = 0; i < d.done; i++) for (let j = 0; j < nL; j++) {
+    const h = d.hr[i * nL + j];
+    if (i + 1 < d.done && d.hr[(i + 1) * nL + j] !== h) { const x = a.px(d.evs[i]) + cw / 2; g.beginPath(); g.moveTo(x, a.py(d.las[j]) - ch / 2); g.lineTo(x, a.py(d.las[j]) + ch / 2); g.stroke(); }
+    if (j + 1 < nL && d.hr[i * nL + j + 1] !== h) { const y = a.py(d.las[j]) - ch / 2; g.beginPath(); g.moveTo(a.px(d.evs[i]) - cw / 2, y); g.lineTo(a.px(d.evs[i]) + cw / 2, y); g.stroke(); }
+  }
+  const mp = S.sim.meta; g.strokeStyle = T.ink; g.lineWidth = 2; g.beginPath(); g.arc(a.px(mp.ev), a.py(mp.la), 6, 0, 7); g.stroke();
+  if (S.sw.hover) { const h = S.sw.hover; g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(a.px(d.evs[h.i]) - cw / 2, a.py(d.las[h.j]) - ch / 2, cw, ch); }
+  cv._a = a; cv._cw = cw; cv._ch = ch;
+  const lg = $('#sw-legend'); lg.innerHTML = '';
+  for (let v = 0; v <= 500; v += 100) { const c = ramp(v / maxD); lg.appendChild(el('span', { html: '<i style="background:rgb(' + c.join(',') + ');border-radius:2px"></i>' + v + (v === 500 ? '+' : '') + ' ft' })); }
+  lg.appendChild(el('span', { html: '<i style="background:none;border:2px solid var(--c-hr);border-radius:2px"></i>Home-run region (clears the fence at this spray angle)' }));
+}
+function sweepCell(e) {
+  const cv = $('#sw-cv'), d = S.sw.data; if (!d || !cv._a) return null;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, a = cv._a;
+  let bi = -1, bj = -1, bd = 1e9;
+  d.evs.forEach((ev, i) => { const dx = Math.abs(a.px(ev) - x); if (dx < bd) { bd = dx; bi = i; } }); bd = 1e9;
+  d.las.forEach((la, j) => { const dy = Math.abs(a.py(la) - y); if (dy < bd) { bd = dy; bj = j; } });
+  if (bi < 0 || bi >= d.done) return null;
+  const cw = cv._cw, ch = cv._ch; if (Math.abs(a.px(d.evs[bi]) - x) > cw / 2 + 1 || Math.abs(a.py(d.las[bj]) - y) > ch / 2 + 1) return null;
+  return { i: bi, j: bj, ev: d.evs[bi], la: d.las[bj], dist: d.dist[bi * d.las.length + bj], hr: d.hr[bi * d.las.length + bj] };
+}
+$('#sw-cv').addEventListener('pointermove', e => { const c = sweepCell(e); S.sw.hover = c; drawSweep(); $('#sw-cv').title = c ? fmt(c.ev, 1) + ' mph at ' + fmt(c.la, 1) + '°: ' + fmt(c.dist, 0) + ' ft' + (c.hr ? ' (home run)' : '') : ''; });
+$('#sw-cv').addEventListener('pointerleave', () => { S.sw.hover = null; drawSweep(); });
+$('#sw-cv').addEventListener('click', e => {
+  const c = sweepCell(e); if (!c) return;
+  S.p.mode = 'ball'; S.p.ev = c.ev; S.p.la = c.la; applyMode(); syncAll(); recompute(false); startPlay(true); drawSweep();
+});
+$('#sw-run').addEventListener('click', runSweep);
+
+/* ---------- Physics tab ---------- */
+function fillPhysics() {
+  if (!S.ctx) return;
+  const c = S.ctx, p = S.p;
+  $('#eqs').textContent =
+    'State:  position r = (x, y, z), velocity v, spin ω.   x → right field, y → center field, z → up.\n' +
+    'Motion: m dv/dt = F_gravity + F_drag + F_Magnus + F_Coriolis      (RK4, 1 ms steps)\n\n' +
+    'Drag:     F_d = ½ ρ A C_D |v_rel| v_rel          v_rel = v − wind(z)\n' +
+    '          C_D = C_D,hi + ΔC_D / (1 + exp((|v_rel| − 22 m/s) / 4 m/s))     (drag crisis at low speed)\n' +
+    'Magnus:   F_L = ½ ρ A C_L |v_rel|² · (ω⊥ × v̂) / |ω⊥|        C_L = k·S / (0.4 + 2.32 S),   S = R|ω⊥| / |v_rel|\n' +
+    'Spin:     ω(t) = ω₀ e^(−t/τ)           (direction fixed; only the part perpendicular to v makes lift)\n' +
+    'Air:      ρ = p_d/(R_d T) + p_v/(R_v T),   p = p_sl (1 − 2.25577×10⁻⁵ h)^5.25588,   ρ(z) = ρ₀ e^(−z/8400 m)\n' +
+    'Wind:     w(z) = w₁₀ (z / 10 m)^α            (clamped between 0.5 m and 80 m)\n' +
+    'Gravity:  g(φ, h) = 9.780327 (1 + 0.0053024 sin²φ − 0.0000058 sin²2φ) − 3.086×10⁻⁶ h\n' +
+    'Coriolis: a = −2 Ω × v,   Ω = 7.2921×10⁻⁵ rad/s resolved into the field frame\n' +
+    'Ground:   normal restitution e = e₀ − 0.008|v_n|; friction impulse limited by μ(1+e)|v_n|; rolling decays by drag + μ_r g\n' +
+    'Contact:  v_n,out = A v_bat,n − (A−1) v_ball,n  along the contact normal; tangential impulse = κ · (k/(1+k)) × slip, capped at μ J_n;\n' +
+    '          spin from Δω = r_c × J_t / (k m R²). Normal tilt = attack angle + offset angle, so a centred hit follows the swing plane.';
+  const rows = [['Air density ρ', c.rho0.toFixed(4), 'kg/m³'], ['Gravity g', c.g.toFixed(4), 'm/s²'], ['Ball mass', (c.m * 1000).toFixed(2), 'g'], ['Ball radius', (c.R * 1000).toFixed(2), 'mm'],
+    ['Cross-section A', (c.A * 1e4).toFixed(2), 'cm²'], ['C_D (high speed)', p.cd.toFixed(3), ''], ['Lift scale k', p.clScale.toFixed(2), ''], ['Spin decay τ', p.tau >= 1e5 ? 'none' : p.tau.toFixed(0), 's'],
+    ['Wind at 10 m', (p.windMph).toFixed(1), 'mph'], ['Coriolis Ω (x, y, z)', [c.Ox, c.Oy, c.Oz].map(v => (v * 1e5).toFixed(2)).join(', '), '×10⁻⁵ rad/s'],
+    ['Terminal fall speed', (Math.sqrt(2 * c.m * c.g / (c.rho0 * c.A * p.cd)) / MPH).toFixed(0), 'mph']];
+  $('#const-tbl').innerHTML = '<tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td style="text-align:left;color:var(--muted)">' + r[2] + '</td></tr>').join('') + '</tbody>';
+  $('#limits').innerHTML = '<h3>What it leaves out</h3><p class="note">Seam orientation effects on lift and drag, ball-to-ball roughness (use Monte Carlo drag spread), spin-axis precession, bat flexing and vibration beyond the sweet-spot fit, turbulence and gusts, and real stadium airflow. The wind is a steady power-law profile, and the ground model is a simple rigid-body bounce. Treat distances as good to a few feet in controlled conditions, and weaker for unusual spin or wind.</p>';
+}
+function runValidation() {
+  const FT_ = FT, rows = [], add = (name, expect, got, ok) => rows.push([name, expect, got, ok]);
+  const mk = o => Object.assign({}, E.DEFAULTS, o);
+  const run = (o, opt) => E.run(mk(o), Object.assign({ dt: 0.001 }, opt));
+  {
+    const o = { ev: 100, la: 30, spray: 0, y0: 0, contactFt: 0, autoSpin: false, backspin: 0, dragOn: false, liftOn: false, coriolisOn: false, latitude: 0 };
+    const c = E.prepare(mk(o)), ic = E.makeIC(mk(o)).ic; ic.z = c.R;
+    const r = E.simulate(c, ic, { dt: 0.001 }), an = Math.pow(100 * MPH, 2) * Math.sin(60 * D2R) / c.g / FT_;
+    add('Vacuum range, 100 mph at 30°', fmt(an, 2) + ' ft (closed form)', fmt(r.landing.dist, 2) + ' ft', Math.abs(r.landing.dist - an) < 0.05);
+  }
+  {
+    const a = run({ ev: 105, la: 27, spray: 5 }, { dt: 0.004 }).landing.dist, b = run({ ev: 105, la: 27, spray: 5 }, { dt: 0.0005 }).landing.dist;
+    add('RK4 step-size convergence', '< 0.05 ft apart', fmt(Math.abs(a - b), 4) + ' ft', Math.abs(a - b) < 0.05);
+  }
+  {
+    const o = mk({}), c = E.prepare(o), ic = { x: 0, y: 0, z: 3000, vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0 };
+    const r = E.simulate(c, ic, { dt: 0.002, tmax: 80, record: true, sampleDt: 1 });
+    const vz = Math.abs(r.tr.vz[r.tr.vz.length - 1]), vt = Math.sqrt(2 * c.m * c.g / (c.rho0 * c.A * o.cd));
+    add('Terminal speed in a long drop', fmt(vt / MPH, 1) + ' mph', fmt(vz / MPH, 1) + ' mph', Math.abs(vz - vt) / vt < 0.02);
+  }
+  {
+    const r = run({ ev: 107.3, la: 26.1, spray: 0, autoSpin: false, backspin: 1860, sidespin: 0, contactFt: 3.5, y0: 2 * FT_, park: 'dome', tau: 1e9 });
+    add('Nathan’s A-Rod fit: distance', '470.5 ft (Statcast)', fmt(r.landing.dist, 1) + ' ft', Math.abs(r.landing.dist - 470.5) < 6);
+    add('Nathan’s A-Rod fit: apex height', '96.0 ft (Statcast)', fmt(r.apexFt, 1) + ' ft', Math.abs(r.apexFt - 96) < 3);
+  }
+  {
+    const o = { ev: 100, la: 28, spray: 0, autoSpin: false, backspin: 2200 }, d0 = run(o).landing.dist, d1 = run(Object.assign({}, o, { tempF: 82 })).landing.dist;
+    add('Temperature, per °F on a ~420 ft ball', '≈ 0.33 ft (Nathan)', fmt((d1 - d0) / 10, 2) + ' ft', (d1 - d0) / 10 > 0.2 && (d1 - d0) / 10 < 0.5);
+    const dc = run(Object.assign({}, o, { elevFt: 5190 })).landing.dist;
+    add('Coors Field air, 5,190 ft', '+5 to +9% (published range)', sgn((dc / d0 - 1) * 100, 1) + '%', dc / d0 > 1.05 && dc / d0 < 1.09);
+    const wo = run(Object.assign({}, o, { windMph: 10, windDir: 0 })).landing.dist, wi = run(Object.assign({}, o, { windMph: 10, windDir: 180 })).landing.dist;
+    add('Headwind costs more than a tailwind gains', '|in| > |out|', sgn(wi - d0, 1) + ' / ' + sgn(wo - d0, 1) + ' ft', (d0 - wi) > (wo - d0));
+    const ns = run(Object.assign({}, o, { backspin: 0 })).landing.dist;
+    add('Backspin lengthens the carry', 'spin > no spin', fmt(d0, 0) + ' vs ' + fmt(ns, 0) + ' ft', d0 > ns);
+    const hk = run(Object.assign({}, o, { sidespin: 1500 }));
+    add('+ sidespin hooks toward left field', 'landing x < 0', sgn(hk.landing.x / FT_, 1) + ' ft', hk.landing.x < 0);
+  }
+  {
+    const o = mk({ ev: 100, la: 28, dragOn: false, liftOn: false, coriolisOn: false, autoSpin: false, backspin: 0 }), c = E.prepare(o), ic = E.makeIC(o).ic;
+    const r = E.simulate(c, ic, { dt: 0.001, record: true, sampleDt: 0.01 }), tr = r.tr;
+    let e0 = 0.5 * (ic.vx * ic.vx + ic.vy * ic.vy + ic.vz * ic.vz) + c.g * ic.z, worst = 0;
+    for (let i = 0; i < tr.t.length - 1; i++) { const e = 0.5 * (tr.vx[i] ** 2 + tr.vy[i] ** 2 + tr.vz[i] ** 2) + c.g * tr.z[i]; worst = Math.max(worst, Math.abs(e - e0) / e0); }
+    add('Energy conserved with forces off', '< 1e-8 relative drift', worst.toExponential(1), worst < 1e-8);
+  }
+  {
+    const col = E.collide(mk({ batMph: 70, pitchMph: 90, offsetIn: 0, attack: 0, sweetIn: 0, pitchSpin: 0 }));
+    add('Head-on collision: A·bat + (A−1)·pitch', fmt(1.2 * 70 + 0.2 * 90, 1) + ' mph', fmt(col.ev, 1) + ' mph', Math.abs(col.ev - 102) < 0.5);
+  }
+  $('#val-tbl').innerHTML = '<thead><tr><th>Check</th><th>Expected</th><th>Model</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td style="white-space:normal">' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td class="' + (r[3] ? 'ok' : 'bad') + '">' + (r[3] ? 'pass' : 'check') + '</td></tr>').join('') + '</tbody>';
+  $('#val-status').textContent = rows.filter(r => r[3]).length + ' of ' + rows.length + ' checks pass.';
+}
+$('#val-run').addEventListener('click', () => { $('#val-status').textContent = 'Running…'; setTimeout(runValidation, 20); });
+
+/* ---------- boot ---------- */
+function resetAll() {
+  stopPlay(); clearTimeout(S.mcAutoT); clearTimeout(S.hfT); S.mcJob = (S.mcJob || 0) + 1; S.hf.job++; S.sw.job++;
+  Object.keys(S.p).forEach(k => delete S.p[k]); Object.assign(S.p, S.p0);
+  Object.assign(S.sigma, S.sigma0);
+  S.target = null; S.hf = { rows: null, job: S.hf.job, spin: 'auto', tol: 8, busy: false, sel: null };
+  $('#hf-out').innerHTML = '<div class="empty">No spot chosen yet. Switch to the overhead view and click the field.</div>';
+  $('#hf-spin').value = 'auto'; $('#hf-tol').value = 8;
+  S.mc = null; S.mcStale = false; $('#mc-out').innerHTML = ''; $('#mc-prog').hidden = true; $('#mc-run').disabled = false; $('#mc-play').disabled = true;
+  $('#t-ens-wrap').hidden = true; S.opt = { trail: true, forces: false, compare: false, ens: true };
+  $('#t-trail').checked = true; $('#t-forces').checked = false; $('#t-compare').checked = false; if ($('#t-stands') && !$('#t-stands').checked) { $('#t-stands').checked = true; E.setStands(true); S.standsOn = true; S.fenceSig = null; S.fencePts = null; } $('#t-ens').checked = true;
+  $('#mc-n').value = 500; $('#mc-seed').value = 2026; $('#mc-dist').value = 'gauss';
+  S.mcAuto = true; S.showSpread = true; $('#show-spread').checked = true; $('#inputs').classList.remove('nospread');
+  S.sw = { data: null, job: S.sw.job, stale: true }; S.bud = null;
+  Object.assign(S.cam, { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 });
+  $('#views button[data-view="3d"]').click();
+  $('#preset').value = '';
+  applyMode(); syncAll(); renderMcSpec(); refreshSpread(); updateMcStrip();
+  showTab('flight'); recompute(true); updateBudget();
+}
+$('#btn-reset').addEventListener('click', resetAll);
+(function boot() {
+  readTokens(); tokenVersion = document.documentElement.dataset.theme + '|' + (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'd' : 'l');
+  buildInputs();
+  const sel = $('#preset'); sel.appendChild(el('option', { value: '', text: 'Choose…' }));
+  PRESETS.forEach((p, i) => sel.appendChild(el('option', { value: i, text: p.name })));
+  sel.addEventListener('change', () => { if (sel.value !== '') { applyPreset(+sel.value); startPlay(true); } sel.value = ''; });
+  syncAll();
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { requestRender(); });
+  new MutationObserver(() => requestRender()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  window.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); if (S.play.playing) stopPlay(); else startPlay(false); } });
+  recompute(true);
+  renderMcSpec(); updateBudget();
+  window.addEventListener('resize', () => { drawHF(); if (S.sw.data) drawSweep(); });
+  window.BFL_APP = { S, startPlay, recompute, applyPreset, runMC, runSweep, showTab, setTargetFromScreen, runValidation, resetAll };
+})();
+
+})();
+</script>
