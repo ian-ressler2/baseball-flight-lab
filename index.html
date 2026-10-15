@@ -1,4 +1,5 @@
 <title>Baseball Flight Lab</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2032%2032%22%3E%3Ccircle%20cx=%2216%22%20cy=%2216%22%20r=%2214.5%22%20fill=%22%23f6f2e7%22%20stroke=%22%2317201b%22%20stroke-width=%222%22/%3E%3Cg%20fill=%22none%22%20stroke=%22%23d6402c%22%20stroke-width=%221.6%22%20stroke-linecap=%22round%22%3E%3Cpath%20d=%22M8.6%205.6C12.6%2010.4%2012.6%2021.6%208.6%2026.4%22/%3E%3Cpath%20d=%22M23.4%205.6C19.4%2010.4%2019.4%2021.6%2023.4%2026.4%22/%3E%3C/g%3E%3Cg%20stroke=%22%23d6402c%22%20stroke-width=%221.3%22%20stroke-linecap=%22round%22%3E%3Cpath%20d=%22M10.2%209.2l-2.4.6M11.6%2012.4l-2.6.2M12%2016h-2.7M11.6%2019.6l-2.6-.2M10.2%2022.8l-2.4-.6%22/%3E%3Cpath%20d=%22M21.8%209.2l2.4.6M20.4%2012.4l2.6.2M20%2016h2.7M20.4%2019.6l2.6-.2M21.8%2022.8l2.4-.6%22/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2047,9 +2048,10 @@ function idxAt(ts, t) {
 function drawTarget(v) {
   if (S.tab !== 'hit') return;
   const tg = S.target; if (!tg) return;
-  const g = v.g, p = v.pt(tg.x, tg.y, 0); if (!p) return;
+  const tz = tg.z || 0;
+  const g = v.g, p = v.pt(tg.x, tg.y, tz); if (!p) return;
   const tolM = S.hf.tol * FT;
-  const rr = v.kind === 'top' ? Math.max(5, v.rpx(tolM)) : Math.max(5, v.rpx(tolM, tg.x, tg.y, 0));
+  const rr = v.kind === 'top' ? Math.max(5, v.rpx(tolM)) : Math.max(5, v.rpx(tolM, tg.x, tg.y, tz));
   g.strokeStyle = '#fff'; g.lineWidth = 3.4; g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke();
   g.strokeStyle = T.accent; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], rr, 0, 7); g.stroke();
   g.beginPath(); g.moveTo(p[0] - rr - 6, p[1]); g.lineTo(p[0] + rr + 6, p[1]); g.moveTo(p[0], p[1] - rr - 6); g.lineTo(p[0], p[1] + rr + 6); g.stroke();
@@ -2179,7 +2181,7 @@ function render() {
   if (S.tab === 'flight') { drawFlightCharts(t); drawSpin(st); }
   stageWrap.classList.toggle('wide', S.view === 'side');
   const hf = S.tab === 'hit';
-  $('#stagehint').textContent = S.view === 'side' ? 'Side profile along the line from home plate' : S.view === 'top' ? (hf ? 'Hit finder: click the field to find hits that land there' : 'Overhead view') : (hf ? 'Hit finder: click the ground to pick a spot · drag to orbit · scroll to zoom' : 'Drag to orbit · scroll to zoom');
+  $('#stagehint').textContent = S.view === 'side' ? 'Side profile along the line from home plate' : S.view === 'top' ? (hf ? 'Hit finder: click the field or the stands to find hits that land there' : 'Overhead view') : (hf ? 'Hit finder: click the field or the stands to pick a spot · drag to orbit · scroll to zoom' : 'Drag to orbit · scroll to zoom');
 }
 let tokenVersion = '';
 function readTokensIfNeeded() {
@@ -2255,10 +2257,18 @@ function showHover(p) {
   const w = stageWrap.getBoundingClientRect().width;
   tip.style.left = Math.min(w - 170, p.x) + 'px'; tip.style.top = p.y + 'px';
 }
+// seat height under a spot behind the wall (0 on the field), so the marker sits on the stands instead of under them
+function standsHeightAt(x, y) {
+  if (!S.ctx) return 0;
+  const ang = Math.atan2(x, y) * R2D; if (Math.abs(ang) > 45) return 0;
+  E.fenceAt(S.ctx, ang); const F = E.fence(), rr = Math.hypot(x, y);
+  if (rr <= F[0]) return 0;
+  const sh = E.standsAt(S.ctx, ang, rr - F[0], F[1]); return sh > 0 ? sh : 0;
+}
 function setTargetFromScreen(sx, sy) {
   const g = groundAt({ x: sx, y: sy }); if (!g) return;
   const d = Math.hypot(g.x, g.y) / FT; if (d < 15 || d > 560 || g.y < 0) return;
-  S.target = { x: g.x, y: g.y };
+  S.target = { x: g.x, y: g.y, z: standsHeightAt(g.x, g.y) };
   showTab('hit'); startSolve(); requestRender();
 }
 $('#views').addEventListener('click', e => {
