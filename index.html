@@ -388,10 +388,13 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
         <button data-view="3d" aria-pressed="false">3-D</button>
       </div>
       <button class="btn sm" id="pbtn-cam" type="button" title="Back to the default 3-D camera"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 5.5h2.2l1-1.7h5.6l1 1.7H14V13H2zM8 6.6a2.6 2.6 0 100 5.2 2.6 2.6 0 000-5.2z" fill="currentColor"/></svg><span>Reset camera</span></button>
+      <select id="pcamsel" aria-label="3-D camera" title="Jump the 3-D camera to a close view of the pitcher"><option value="">Camera…</option><option value="side">Pitcher, from the side</option><option value="front">Pitcher, from the plate</option><option value="back">Pitcher, from behind</option><option value="plate">Behind the plate</option></select>
       <div class="toggles">
         <label><input type="checkbox" id="pt-trail" checked> Trail</label>
         <label title="The same throw with no spin: the gap at the plate is the movement the spin made"><input type="checkbox" id="pt-nospin" checked> No-spin path</label>
         <label><input type="checkbox" id="pt-pitcher" checked> Pitcher</label>
+        <label title="Play the whole delivery (set, leg lift, stride, arm action, release, follow-through) before the ball leaves"><input type="checkbox" id="pt-anim" checked> Delivery</label>
+        <label title="Trace the throwing hand through the delivery"><input type="checkbox" id="pt-hand" checked> Hand path</label>
         <label><input type="checkbox" id="pt-batter" checked> Batter</label>
         <label title="Shade heart, shadow, chase and waste zones"><input type="checkbox" id="pt-zones"> Attack zones</label>
         <label title="Draw every pitch type from this release point"><input type="checkbox" id="pt-arsenal"> All pitch types</label>
@@ -3361,7 +3364,8 @@ const PS = {
   sim: null, ns: null, dur: 0.45, bud: null,
   view: 'zone', tab: 'data',
   play: { t: 0, playing: false, speed: 0.25, last: 0 },
-  opt: { trail: true, nospin: true, batter: true, pitcher: true, zones: false, ens: true, arsenal: false, arsMode: 'angles' },
+  tauNow: 0,
+  opt: { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles' },
   cam: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 },
   sigma: { velo: 1.0, spin: 80, dir: 5, eff: 3, relH: 1.2, relSide: 1.5, relExt: 1.5, angV: 0.55, angH: 0.55, pCd: 0.008 },
   mc: null, mcStale: false, mcAuto: true, mcSwing: false, mcJob: 0, ver: 0,
@@ -3599,11 +3603,14 @@ function pRecompute(toEnd) {
   if (PS.opt.arsenal) { clearTimeout(PS.arsT); PS.arsT = setTimeout(() => { pComputeArsenal(); pRequestRender(); }, 140); }
   pRequestRender();
 }
+// the delivery plays before release when it is on; the timeline is delivery + flight
+function pPre() { return PS.opt.anim && PS.opt.pitcher && PS.P ? PI.delivery(PS.P).deliveryTime : 0; }
 function pTotalDur() {
   let d = PS.dur;
+  if (PS.opt.anim && PS.opt.pitcher) d = Math.max(d, P_FOLLOW);
   if (pMcOn()) d = Math.max(d, PS.mc.maxT);
   if (PS.opt.arsenal && PS.arsenal) PS.arsenal.forEach(a => { if (a.res.tEnd > d) d = a.res.tEnd; });
-  return d + 0.05;
+  return d + 0.05 + pPre();
 }
 function pMcOn() { const mc = PS.mc; return !!(mc && mc.visible && mc.tracks.length && PS.opt.ens); }
 function pFillActiveTab() {
@@ -3751,6 +3758,7 @@ function pView2d(kind, f, s) {
     if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.lineWidth = lw || 1; g.strokeStyle = stroke; g.stroke(); }
   };
   v.rpx = r => r * s;
+  v.depth = kind === 'side' ? (p => p[0]) : kind === 'top' ? (p => -p[2]) : (p => p[1]);   // bigger = farther from the viewer
   return v;
 }
 /* ---------- 3-D view ---------- */
@@ -3791,63 +3799,6 @@ function pView3d() {
   return v;
 }
 
-/* ---------- figures ---------- */
-function pitcherPose(P) {
-  const d = PI.delivery(P), b = d.body, side = P.hand === 'R' ? -1 : 1, yRub = PI.RUBBER_Y;
-  const yF = yRub - d.strideIn * IN_, footZ = d.footZ * IN_, xF = d.xBody * IN_;
-  const trunkLen = 0.30 * b.H * IN_, lean = P.lean * D2R, zSh = footZ + d.zsh * IN_;
-  const trunkF = Math.min(d.fwd * IN_, 0.1944 * b.H * Math.sin(lean) * IN_), ySh = yF - trunkF, sw = b.sw * IN_;
-  const hip = [xF, ySh + trunkLen * Math.sin(lean), zSh - trunkLen * Math.cos(lean)];
-  const shT = [xF + side * sw / 2, ySh, zSh], shG = [xF - side * sw / 2, ySh, zSh];
-  const hand = [d.x, d.y, d.z];
-  const elbow = [(shT[0] + hand[0]) / 2 + side * 0.04, (shT[1] + hand[1]) / 2 + 0.03, (shT[2] + hand[2]) / 2 + 0.05];
-  const gHand = [xF - side * 0.12, ySh - 0.38, zSh - 0.12], gElbow = [shG[0] - side * 0.10, ySh - 0.12, zSh - 0.26];
-  const head = [xF, ySh - 0.02, zSh + 0.12 + 0.011 * b.H];
-  const fF = [xF, yF, footZ], fB = [P.rubberX * IN_, yRub + 0.06, P.mound * IN_];
-  const kF = [(hip[0] + fF[0]) / 2, (hip[1] + fF[1]) / 2 - 0.10, (hip[2] + fF[2]) / 2 + 0.02], kB = [(hip[0] + fB[0]) / 2, (hip[1] + fB[1]) / 2 + 0.05, (hip[2] + fB[2]) / 2 - 0.03];
-  return { hip, shT, shG, hand, elbow, gHand, gElbow, head, fF, fB, kF, kB, headR: 0.095 };
-}
-function batterPose(P) {
-  const rh = P.bat === 'R', sd = rh ? -1 : 1, H = P.batH * IN_, xb = sd * (8.5 + 6 + 11) * IN_, yc = 0.22;
-  const hipZ = 0.53 * H, shZ = 0.818 * H, sw = 0.23 * H;
-  const hip = [xb, yc, hipZ], sh = [xb, yc + 0.03, shZ];
-  const hands = [xb - sd * 0.28, yc + 0.18, 0.72 * H];
-  return { hip, sh, shL: [xb - sd * 0.0, yc + 0.03 + sw / 2 * 0.2, shZ], hands, head: [xb, yc + 0.06, shZ + 0.13 + 0.01 * H], headR: 0.1,
-    fF: [xb, yc + 0.34, 0], fB: [xb, yc - 0.34, 0], kF: [xb, yc + 0.28, 0.27 * H], kB: [xb, yc - 0.26, 0.27 * H],
-    bat0: hands, bat1: [xb - sd * 0.05, yc - 0.30, 0.72 * H + 0.72], xb, sd };
-}
-function pLimb(v, pts, col, wM) {
-  const g = v.g; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = col;
-  const p0 = v.pt(pts[0][0], pts[0][1], pts[0][2]); if (!p0) return;
-  let wpx = v.persp ? v.rpx(wM, pts[0][0], pts[0][1], pts[0][2]) : v.rpx(wM);
-  g.lineWidth = Math.max(1.6, wpx);
-  g.beginPath(); let first = true;
-  for (const q of pts) { const p = v.pt(q[0], q[1], q[2]); if (!p) { first = true; continue; } first ? g.moveTo(p[0], p[1]) : g.lineTo(p[0], p[1]); first = false; }
-  g.stroke();
-}
-function pDrawPitcher(v) {
-  const J = pitcherPose(PS.P), col = T['ink-2'], g = v.g;
-  g.save(); g.globalAlpha = 0.62;
-  pLimb(v, [J.fB, J.kB, J.hip], col, 0.12); pLimb(v, [J.fF, J.kF, J.hip], col, 0.12);
-  pLimb(v, [J.hip, [(J.hip[0] + J.shG[0] / 2 + J.shT[0] / 2) / 2, (J.hip[1] + J.shT[1]) / 2, (J.hip[2] + J.shT[2]) / 2], [(J.shT[0] + J.shG[0]) / 2, J.shT[1], J.shT[2]]], col, 0.24);
-  pLimb(v, [J.shG, J.shT], col, 0.12);
-  pLimb(v, [J.shG, J.gElbow, J.gHand], col, 0.075);
-  g.globalAlpha = 0.92; pLimb(v, [J.shT, J.elbow, J.hand], T.accent, 0.085);
-  g.globalAlpha = 0.62;
-  const hp = v.pt(J.head[0], J.head[1], J.head[2]); if (hp) { const r = v.persp ? v.rpx(J.headR, J.head[0], J.head[1], J.head[2]) : v.rpx(J.headR); g.fillStyle = col; g.beginPath(); g.arc(hp[0], hp[1], Math.max(2.5, r), 0, 7); g.fill(); }
-  g.restore();
-}
-function pDrawBatter(v, withBat) {
-  const J = batterPose(PS.P), col = T.ghost, g = v.g;
-  g.save(); g.globalAlpha = 0.55;
-  pLimb(v, [J.fB, J.kB, J.hip], col, 0.13); pLimb(v, [J.fF, J.kF, J.hip], col, 0.13);
-  pLimb(v, [J.hip, J.sh], col, 0.26);
-  pLimb(v, [J.sh, [(J.sh[0] + J.hands[0]) / 2, (J.sh[1] + J.hands[1]) / 2, (J.sh[2] + J.hands[2]) / 2 - 0.08], J.hands], col, 0.085);
-  if (withBat !== false) pLimb(v, [J.bat0, J.bat1], T['dirt-2'], 0.06);
-  const hp = v.pt(J.head[0], J.head[1], J.head[2]); if (hp) { const r = v.persp ? v.rpx(J.headR, J.head[0], J.head[1], J.head[2]) : v.rpx(J.headR); g.fillStyle = col; g.beginPath(); g.arc(hp[0], hp[1], Math.max(2.5, r), 0, 7); g.fill(); }
-  g.restore();
-}
-
 /* ---------- shared pieces ---------- */
 function pBall(v, x, y, z, big) {
   const g = v.g, p = v.pt(x, y, z); if (!p) return;
@@ -3862,7 +3813,7 @@ function pLabel(g, txt, x, y, col, align, size) {
 }
 function pArsenalOn() { return PS.opt.arsenal && PS.arsenal; }
 function pDrawArsenal(v, t) {
-  if (!pArsenalOn()) return;
+  if (!pArsenalOn() || t < 0) return;
   PS.arsenal.forEach(a => {
     if (a.cur) return;
     const tr = a.res.tr; if (!tr) return;
@@ -3908,15 +3859,8 @@ function pDrawZone(t) {
       g.fillStyle = T.muted; g.font = '10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(nm, m.X(-8.5 * k) + 3, m.Z(zc + hh * k) - 1);
     });
   }
-  // batter
-  if (PS.opt.batter) {
-    const sd = P.bat === 'R' ? -1 : 1, xb = sd * 25, H = P.batH, col = T.ghost;
-    g.save(); g.globalAlpha = 0.5; g.fillStyle = col;
-    const rect = (cx, z0_, z1_, w) => g.fillRect(m.X(cx - w / 2), m.Z(z1_), w * m.s, (z1_ - z0_) * m.s);
-    rect(xb - 4, 0, 0.53 * H, 6.5); rect(xb + 4, 0, 0.53 * H, 6.5); rect(xb, 0.5 * H, 0.83 * H, 17);
-    g.beginPath(); g.arc(m.X(xb), m.Z(0.905 * H), 4.6 * m.s, 0, 7); g.fill();
-    g.restore();
-  }
+  // batter (the same rig as the other views, seen from behind the plate)
+  if (PS.opt.batter) pDrawBatter(v, true);
   // plate (seen from behind: the point toward the catcher)
   g.fillStyle = T.chalk; g.strokeStyle = T['ink-2']; g.lineWidth = 1; g.beginPath();
   [[-8.5, 0], [8.5, 0], [8.5, -1.4], [0, -3.4], [-8.5, -1.4]].forEach((q, i) => i ? g.lineTo(m.X(q[0]), m.Z(q[1])) : g.moveTo(m.X(q[0]), m.Z(q[1]))); g.closePath(); g.fill(); g.stroke();
@@ -3937,7 +3881,7 @@ function pDrawZone(t) {
   if (pArsenalOn()) {
     PS.arsenal.forEach(a => {
       const f = a.res.front; if (!f) return;
-      if (t >= f.t - 1e-6 || PS.play.t >= PS.dur - 0.01) {
+      if (t >= f.t - 1e-6 || t >= PS.dur - 0.01) {
         const X = m.X(f.x / IN_), Z = m.Z(f.z / IN_), r = 1.45 * m.s;
         g.fillStyle = a.color; g.globalAlpha = a.cur ? 1 : 0.85; g.beginPath(); g.arc(X, Z, Math.max(4, r), 0, 7); g.fill(); g.globalAlpha = 1;
         g.strokeStyle = T.ink; g.lineWidth = a.cur ? 2 : 1; g.stroke();
@@ -3965,7 +3909,7 @@ function pDrawZone(t) {
       pBall(v, f.x, 0, f.z, true);
       // draw to scale at the plate
       const rr = 1.45 * m.s; g.strokeStyle = col; g.lineWidth = 2.2; g.beginPath(); g.arc(ax, az, Math.max(4, rr), 0, 7); g.stroke();
-    } else {
+    } else if (t >= 0) {
       const c = pTrackAt(res.tr, t), p = v.pt(c.x, c.y, c.z), prog = 1 - (c.y - PI.PLATE_Y) / (res.rel.y - PI.PLATE_Y);
       const r = Math.max(3, 1.45 * m.s * (0.28 + 0.72 * prog * prog));
       g.fillStyle = '#fff'; g.strokeStyle = T.ink; g.lineWidth = 1.3; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.stroke();
@@ -4051,7 +3995,7 @@ function pDrawSide(t) {
     const rub = L.f(0, PI.RUBBER_Y, 0); g.beginPath(); g.moveTo(rub[0], gy + 22); g.lineTo(rg[0], gy + 22); g.stroke(); g.setLineDash([]);
     pLabel(g, 'extension ' + fmt(d.ext, 1) + ' ft', (rub[0] + rg[0]) / 2, gy + 31, T.ink, 'center', 10.5);
     pLabel(g, 'release ' + fmt(res.rel.z / FT, 1) + ' ft', rp[0] + 6, (rp[1] + rg[1]) / 2, T.ink, 'left', 10.5);
-    const c = pTrackAt(res.tr, t); pBall(v, c.x, c.y, c.z, false);
+    if (t >= 0) { const c = pTrackAt(res.tr, t); pBall(v, c.x, c.y, c.z, false); }
     if (res.front && t >= res.front.t - 1e-6) {
       const pp = L.f(0, PI.PLATE_Y, res.front.z); g.fillStyle = pVerdict(res).kind === 'strike' ? P_STRIKE() : P_BALL(); g.beginPath(); g.arc(pp[0], pp[1], 4.5, 0, 7); g.fill();
     }
@@ -4075,25 +4019,21 @@ function pDrawTop(t) {
   g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.fillStyle = T.chalk; g.textAlign = 'center'; g.textBaseline = 'top';
   [0, 10, 20, 30, 40, 50, 60].forEach(ft => { const p = L.f(0, ft * FT, 0), q = L.f(2.4, ft * FT, 0); g.strokeStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.moveTo(p[0], p[1] - 40); g.lineTo(p[0], p[1] + 40); g.stroke(); g.fillText(ft, p[0], PH - 12); });
   g.textAlign = 'left'; g.fillText('feet from the back of the plate · first base is up', 10, 6);
-  if (PS.opt.batter) { const J = batterPose(P); const p = L.f(J.hip[0], J.hip[1], 0); g.fillStyle = T.ghost; g.globalAlpha = 0.6; g.beginPath(); g.ellipse(p[0], p[1], 0.35 * L.s, 0.2 * L.s, 0, 0, 7); g.fill(); g.globalAlpha = 1; }
-  if (PS.opt.pitcher) {
-    const J = pitcherPose(P), col = T['ink-2']; g.save(); g.globalAlpha = 0.75;
-    pLimb(v, [J.shG, J.shT], col, 0.15); pLimb(v, [J.shT, J.elbow, J.hand], T.accent, 0.09); pLimb(v, [J.shG, J.gElbow, J.gHand], col, 0.08);
-    pLimb(v, [J.fB, J.hip, J.fF], col, 0.12);
-    const hp = L.f(J.head[0], J.head[1], 0); g.fillStyle = col; g.beginPath(); g.arc(hp[0], hp[1], Math.max(3, 0.1 * L.s), 0, 7); g.fill(); g.restore();
-  }
+  if (PS.opt.batter) pDrawBatter(v, true);
+  if (PS.opt.pitcher) pDrawPitcher(v);
   if (pMcOn()) { pDrawMcLanes(v, t, 'top'); return v; }
   pDrawArsenal(v, t);
   if (res) {
     if (PS.opt.nospin && PS.ns) v.line(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2), T.ghost, 1.6, [5, 4]);
     if (PS.opt.trail) v.line(pPts(res.tr, t, 1), T.path, 2.6);
-    const c = pTrackAt(res.tr, t); pBall(v, c.x, c.y, c.z, false);
+    if (t >= 0) { const c = pTrackAt(res.tr, t); pBall(v, c.x, c.y, c.z, false); }
     const rp = L.f(res.rel.x, res.rel.y, 0); g.strokeStyle = T.accent; g.lineWidth = 2; g.beginPath(); g.arc(rp[0], rp[1], 5, 0, 7); g.stroke();
     pLabel(g, 'release ' + sgn(res.rel.x / FT, 1) + ' ft', rp[0], rp[1] + 14, T.ink, 'center', 10.5);
   }
   return v;
 }
 function pDrawMcLanes(v, t, kind) {
+  if (t < 0) return;
   const mc = PS.mc, g = v.g, n = mc.tracks.length;
   g.globalAlpha = 0.13; g.lineWidth = 1;
   for (let i = 0; i < n; i++) {
@@ -4139,8 +4079,8 @@ function pDraw3D(t) {
       v.line(pts.map(q => [q[0], q[1], 0.002]), 'rgba(0,0,0,0.25)', 2);
       v.line(pts, T.path, 2.6);
     }
-    const c = pTrackAt(res.tr, t), sp = v.pt(c.x, c.y, 0), p = v.pt(c.x, c.y, c.z);
-    if (p) { const r = Math.max(3.2, v.rpx(BALL_R * 1.3, c.x, c.y, c.z)); if (sp) { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(sp[0], sp[1], r * 1.1, r * 0.4, 0, 0, 7); g.fill(); } pBall(v, c.x, c.y, c.z, true); }
+    const c = pTrackAt(res.tr, Math.max(0, t)), sp = v.pt(c.x, c.y, 0), p = v.pt(c.x, c.y, c.z);
+    if (p && t >= 0) { const r = Math.max(3.2, v.rpx(BALL_R * 1.3, c.x, c.y, c.z)); if (sp) { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(sp[0], sp[1], r * 1.1, r * 0.4, 0, 0, 7); g.fill(); } pBall(v, c.x, c.y, c.z, true); }
   }
   return v;
 }
@@ -4158,7 +4098,7 @@ function pRequestRender() { if (S.app === 'pitch' && !pRaf) pRaf = requestAnimat
 function pLoop(ts) {
   pRaf = 0;
   if (PS.play.playing) {
-    const dt = Math.min(0.1, (ts - PS.play.last) / 1000); PS.play.last = ts; PS.play.t += dt * PS.play.speed;
+    const dt = Math.min(0.1, (ts - PS.play.last) / 1000); PS.play.last = ts; PS.play.t += dt * (PS.play.t < pPre() ? Math.max(PS.play.speed, 0.5) : PS.play.speed);
     const d = pTotalDur(); if (PS.play.t >= d) { PS.play.t = d; PS.play.playing = false; pUpdatePlayBtn(); }
   }
   pRender();
@@ -4168,13 +4108,13 @@ function pRender() {
   if (!PS.sim || S.app !== 'pitch') return;
   pSizeStage(); readTokensIfNeeded();
   const g = PG; g.clearRect(0, 0, PW, PH);
-  const d = pTotalDur(), t = clamp(PS.play.t, 0, d);
+  const d = pTotalDur(), tAbs = clamp(PS.play.t, 0, d), t = tAbs - pPre(); PS.tauNow = t;   // t is the ball's clock: negative while the pitcher is still winding up
   pwrap.classList.toggle('wide', PS.view === 'top'); pwrap.classList.toggle('wide3', PS.view === 'side'); pwrap.classList.toggle('pzone', PS.view === 'zone');
   if (PS.view === 'zone') pDrawZone(t); else if (PS.view === 'side') pDrawSide(t); else if (PS.view === 'top') pDrawTop(t); else pDraw3D(t);
-  $('#pscrub').value = Math.round(t / d * 1000);
-  $('#ptread').textContent = t.toFixed(3) + ' / ' + d.toFixed(3) + ' s';
-  pUpdateLive(t);
-  if (PS.tab === 'data') pDrawSpinBall(t);
+  $('#pscrub').value = Math.round(tAbs / d * 1000);
+  $('#ptread').textContent = tAbs.toFixed(3) + ' / ' + d.toFixed(3) + ' s';
+  pUpdateLive(Math.max(0, t));
+  if (PS.tab === 'data') pDrawSpinBall(Math.max(0, t));
   const hints = { zone: PS.P.aim === 'target' ? 'Click the plate to aim there' : 'Release angles are set by hand · click to aim at a spot', side: 'Seen from third base · scroll to zoom, drag to pan, double-click to reset', top: 'Seen from above, first base at the top · scroll to zoom, drag to pan', '3d': 'Drag to orbit · scroll to zoom' };
   $('#pstagehint').textContent = hints[PS.view];
 }
@@ -4256,8 +4196,17 @@ pstage.addEventListener('wheel', e => {
 }, { passive: false });
 pstage.addEventListener('dblclick', () => { if (PS.view === '3d') Object.assign(PS.cam, { yaw: 0.42, pitch: 0.17, dist: 14.5 }); else if (PS.zoom[PS.view]) PS.zoom[PS.view] = { k: 1, px: 0, py: 0 }; pRequestRender(); });
 $('#pbtn-cam').addEventListener('click', () => { Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 }; pRequestRender(); });
+$('#pcamsel').addEventListener('change', e => {
+  const k = e.target.value, rh = PS.P.hand === 'R'; e.target.value = '';
+  const C = { side: { yaw: rh ? 1.42 : -1.42, pitch: 0.10, dist: 6.6, tx: 0, ty: 17.7, tz: 1.15 }, front: { yaw: 0.0, pitch: 0.07, dist: 8.6, tx: 0, ty: 17.5, tz: 1.2 },
+    back: { yaw: Math.PI - (rh ? 0.35 : -0.35), pitch: 0.12, dist: 7.2, tx: 0, ty: 17.4, tz: 1.2 }, plate: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 } }[k];
+  if (!C) return; Object.assign(PS.cam, C); PS.view = '3d';
+  $$('#pviews button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.view === '3d'))); pRequestRender();
+});
 $('#pviews').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; PS.view = b.dataset.view; $$('#pviews button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); pRequestRender(); });
-[['pt-trail', 'trail'], ['pt-nospin', 'nospin'], ['pt-pitcher', 'pitcher'], ['pt-batter', 'batter'], ['pt-zones', 'zones']].forEach(([id, k]) => $('#' + id).addEventListener('change', e => { PS.opt[k] = e.target.checked; pRequestRender(); }));
+[['pt-trail', 'trail'], ['pt-nospin', 'nospin'], ['pt-pitcher', 'pitcher'], ['pt-batter', 'batter'], ['pt-zones', 'zones'], ['pt-hand', 'hand']].forEach(([id, k]) => $('#' + id).addEventListener('change', e => { PS.opt[k] = e.target.checked; pRequestRender(); }));
+$('#pt-anim').addEventListener('change', e => { PS.opt.anim = e.target.checked; PS.play.t = pTotalDur(); pStopPlay(); pRequestRender(); });
+$('#pt-pitcher').addEventListener('change', () => { PS.play.t = pTotalDur(); pRequestRender(); });
 $('#pt-ens').addEventListener('change', e => { PS.opt.ens = e.target.checked; PS.play.t = pTotalDur(); pUpdateHud(); pRequestRender(); });
 $('#pt-arsmode').addEventListener('change', e => { PS.opt.arsMode = e.target.value; PS.arsenal = null; if (PS.opt.arsenal) pComputeArsenal(); pRequestRender(); });
 $('#pt-arsenal').addEventListener('change', e => { PS.opt.arsenal = e.target.checked; if (e.target.checked) pComputeArsenal(); pRequestRender(); });
@@ -4266,6 +4215,311 @@ $('#pbtn-replay').addEventListener('click', () => pStartPlay(true));
 $('#pscrub').addEventListener('input', e => { pStopPlay(); PS.play.t = parseFloat(e.target.value) / 1000 * pTotalDur(); pRequestRender(); });
 $('#pspeed').addEventListener('change', e => { PS.play.speed = parseFloat(e.target.value); });
 new ResizeObserver(() => pRequestRender()).observe(pwrap);
+
+/* ===== Pitching: skeleton rigs (pitcher delivery + batter stance) and the figure renderer ===== */
+/* Everything is in the field frame, metres: +x toward first base, +y toward the mound, +z up. Joints come from two-bone IK
+ * (legs and arms keep their lengths) and the delivery is a set of keyframed tracks on the time before release. */
+const V3 = {
+  add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  len: a => Math.hypot(a[0], a[1], a[2]),
+  nrm: a => { const n = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / n, a[1] / n, a[2] / n]; },
+  lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+};
+const sm01 = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+const kseg = (t, a, b) => sm01((t - a) / (b - a));         // smooth 0 -> 1 between a and b
+const klin = (t, a, b) => clamp((t - a) / (b - a), 0, 1);  // straight 0 -> 1 between a and b
+// keyframe track, smooth between keys: keys = [[t, value], ...] with ascending t; values are numbers or arrays
+function kfTrack(t, keys) {
+  if (t <= keys[0][0]) return keys[0][1];
+  const n = keys.length; if (t >= keys[n - 1][0]) return keys[n - 1][1];
+  let i = 0; while (i < n - 2 && t > keys[i + 1][0]) i++;
+  const a = keys[i], b = keys[i + 1], k = sm01((t - a[0]) / (b[0] - a[0]));
+  if (typeof a[1] === 'number') return a[1] + (b[1] - a[1]) * k;
+  return a[1].map((q, j) => q + (b[1][j] - q) * k);
+}
+// two-bone IK: the middle joint between a (root) and c (end). The limb stretches a little instead of coming apart.
+function ik2(a, c, l1, l2, pole) {
+  let d = V3.sub(c, a), D = V3.len(d) || 1e-6;
+  const full = (l1 + l2) * 0.995, k = D > full ? Math.min(1.14, D / full) : 1;
+  const L1 = l1 * k, L2 = l2 * k, Dmax = (L1 + L2) * 0.995, Dmin = Math.abs(L1 - L2) + 1e-3;
+  if (D > Dmax) { c = V3.add(a, V3.mul(d, Dmax / D)); D = Dmax; d = V3.sub(c, a); }
+  else if (D < Dmin) { c = V3.add(a, V3.mul(d, Dmin / D)); D = Dmin; d = V3.sub(c, a); }
+  const dn = V3.mul(d, 1 / D), x = (D * D + L1 * L1 - L2 * L2) / (2 * D), h = Math.sqrt(Math.max(0, L1 * L1 - x * x));
+  let pv = V3.sub(pole, V3.mul(dn, V3.dot(pole, dn))), pl = V3.len(pv);
+  if (pl < 1e-4) { pv = V3.cross(dn, [0, 0, 1]); pl = V3.len(pv); if (pl < 1e-4) { pv = [1, 0, 0]; pl = 1; } }
+  pv = V3.mul(pv, 1 / pl);
+  return { j: V3.add(a, V3.add(V3.mul(dn, x), V3.mul(pv, h))), end: c, k };
+}
+// a foot that cannot reach is dragged toward the hip (a trailing leg lifts its heel rather than stretching)
+function reachFoot(hip, ank, maxD) {
+  const d = V3.sub(ank, hip), D = V3.len(d); if (D <= maxD) return ank;
+  return V3.add(hip, V3.mul(d, maxD / D));
+}
+
+/* ---------- pitcher ---------- */
+// times are seconds from release (negative = before)
+const P_TM = {
+  windup:  { rock: 1, r0: -1.15, r1: -0.90, lift0: -0.86, peak: -0.50, brk0: -0.49, brk1: -0.32, str0: -0.45, plant: -0.15, lay: -0.06, liftK: 1.0 },
+  stretch: { rock: 0, r0: 0, r1: 0, lift0: -0.90, peak: -0.52, brk0: -0.50, brk1: -0.34, str0: -0.47, plant: -0.15, lay: -0.06, liftK: 0.85 },
+  slide:   { rock: 0, r0: 0, r1: 0, lift0: -0.72, peak: -0.38, brk0: -0.37, brk1: -0.27, str0: -0.34, plant: -0.13, lay: -0.05, liftK: 0.35 }
+};
+const P_FOLLOW = 0.5;   // seconds of follow-through after release
+
+function pitcherAt(P, tauIn, anim) {
+  const d = PI.delivery(P), b = d.body, H = b.H * IN_, side = P.hand === 'R' ? -1 : 1, glv = -side;
+  const m = P_TM[P.delivery] || P_TM.windup, T0 = -d.deliveryTime;
+  const tau = anim ? clamp(tauIn, T0, P_FOLLOW) : 0;
+  // lengths
+  const thigh = 0.245 * H, shank = 0.246 * H, Ll = thigh + shank, trunk = 0.30 * H, sw = b.sw * IN_, hw = 0.115 * H, ankH = 0.04 * H;
+  const R0 = b.reach * IN_, ball = [d.x, d.y, d.z];
+  // places
+  const RUB = PI.RUBBER_Y, mound = P.mound * IN_, pivotX = P.rubberX * IN_;
+  const xF = d.xBody * IN_, yF = RUB - d.strideIn * IN_, footZ = d.footZ * IN_, strideM = d.strideIn * IN_;
+  const leanRel = P.lean, tiltRel = 0.28 * P.slot;
+  const trunkF = Math.min(d.fwd * IN_, 0.1944 * b.H * Math.sin(leanRel * D2R) * IN_), zSh = footZ + d.zsh * IN_, ySh = yF - trunkF;
+  const hipRel = [xF, ySh + trunk * Math.sin(leanRel * D2R), zSh - trunk * Math.cos(leanRel * D2R)];
+  const zStand = mound + ankH + 0.985 * Ll;
+  const plantXY = [pivotX + 0.62 * (xF - pivotX), RUB - 0.6 * strideM];
+  const hdLead = Math.hypot(plantXY[0] - xF, plantXY[1] - yF);
+  const zPlant = Math.max(0.8 * zStand, Math.min(zStand, footZ + ankH + Math.sqrt(Math.max(0.1, (0.985 * Ll) * (0.985 * Ll) - hdLead * hdLead))));
+
+  const core = t => {
+    const kLift = kseg(t, m.lift0, m.peak), kStep = m.rock ? kseg(t, m.r0, m.r1) : 0, kRock = m.rock ? kStep * (1 - kLift) : 0;
+    const kStr = klin(t, m.str0, m.plant), eP = Math.pow(kStr, 1.55), kDrive = kseg(t, m.plant, 0), kFol = kseg(t, 0, 0.34);
+    // pelvis
+    const ps = [pivotX + glv * 0.15 * H / 1.88, RUB + 0.03], pb = [pivotX + glv * 0.03, RUB + 0.04];
+    let px, py, pz;
+    if (t < m.str0) {
+      const q = V3.lerp([ps[0], ps[1], 0], [pb[0], pb[1], 0], kLift); px = q[0]; py = q[1] + 0.12 * kRock; pz = zStand - 0.05 * kRock;
+    } else if (t < m.plant) {
+      px = pb[0] + (plantXY[0] - pb[0]) * eP; py = pb[1] + (plantXY[1] - pb[1]) * eP; pz = zStand + (zPlant - zStand) * Math.pow(kStr, 1.2);
+    } else {
+      px = plantXY[0] + (hipRel[0] - plantXY[0]) * kDrive; py = plantXY[1] + (hipRel[1] - plantXY[1]) * kDrive; pz = zPlant + (hipRel[2] - zPlant) * kDrive;
+      py -= 0.16 * kFol; pz -= 0.10 * kFol;
+    }
+    const pelvis = [px, py, pz];
+    // body angles
+    const lean = kfTrack(t, [[T0, 0], [m.lift0, 0], [m.peak, -5], [m.plant, 8], [0, leanRel], [0.4, leanRel + 16]]) * D2R;
+    const tilt = kfTrack(t, [[T0, 0], [m.peak, 0], [m.plant, 6], [0, tiltRel], [0.4, tiltRel + 5]]) * D2R;
+    const yH = kfTrack(t, [[T0, 0], [m.lift0, 0], [m.peak, 72], [m.plant, 64], [m.lay, 18], [0, -4], [0.4, -24]]) * D2R;
+    const yS = kfTrack(t, [[T0, 0], [m.lift0, 0], [m.peak, 78], [m.plant, 86], [m.lay, 46], [0, 0], [0.4, -38]]) * D2R;
+    const eH = [side * Math.cos(yH), Math.sin(yH), 0], fH = [side * Math.sin(yH), -Math.cos(yH), 0];
+    const tiltDir = [-eH[0], -eH[1], 0];
+    const tv = V3.nrm([tiltDir[0] * Math.sin(tilt) * Math.cos(lean), tiltDir[1] * Math.sin(tilt) * Math.cos(lean) - Math.sin(lean), Math.cos(lean) * Math.cos(tilt)]);
+    const SC = V3.add(pelvis, V3.mul(tv, trunk)), u = tv;
+    const e = V3.nrm([side * Math.cos(yS) * Math.cos(tilt), Math.sin(yS) * Math.cos(tilt), -Math.sin(tilt)]);
+    let f = V3.mul(V3.nrm(V3.cross(u, e)), -side);
+    const thrSh = V3.add(SC, V3.mul(e, sw / 2)), gloSh = V3.sub(SC, V3.mul(e, sw / 2));
+    return { t, kLift, kStep, kRock, kStr, eP, kDrive, kFol, pelvis, lean, tilt, yH, yS, eH, fH, u, e, f, SC, thrSh, gloSh };
+  };
+  const c = core(tau), c0 = core(0);
+  // arm reach is whatever gets the ball to the release point
+  const Rr = Math.max(R0, V3.len(V3.sub(ball, c0.thrSh)) * 1.02);
+  const ua = 0.455 * Rr, fa = 0.40 * Rr, hl = 0.145 * Rr;
+  const rel = V3.sub(ball, c0.thrSh), K4 = [V3.dot(rel, c0.e) / Rr, V3.dot(rel, c0.f) / Rr, V3.dot(rel, c0.u) / Rr];
+  const K0 = [-(sw / 2) / Rr, 0.20 * H / 1.88 / Rr, -0.40], K1 = [0.10, -0.12, -0.95];
+  const K2 = [0.62, -0.05, 0.10], K3 = [0.30, -0.70, 0.35], KF = [-0.55, 0.45, -0.80];
+  let hc = kfTrack(tau, [[T0, K0], [m.brk0, K0], [m.brk1, K1], [m.plant, K2], [m.lay, K3], [0, K4], [0.34, KF]]);
+  const humpK = klin(tau, m.lay, 0); hc = [hc[0], hc[1], hc[2] + 0.24 * Math.sin(Math.PI * humpK) * (tau < 0 ? 1 : 0)];
+  const hand = V3.add(c.thrSh, V3.add(V3.mul(c.e, hc[0] * Rr), V3.add(V3.mul(c.f, hc[1] * Rr), V3.mul(c.u, hc[2] * Rr))));
+  const hdir = V3.nrm(V3.sub(hand, c.thrSh)), wrist = V3.sub(hand, V3.mul(hdir, hl));
+  const elT = ik2(c.thrSh, wrist, ua, fa, V3.add(V3.mul(c.e, 0.4), [0, 0, -0.9]));
+  // glove arm: chest -> reaching to the plate -> tucked -> relaxed
+  const gE = V3.mul(c.e, -1);
+  const gAt = (ce, cf, cz) => V3.add(c.gloSh, V3.add(V3.mul(c.e, ce * Rr), V3.add(V3.mul(c.f, cf * Rr), V3.mul(c.u, cz * Rr))));   // ce: toward the midline
+  const G0 = gAt((sw / 2) / Rr, K0[1], K0[2]);    // together at the chest
+  const G1 = V3.add(c.gloSh, V3.mul([glv * 0.10, -0.92, 0.10], Rr));
+  const G2 = gAt(0.42, 0.12, -0.55), G3 = gAt(0.18, 0.05, -0.95);
+  let gh = kfTrack(tau, [[T0, G0], [m.brk0, G0], [(m.brk0 + m.brk1) / 2, G1], [m.plant, G1], [0, G2], [0.34, G3]]);
+  const gdir = V3.nrm(V3.sub(gh, c.gloSh)), gwr = V3.sub(gh, V3.mul(gdir, hl));
+  const elG = ik2(c.gloSh, gwr, ua, fa, V3.add(V3.mul(gE, 0.5), [0, 0, -0.9]));
+  // legs
+  const hipT = V3.add(c.pelvis, V3.mul(c.eH, hw / 2)), hipG = V3.sub(c.pelvis, V3.mul(c.eH, hw / 2));   // throwing side = pivot leg
+  const kneePole = V3.nrm(V3.add(V3.mul(c.fH, 0.6), [0, -0.5, 0.15]));
+  const anklePivStart = [pivotX, RUB + 0.04, mound + ankH];
+  const kBF = kseg(tau, 0.0, 0.40);
+  const landPiv = [xF + side * 0.34 * H / 1.88, yF + 0.25, footZ + ankH];
+  let ankPiv = V3.lerp(anklePivStart, landPiv, kBF); ankPiv[2] += 0.30 * Math.sin(Math.PI * kBF);
+  ankPiv = reachFoot(hipT, ankPiv, 0.99 * Ll);
+  // lead (glove side) foot
+  const F0 = [pivotX + glv * 0.30 * H / 1.88, RUB + 0.02 + 0.30 * c.kStep, mound + ankH];
+  const liftOff = (kk) => V3.lerp([glv * 0.0, 0, -0.985 * Ll], [glv * 0.04 * H, -0.17 * H, -0.255 * H], kk);
+  const FP = [xF, yF, footZ + ankH];
+  let ankLead;
+  if (tau < m.str0) ankLead = V3.lerp(F0, V3.add(c.pelvis, liftOff(m.liftK * c.kLift)), c.kLift);
+  else {
+    const cs = core(m.str0), st = V3.add(cs.pelvis, liftOff(m.liftK));
+    const e1 = sm01(c.kStr), e2 = Math.pow(c.kStr, 1.6);
+    ankLead = [st[0] + (FP[0] - st[0]) * e1, st[1] + (FP[1] - st[1]) * e1, st[2] + (FP[2] - st[2]) * e2];
+  }
+  ankLead = reachFoot(hipG, ankLead, 0.995 * Ll);
+  const kn1 = ik2(hipG, ankLead, thigh, shank, kneePole), kn2 = ik2(hipT, ankPiv, thigh, shank, kneePole);
+  const fdL = V3.nrm([side * Math.sin(c.yH * 0.35), -Math.cos(c.yH * 0.35), 0]), fdP = V3.nrm([side * 0.9, -0.4, 0]);
+  const toe = (a, fd) => [a[0] + fd[0] * 0.115 * H, a[1] + fd[1] * 0.115 * H, a[2] - 0.028 * H];
+  // head: level, looking at the plate
+  const hdv = V3.nrm(V3.add(V3.mul(c.u, 0.6), [0, 0, 0.4])), headR = 0.06 * H;
+  const head = V3.add(V3.add(c.SC, V3.mul(hdv, 0.117 * H)), [0, -0.015 * H, 0]);
+  // the ball: in the glove until the hands part, then in the throwing hand
+  const inGlove = tau < m.brk0, ballPos = inGlove ? V3.add(gh, V3.mul(V3.nrm(V3.sub(hand, gh)), 0.0)) : hand;
+  return { tau, H, side, glv, c, ua, fa, hl, Rr, headR, head, brim: V3.nrm([0, -1, -0.12]),
+    pelvis: c.pelvis, SC: c.SC, thrSh: c.thrSh, gloSh: c.gloSh, e: c.e, f: c.f, u: c.u, eH: c.eH,
+    elbT: elT.j, wrT: elT.end, hand, elbG: elG.j, wrG: elG.end, gHand: gh,
+    hipT, hipG, kneeP: kn2.j, ankP: ankPiv, toeP: toe(ankPiv, fdP), kneeL: kn1.j, ankL: ankLead, toeL: toe(ankLead, fdL),
+    ball: ballPos, inGlove, hasBall: tau < 0, sw, hw, thigh, shank, followK: c.kFol };
+}
+
+/* ---------- batter ---------- */
+function batterAt(P) {
+  const rh = P.bat === 'R', sd = rh ? -1 : 1, a = -sd, H = P.batH * IN_, yc = 0.216, xb = sd * (8.5 + 6 + 11) * IN_;
+  const thigh = 0.245 * H, shank = 0.246 * H, Ll = thigh + shank, hw = 0.115 * H, sw = 0.23 * H, trunk = 0.30 * H, ankH = 0.04 * H;
+  const sep = 0.165 * H, b = [0, 1, 0];
+  const dz = Math.sqrt(Math.max(0.01, Math.pow(0.955 * Ll, 2) - Math.pow(sep - hw / 2, 2) - Math.pow(0.045 * H, 2)));
+  const pelvis = [xb - a * 0.045 * H, yc - 0.005, ankH + dz];
+  const hipL = V3.add(pelvis, V3.mul(b, hw / 2)), hipB = V3.sub(pelvis, V3.mul(b, hw / 2));
+  const ankL = [xb, yc + sep, ankH], ankB = [xb, yc - sep, ankH];
+  const knL = ik2(hipL, ankL, thigh, shank, V3.nrm([a * 0.9, 0.35, 0.2])), knB = ik2(hipB, ankB, thigh, shank, V3.nrm([a * 0.9, -0.35, 0.2]));
+  const lean = 28 * D2R, u = V3.nrm([a * Math.sin(lean), 0, Math.cos(lean)]);
+  const SC = V3.add(pelvis, V3.mul(u, trunk)), es = V3.nrm([a * 0.16, 1, 0]);
+  const shL = V3.add(SC, V3.add(V3.mul(es, sw / 2), [0, 0, 0.012 * H])), shB = V3.add(V3.sub(SC, V3.mul(es, sw / 2)), [0, 0, -0.012 * H]);
+  const dirH = V3.nrm([a * 0.25, 0.1, 0.9]);
+  const head = V3.add(V3.add(SC, V3.mul(V3.nrm(V3.add(u, [0, 0, 1])), 0.117 * H)), [a * 0.02 * H, 0.012 * H, 0]), headR = 0.06 * H;
+  const hands = [shB[0] + a * 0.075 * H, shB[1] - 0.03 * H, shB[2] + 0.04 * H];
+  const bdir = V3.nrm([-a * 0.20, -0.40, 0.90]), knob = V3.sub(hands, V3.mul(bdir, 0.06)), tip = V3.add(knob, V3.mul(bdir, 0.86));
+  const armR = 0.455 * 0.385 * H, armF = 0.40 * 0.385 * H, hl = 0.145 * 0.385 * H * 1.0;
+  const wrB = V3.sub(hands, V3.mul(V3.nrm(V3.sub(hands, shB)), hl)), handL = V3.add(hands, [a * 0.005, 0.07 * H, -0.015 * H]);
+  const wrL = V3.sub(handL, V3.mul(V3.nrm(V3.sub(handL, shL)), hl));
+  const elB = ik2(shB, wrB, armR, armF, V3.nrm([-a * 0.2, -0.7, 0.55])), elL = ik2(shL, wrL, armR, armF, V3.nrm([a * 0.3, 0.2, -0.9]));
+  const toe = (an) => [an[0] + a * 0.115 * H, an[1], an[2] - 0.028 * H];
+  return { sd, a, H, pelvis, SC, u, es, hipL, hipB, kneeL: knL.j, kneeB: knB.j, ankL, ankB, toeL: toe(ankL), toeB: toe(ankB), shL, shB,
+    elL: elL.j, wrL: elL.end, elB: elB.j, wrB: elB.end, hands, handL, head, headR, knob, tip, sw, hw, thigh, shank };
+}
+
+/* ---------- renderer ---------- */
+/* Each part is a group of shapes with one colour. A shape is a capsule {a, b, ra, rb} (joint to joint, radii in metres),
+ * a ball {c, r}, or a rounded polygon {pts, pad}. Groups are drawn far to near, outline first so a group is one piece. */
+let PFC = null;
+function pFigDraw(v, groups, o) {
+  o = o || {};
+  const g0 = v.g; let g = g0, off = null;
+  if (o.alpha !== undefined && o.alpha < 1) {
+    if (!PFC) PFC = document.createElement('canvas');
+    if (PFC.width !== pstage.width || PFC.height !== pstage.height) { PFC.width = pstage.width; PFC.height = pstage.height; }
+    off = PFC.getContext('2d'); off.setTransform(1, 0, 0, 1, 0, 0); off.clearRect(0, 0, PFC.width, PFC.height); off.setTransform(g0.getTransform()); g = off;
+  }
+  const depth = (p) => v.persp ? v.cam(p[0], p[1], p[2])[2] : v.depth(p);
+  const rp = (r, p) => v.persp ? v.rpx(r, p[0], p[1], p[2]) : v.rpx(r);
+  // gather
+  const items = [];
+  groups.forEach(gr => {
+    const shapes = []; let dsum = 0, n = 0;
+    gr.s.forEach(s => {
+      if (s.a) { const pa = v.pt(s.a[0], s.a[1], s.a[2]), pb = v.pt(s.b[0], s.b[1], s.b[2]); if (!pa || !pb) return; shapes.push({ t: 'cap', pa, pb, ra: Math.max(0.6, rp(s.ra, s.a)), rb: Math.max(0.6, rp(s.rb === undefined ? s.ra : s.rb, s.b)) }); dsum += depth(s.a) + depth(s.b); n += 2; }
+      else if (s.c) { const pc = v.pt(s.c[0], s.c[1], s.c[2]); if (!pc) return; shapes.push({ t: 'cap', pa: pc, pb: pc, ra: Math.max(0.8, rp(s.r, s.c)), rb: Math.max(0.8, rp(s.r, s.c)) }); dsum += depth(s.c); n++; }
+      else if (s.pts) { const pp = s.pts.map(q => v.pt(q[0], q[1], q[2])); if (pp.some(q => !q)) return; shapes.push({ t: 'poly', pp, pad: Math.max(0.6, rp(s.pad, s.pts[0])) }); s.pts.forEach(q => { dsum += depth(q); n++; }); }
+    });
+    if (shapes.length && n) items.push({ shapes, col: gr.col, d: dsum / n, dim: gr.dim });
+  });
+  if (!items.length) return;
+  items.sort((p, q) => q.d - p.d);
+  let dmin = Infinity, dmax = -Infinity; items.forEach(i => { dmin = Math.min(dmin, i.d); dmax = Math.max(dmax, i.d); });
+  const trace = (sh) => {
+    g.beginPath();
+    if (sh.t === 'poly') { sh.pp.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); return; }
+    const dx = sh.pb[0] - sh.pa[0], dy = sh.pb[1] - sh.pa[1], len = Math.hypot(dx, dy);
+    if (len < Math.abs(sh.ra - sh.rb) + 0.01) { const big = sh.ra >= sh.rb; const p = big ? sh.pa : sh.pb, r = Math.max(sh.ra, sh.rb); g.arc(p[0], p[1], r, 0, 7); return; }
+    const th = Math.atan2(dy, dx), cc = Math.acos(clamp((sh.ra - sh.rb) / len, -1, 1));
+    g.arc(sh.pa[0], sh.pa[1], sh.ra, th + cc, th - cc + 2 * Math.PI); g.arc(sh.pb[0], sh.pb[1], sh.rb, th - cc, th + cc); g.closePath();
+  };
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  const ow = o.outline === undefined ? 1.15 : o.outline;
+  items.forEach(it => {
+    const shade = dmax > dmin ? clamp((it.d - dmin) / (dmax - dmin), 0, 1) * (o.shade === undefined ? 0.26 : o.shade) : 0;
+    if (ow > 0) {
+      g.strokeStyle = o.outCol || 'rgba(14,20,18,0.78)';
+      it.shapes.forEach(sh => { trace(sh); g.lineWidth = ow * 2 + (sh.t === 'poly' ? sh.pad * 2 : 0); g.stroke(); });
+    }
+    g.fillStyle = it.col; g.strokeStyle = it.col;
+    it.shapes.forEach(sh => { trace(sh); if (sh.t === 'poly') { g.lineWidth = sh.pad * 2; g.stroke(); } g.fill(); });
+    if (shade > 0.01) {
+      g.fillStyle = 'rgba(0,0,0,' + shade.toFixed(3) + ')'; g.strokeStyle = g.fillStyle;
+      it.shapes.forEach(sh => { trace(sh); if (sh.t === 'poly') { g.lineWidth = sh.pad * 2; g.stroke(); } g.fill(); });
+    }
+  });
+  if (off) { g0.save(); g0.setTransform(1, 0, 0, 1, 0, 0); g0.globalAlpha = o.alpha; g0.drawImage(PFC, 0, 0); g0.restore(); }
+}
+function pFigGroundShadow(v, c, r, a) {
+  const pts = []; for (let i = 0; i < 18; i++) { const t = i / 18 * 2 * Math.PI; pts.push([c[0] + r * Math.cos(t), c[1] + r * Math.sin(t) * 0.8, 0.003]); }
+  v.poly(pts, 'rgba(0,0,0,' + (a || 0.2) + ')');
+}
+
+const PF = { jersey: '#ece7da', pants: '#bdb8aa', skin: '#d9a98a', shoe: '#2b302d', glove: '#7b4b29', ball: '#fbfaf5', bat: '#c89a62' };
+function pitcherGroups(J) {
+  const H = J.H, cap = (a, b, ra, rb) => ({ a, b, ra: ra * H, rb: (rb === undefined ? ra : rb) * H });
+  const G = [], acc = T.accent;
+  // legs
+  const leg = (hip, kn, an, toe, k) => {
+    G.push({ col: PF.pants, s: [cap(hip, kn, 0.052, 0.042), cap(kn, an, 0.040, 0.029)] });
+    const heel = [an[0] - (toe[0] - an[0]) * 0.35, an[1] - (toe[1] - an[1]) * 0.35, an[2] - 0.02 * H];
+    G.push({ col: PF.shoe, s: [cap(heel, toe, 0.030, 0.027)] });
+  };
+  leg(J.hipG, J.kneeL, J.ankL, J.toeL); leg(J.hipT, J.kneeP, J.ankP, J.toeP);
+  // hips and torso
+  G.push({ col: PF.pants, s: [cap(J.hipG, J.hipT, 0.060, 0.060)] });
+  const tors = { col: PF.jersey, s: [cap(J.pelvis, J.SC, 0.072, 0.080), { pts: [J.thrSh, J.gloSh, J.hipG, J.hipT], pad: 0.036 * H }, { c: J.thrSh, r: 0.050 * H }, { c: J.gloSh, r: 0.050 * H }] };
+  G.push(tors);
+  // arms
+  const sleeve = (sh, el, wr, hand, col) => { G.push({ col, s: [cap(sh, el, 0.037, 0.031), cap(el, wr, 0.031, 0.024)] }); };
+  sleeve(J.gloSh, J.elbG, J.wrG, J.gHand, PF.jersey);
+  sleeve(J.thrSh, J.elbT, J.wrT, J.hand, PF.jersey);
+  // sleeve cuff / throwing arm accent
+  G.push({ col: acc, s: [cap(V3.lerp(J.thrSh, J.elbT, 0.62), V3.lerp(J.thrSh, J.elbT, 0.74), 0.034, 0.033)] });
+  // hands: the glove on the glove hand, bare hand and ball on the other
+  G.push({ col: PF.glove, s: [{ c: J.gHand, r: 0.058 * H }, { a: J.wrG, b: J.gHand, ra: 0.030 * H, rb: 0.056 * H }] });
+  G.push({ col: PF.skin, s: [cap(J.wrT, J.hand, 0.024, 0.021)] });
+  // head
+  const nb = V3.add(J.SC, V3.mul(J.u, 0.02 * H)), hb = V3.sub(J.head, V3.mul(V3.nrm(V3.sub(J.head, J.SC)), 0.05 * H));
+  G.push({ col: PF.skin, s: [cap(nb, hb, 0.030, 0.027), { c: J.head, r: J.headR }] });
+  const top = V3.add(J.head, [0, 0, 0.008 * H]), br = V3.add(J.head, V3.mul(J.brim, 0.085 * H));
+  G.push({ col: acc, s: [{ c: V3.add(J.head, [0, 0.004 * H, 0.012 * H]), r: J.headR * 1.06 }, cap(V3.add(J.head, [0, 0, 0.012 * H]), V3.add(br, [0, 0, 0.0]), 0.014, 0.012)] });
+  return G;
+}
+function pDrawPitcher(v) {
+  const J = pitcherAt(PS.P, PS.tauNow, PS.opt.anim);
+  pFigGroundShadow(v, [J.pelvis[0], J.pelvis[1] + 0.05, 0], 0.55 * J.H / 1.88, 0.22);
+  if (PS.opt.anim && PS.opt.hand && v.kind !== 'zone') pHandTrace(v, J);
+  pFigDraw(v, pitcherGroups(J), { alpha: 1, shade: 0.30 });
+  // the ball: in the glove, then in the hand, up to release
+  if (J.hasBall && PS.opt.anim) pBall(v, J.ball[0], J.ball[1], J.ball[2], false);
+  return J;
+}
+function pHandTrace(v, J) {
+  const d = PI.delivery(PS.P), t1 = Math.min(J.tau, 0), pts = [];
+  for (let t = -d.deliveryTime * 0.62; t <= t1 + 1e-6; t += 0.03) pts.push(pitcherAt(PS.P, t, true).hand);
+  if (J.tau > 0) for (let t = 0; t <= J.tau; t += 0.03) pts.push(pitcherAt(PS.P, t, true).hand);
+  if (pts.length > 1) { v.g.save(); v.g.globalAlpha = 0.7; v.line(pts, T.accent, 1.6, [2, 3]); v.g.restore(); }
+}
+function pDrawBatter(v, withBat) {
+  const J = batterAt(PS.P), H = J.H, cap = (a, b, ra, rb) => ({ a, b, ra: ra * H, rb: (rb === undefined ? ra : rb) * H });
+  const body = T['ink-2'], dark = T.ink, G = [];
+  const leg = (hip, kn, an, toe) => { G.push({ col: body, s: [cap(hip, kn, 0.052, 0.042), cap(kn, an, 0.040, 0.029)] }); G.push({ col: dark, s: [cap([an[0] - (toe[0] - an[0]) * 0.35, an[1], an[2] - 0.02 * H], toe, 0.030, 0.027)] }); };
+  leg(J.hipL, J.kneeL, J.ankL, J.toeL); leg(J.hipB, J.kneeB, J.ankB, J.toeB);
+  G.push({ col: body, s: [cap(J.hipL, J.hipB, 0.060, 0.060), cap(J.pelvis, J.SC, 0.072, 0.080), { pts: [J.shL, J.shB, J.hipB, J.hipL], pad: 0.036 * H }, { c: J.shL, r: 0.050 * H }, { c: J.shB, r: 0.050 * H }] });
+  const arm = (sh, el, wr, hd) => G.push({ col: body, s: [cap(sh, el, 0.037, 0.031), cap(el, wr, 0.031, 0.024), cap(wr, hd, 0.024, 0.021)] });
+  arm(J.shL, J.elL, J.wrL, J.handL); arm(J.shB, J.elB, J.wrB, J.hands);
+  if (withBat !== false) G.push({ col: PF.bat, s: [{ a: J.knob, b: J.tip, ra: 0.016, rb: 0.037 }] });
+  const nb = V3.add(J.SC, V3.mul(J.u, 0.02 * H)), hb = V3.sub(J.head, V3.mul(V3.nrm(V3.sub(J.head, J.SC)), 0.05 * H));
+  G.push({ col: body, s: [cap(nb, hb, 0.030, 0.027), { c: J.head, r: J.headR }] });
+  // helmet with a brim toward the pitcher and a flap over the near ear
+  const hc = V3.add(J.head, [0, 0, 0.012 * H]);
+  G.push({ col: dark, s: [{ c: hc, r: J.headR * 1.14 }, cap(hc, V3.add(hc, [0, 0.10 * H, -0.01 * H]), 0.014, 0.011), { c: V3.add(J.head, [-J.a * 0.045 * H, -0.01 * H, -0.02 * H]), r: J.headR * 0.62 }] });
+  pFigGroundShadow(v, [J.pelvis[0], J.pelvis[1], 0], 0.62 * H / 1.88, 0.16);
+  pFigDraw(v, G, { alpha: 0.72, shade: 0.18, outline: 0 });
+  return J;
+}
 
 /* ===== Pitching: analysis panels ===== */
 const PMC_ROWS = [
