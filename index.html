@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Baseball Flight Lab</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2032%2032%22%3E%3Ccircle%20cx=%2216%22%20cy=%2216%22%20r=%2214.5%22%20fill=%22%23f6f2e7%22%20stroke=%22%2317201b%22%20stroke-width=%222%22/%3E%3Cg%20fill=%22none%22%20stroke=%22%23d6402c%22%20stroke-width=%221.6%22%20stroke-linecap=%22round%22%3E%3Cpath%20d=%22M8.6%205.6C12.6%2010.4%2012.6%2021.6%208.6%2026.4%22/%3E%3Cpath%20d=%22M23.4%205.6C19.4%2010.4%2019.4%2021.6%2023.4%2026.4%22/%3E%3C/g%3E%3Cg%20stroke=%22%23d6402c%22%20stroke-width=%221.3%22%20stroke-linecap=%22round%22%3E%3Cpath%20d=%22M10.2%209.2l-2.4.6M11.6%2012.4l-2.6.2M12%2016h-2.7M11.6%2019.6l-2.6-.2M10.2%2022.8l-2.4-.6%22/%3E%3Cpath%20d=%22M21.8%209.2l2.4.6M20.4%2012.4l2.6.2M20%2016h2.7M20.4%2019.6l2.6-.2M21.8%2022.8l2.4-.6%22/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,7 +94,7 @@ button, select, input { font: inherit; color: inherit; }
 .toggles label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .stage-wrap { position: relative; border-radius: 4px; overflow: hidden; background: var(--sky-bot); border: 1px solid var(--line); aspect-ratio: 16 / 10; max-height: 62vh; min-height: 260px; width: 100%; }
 @media (max-width: 560px) { .stage-wrap { aspect-ratio: 4 / 4; max-height: none; } }
-#stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+#stage, #pstage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 .hud { position: absolute; left: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; max-width: calc(100% - 16px); }
 .chip { background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chip b { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; font-size: 12px; color: var(--muted); margin-right: 5px; }
@@ -161,7 +166,7 @@ select { background: var(--surface-2); border: 1px solid var(--line); border-rad
 .tabs button { border: 0; border-right: 1px solid var(--line); background: transparent; cursor: pointer; padding: 10px 14px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 15px; white-space: nowrap; color: var(--ink-2); }
 .tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: inset 0 -3px 0 var(--accent); }
 .pane { padding: 14px; display: none; gap: 14px; }
-.pane.on { display: grid; }
+.pane.on { display: grid; grid-template-columns: minmax(0, 1fr); }
 .pane h3 { font-size: 18px; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px; }
 .pane h3 small { font-family: var(--font-body); text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-left: 6px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: 8px; }
@@ -198,13 +203,41 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
 .spin-wrap { display: flex; gap: 12px; align-items: center; }
 .spin-wrap canvas { width: 118px; height: 118px; flex: none; }
 .spin-wrap div { font-size: 13px; color: var(--ink-2); display: grid; gap: 2px; }
+
+/* app tabs: hitting / pitching */
+.apptabs { display: flex; gap: 2px; margin: 0 0 12px; border-bottom: 2px solid var(--line); }
+.apptabs button { border: 0; background: transparent; cursor: pointer; padding: 6px 22px 5px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: 21px; font-weight: 600; color: var(--muted); border-bottom: 4px solid transparent; margin-bottom: -2px; }
+.apptabs button:hover { color: var(--ink); }
+.apptabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+body[data-app="pitch"] #hit-stage, body[data-app="pitch"] #hit-analysis, body[data-app="pitch"] #inputs details[data-app="hit"] { display: none; }
+body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysis, body:not([data-app="pitch"]) #inputs details[data-app="pitch"] { display: none; }
+#pstagecard { grid-area: stage; } #panalysis { grid-area: analysis; }
+.stage-wrap.wide3 { aspect-ratio: 3.4 / 1; }
+.stage-wrap.pzone { aspect-ratio: 1.3 / 1; }
+@media (max-width: 560px) { .stage-wrap.pzone { aspect-ratio: 4 / 5; } }
+.hlink { background: var(--accent-soft); border-left: 3px solid var(--accent); border-radius: 3px; padding: 7px 10px; font-size: 12.5px; display: grid; gap: 4px; }
+.hlink button { justify-self: start; }
+.tgrid { display: grid; grid-template-columns: repeat(3, 28px); gap: 3px; }
+.tgrid button { border: 1px solid var(--line); background: var(--surface-2); height: 22px; border-radius: 3px; cursor: pointer; padding: 0; }
+.tgrid button:hover { background: var(--accent-soft); border-color: var(--accent); }
+.rowbtns { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.inputs .seg { width: 100%; } .inputs .seg button { flex: 1; padding: 4px 6px; font-size: 13px; }
+.pt-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.dt tr.cur td { background: var(--accent-soft); }
+.dt td.l, .dt th.l { text-align: left; }
+.subnote { font-size: 11.5px; color: var(--muted); }
+.derived .full { grid-column: 1 / -1; }
+.clockface { display: flex; align-items: center; gap: 10px; }
+.clockface canvas { width: 54px; height: 54px; flex: none; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 </style>
+</head>
+<body data-app="hit">
 
 <header class="top">
   <div class="brand">
     <h1>Baseball <b>Flight</b> Lab</h1>
-    <p>Three-dimensional batted-ball trajectories with drag, Magnus lift, weather, Monte Carlo and a reverse hit finder.</p>
+    <p id="subtitle">Three-dimensional batted-ball trajectories with drag, Magnus lift, weather, Monte Carlo and a reverse hit finder.</p>
   </div>
   <div class="top-controls">
     <label>Preset <select id="preset" aria-label="Load a preset"></select></label>
@@ -212,10 +245,15 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
   </div>
 </header>
 
+<nav class="apptabs" role="tablist" aria-label="Simulator" id="apptabs">
+  <button role="tab" data-app="hit" aria-selected="true">Hitting</button>
+  <button role="tab" data-app="pitch" aria-selected="false">Pitching</button>
+</nav>
+
 <div class="app">
   <aside class="inputs card" id="inputs" aria-label="Simulation inputs"></aside>
 
-  <section class="stage-card card" aria-label="Field view">
+  <section class="stage-card card" id="hit-stage" aria-label="Field view">
     <div class="stage-top">
       <div class="seg" role="group" aria-label="Camera view" id="views">
         <button data-view="3d" aria-pressed="true">3-D</button>
@@ -252,7 +290,7 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
     <div class="live" id="live"></div>
   </section>
 
-  <section class="analysis card" aria-label="Analysis">
+  <section class="analysis card" id="hit-analysis" aria-label="Analysis">
     <div class="tabs" role="tablist" id="tabs">
       <button role="tab" data-tab="flight" aria-selected="true">Flight data</button>
       <button role="tab" data-tab="mc" aria-selected="false">Monte Carlo</button>
@@ -338,6 +376,62 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
       </div>
       <div id="limits"></div>
     </div>
+  </section>
+
+  <!-- ============ Pitching ============ -->
+  <section class="stage-card card" id="pstagecard" aria-label="Pitch view">
+    <div class="stage-top">
+      <div class="seg" role="group" aria-label="Pitch view" id="pviews">
+        <button data-view="zone" aria-pressed="true">Plate</button>
+        <button data-view="side" aria-pressed="false">Side</button>
+        <button data-view="top" aria-pressed="false">Overhead</button>
+        <button data-view="3d" aria-pressed="false">3-D</button>
+      </div>
+      <button class="btn sm" id="pbtn-cam" type="button" title="Back to the default 3-D camera"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 5.5h2.2l1-1.7h5.6l1 1.7H14V13H2zM8 6.6a2.6 2.6 0 100 5.2 2.6 2.6 0 000-5.2z" fill="currentColor"/></svg><span>Reset camera</span></button>
+      <div class="toggles">
+        <label><input type="checkbox" id="pt-trail" checked> Trail</label>
+        <label title="The same throw with no spin: the gap at the plate is the movement the spin made"><input type="checkbox" id="pt-nospin" checked> No-spin path</label>
+        <label><input type="checkbox" id="pt-pitcher" checked> Pitcher</label>
+        <label><input type="checkbox" id="pt-batter" checked> Batter</label>
+        <label title="Shade heart, shadow, chase and waste zones"><input type="checkbox" id="pt-zones"> Attack zones</label>
+        <label title="Draw every pitch type from this release point"><input type="checkbox" id="pt-arsenal"> All pitch types</label>
+        <select id="pt-arsmode" aria-label="How the other pitch types are thrown" title="Same release angles shows how differently each type breaks. Same target shows where they tunnel together."><option value="angles">thrown on the same angles</option><option value="target">aimed at the same spot</option></select>
+        <label id="pt-ens-wrap" hidden><input type="checkbox" id="pt-ens" checked> Monte Carlo (replaces single pitch)</label>
+      </div>
+    </div>
+    <div class="stage-wrap" id="pstagewrap">
+      <canvas id="pstage" aria-label="Pitch view. Click the plate view to choose a target."></canvas>
+      <div class="hud" id="phud"></div>
+      <div class="stage-hint" id="pstagehint">Click the zone to aim here</div>
+      <div class="tip" id="ptip" hidden></div>
+    </div>
+    <div class="transport">
+      <button class="btn primary" id="pbtn-play" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg><span>Throw</span></button>
+      <button class="btn" id="pbtn-replay" type="button" title="Restart from the release"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Replay</span></button>
+      <input type="range" id="pscrub" min="0" max="1000" value="1000" aria-label="Timeline">
+      <span class="tread mono" id="ptread">0.00 / 0.00 s</span>
+      <label class="speed">Speed
+        <select id="pspeed" aria-label="Playback speed">
+          <option value="0.02">0.02×</option><option value="0.05">0.05×</option><option value="0.1">0.1×</option><option value="0.25" selected>0.25× slow motion</option><option value="0.5">0.5×</option><option value="1">1× real time</option>
+        </select>
+      </label>
+    </div>
+    <div class="live" id="plive"></div>
+  </section>
+
+  <section class="analysis card" id="panalysis" aria-label="Pitch analysis">
+    <div class="tabs" role="tablist" id="ptabs">
+      <button role="tab" data-tab="data" aria-selected="true">Pitch data</button>
+      <button role="tab" data-tab="mc" aria-selected="false">Monte Carlo</button>
+      <button role="tab" data-tab="types" aria-selected="false">Pitch types</button>
+      <button role="tab" data-tab="bat" aria-selected="false">Pitch → bat</button>
+      <button role="tab" data-tab="phys" aria-selected="false">Physics</button>
+    </div>
+    <div class="pane on" id="ppane-data"></div>
+    <div class="pane" id="ppane-mc"></div>
+    <div class="pane" id="ppane-types"></div>
+    <div class="pane" id="ppane-bat"></div>
+    <div class="pane" id="ppane-phys"></div>
   </section>
 </div>
 
@@ -675,8 +769,10 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
     // contact normal: swing-plane tilt (attack angle) plus the offset angle from the barrel's centre line
     const E = al + phi;
     const n = [Math.cos(E) * Math.sin(xf), Math.cos(E) * Math.cos(xf), Math.sin(E)];
-    const vin = [0, -vp * Math.cos(dsc), -vp * Math.sin(dsc)];
-    const win = [-p.pitchSpin * RPM, 0, 0];
+    // an incoming pitch can be given as a full velocity / spin vector (from the pitching model); otherwise a straight-on pitch from speed, descent angle and backspin
+    let vin = p.pitchV ? p.pitchV.slice() : [0, -vp * Math.cos(dsc), -vp * Math.sin(dsc)];
+    if (p.pitchV && p.pitchMph > 0) { const s0 = Math.hypot(vin[0], vin[1], vin[2]) || 1, k0 = p.pitchMph * MPH / s0; vin = [vin[0] * k0, vin[1] * k0, vin[2] * k0]; }
+    const win = p.pitchW ? p.pitchW.slice() : [-p.pitchSpin * RPM, 0, 0];
     const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
     const vbn = dot(bv, n), vin_n = dot(vin, n);
@@ -1183,7 +1279,390 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
 
   return { FT, MPH, IN, RPM, D2R, R2D, DEFAULTS, PARKS, ANG, standsAt, standsDepth, setStands, airDensity, gravity, prepare, fenceAt, fence: () => [_fF, _fH],
            makeIC, collide, decomposeSpin, spinVector, autoSpin, simulate, run, mulberry32, gauss, stats, corr, ellipse,
-           createMC, solveRow, evalShot, sweepGrid, accel, dg };
+           createMC, solveRow, evalShot, sweepGrid, accel, dg, acc };
+});
+
+</script>
+<script>
+/* Baseball Flight Lab: pitching model (extends the batted-ball engine)
+ * Same coordinates as the engine: metres, origin = back point of home plate, +x toward right field (the catcher's right,
+ * first-base side), +y toward center field (toward the mound), +z up. A pitch therefore travels in the -y direction.
+ * Plate locations are reported in inches at the FRONT edge of the plate (17 in from the back point), x + toward first base,
+ * z = height of the ball centre above the ground at the plate, the way Statcast reports them.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./engine.js'));
+  else root.BFL.pitch = factory(root.BFL);
+})(typeof self !== 'undefined' ? self : this, function (E) {
+  'use strict';
+  const FT = E.FT, MPH = E.MPH, IN = E.IN, RPM = E.RPM, D2R = E.D2R, R2D = E.R2D;
+  const PLATE_Y = 17 * IN;        // front edge of the plate
+  const RUBBER_Y = 60.5 * FT;     // front of the pitching rubber (60 ft 6 in from the back point of the plate)
+  const PLATE_HALF = 8.5 * IN;
+
+  /* ------------------------------------------------------------------ */
+  /* Defaults and pitch-type library                                     */
+  /* ------------------------------------------------------------------ */
+  const DEFAULTS = {
+    // pitcher body and delivery
+    hand: 'R', height: 74, wingspan: 76, slot: 45, stride: 85, lean: 30, strideDir: 0, rubberX: 0, mound: 10,
+    delivery: 'windup', stretchPen: 0.8, slidePen: 1.6, stretchStride: 97, slideStride: 88,
+    manual: false, relH: 5.9, relExt: 6.2, relSide: -2.0,
+    // the pitch
+    type: 'FF', velo: 94.2, spin: 2300, dir: 331, eff: 91, gyroSign: 1,
+    // where it is aimed
+    aim: 'target', tx: 0, tz: 30, angV: -1.6, angH: 0.4,
+    // the batter and the zone
+    bat: 'R', batH: 72, zTop: 53.5, zBot: 27, ballRule: true,
+    // aerodynamics specific to pitched balls
+    pLift: 0.86, pCd: 0.34, liftK: 1.0
+  };
+
+  // Direction = where the spin pushes the ball, as the catcher sees it, in degrees clockwise from 12 o'clock:
+  // 0 = pure backspin (rises), 90 = toward the catcher's right (first base), 180 = pure topspin (drops), 270 = toward the catcher's left.
+  // Values are for a right-handed pitcher; a left-hander is the mirror image (dir -> 360 - dir).
+  const TYPES = {
+    FF: { name: 'Four-seam fastball', velo: 94.2, spin: 2300, dir: 331, eff: 91, liftK: 1.0 },
+    SI: { name: 'Sinker', velo: 93.6, spin: 2150, dir: 301, eff: 84, liftK: 1.06 },
+    FT: { name: 'Two-seam fastball', velo: 93.2, spin: 2200, dir: 310, eff: 87, liftK: 1.04 },
+    FC: { name: 'Cutter', velo: 88.5, spin: 2400, dir: 13, eff: 55, liftK: 0.64 },
+    SL: { name: 'Slider', velo: 85.5, spin: 2430, dir: 57, eff: 38, liftK: 0.47 },
+    ST: { name: 'Sweeper', velo: 82.5, spin: 2550, dir: 87, eff: 55, liftK: 0.94 },
+    GY: { name: 'Gyro slider', velo: 87.0, spin: 2600, dir: 11, eff: 18, liftK: 0.57 },
+    CU: { name: 'Curveball', velo: 79.5, spin: 2520, dir: 137, eff: 70, liftK: 0.71 },
+    KC: { name: 'Knuckle-curve', velo: 82.0, spin: 2600, dir: 128, eff: 66, liftK: 0.67 },
+    CH: { name: 'Changeup', velo: 85.3, spin: 1780, dir: 293, eff: 88, liftK: 1.02 },
+    FS: { name: 'Splitter', velo: 86.0, spin: 1400, dir: 286, eff: 62, liftK: 1.13 },
+    SC: { name: 'Screwball', velo: 78.0, spin: 2000, dir: 254, eff: 75, liftK: 1.04 },
+    EP: { name: 'Eephus', velo: 62.0, spin: 1300, dir: 347, eff: 90, liftK: 0.62 },
+    KN: { name: 'Knuckleball', velo: 76.0, spin: 40, dir: 0, eff: 100, liftK: 6.0 }
+  };
+  const TYPE_ORDER = ['FF', 'SI', 'FT', 'FC', 'SL', 'ST', 'GY', 'CU', 'KC', 'CH', 'FS', 'SC', 'EP', 'KN'];
+  const TYPE_COLOR = { FF: '#d33f2d', SI: '#e08a1e', FT: '#c9a227', FC: '#8a5a2b', SL: '#2c8a57', ST: '#16a59a', GY: '#4a9b3a', CU: '#2a6fb5', KC: '#5b4bb5', CH: '#9b4bb5', FS: '#c24b8f', SC: '#7a7f85', EP: '#a86f4b', KN: '#555d63' };
+  function applyType(P, key, keepSpeed) {
+    const t = TYPES[key]; if (!t) return P;
+    const m = P.hand === 'L';
+    P.type = key; if (!keepSpeed) P.velo = t.velo; P.spin = t.spin; P.eff = t.eff; P.liftK = t.liftK; P.dir = m ? (360 - t.dir) % 360 : t.dir;
+    return P;
+  }
+  function clockText(deg) {
+    const d = ((deg % 360) + 360) % 360, mins = Math.round(d / 360 * 720) % 720; // 12:00 at 0, 720 "minutes" around
+    let h = Math.floor(mins / 60); const m = Math.round(mins - h * 60);
+    h = h === 0 ? 12 : h;
+    return h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Pitcher geometry: height, wingspan, arm slot, stride -> release point */
+  /* The relations are simple body-proportion rules calibrated so a 6'2" pitcher with a three-quarters slot and an
+   * 85%-of-height stride releases about 5.9 ft up, 6.2 ft in front of the rubber and 2 ft toward his arm side. */
+  /* ------------------------------------------------------------------ */
+  const DELIVERY_TIME = { windup: 1.50, stretch: 1.20, slide: 1.00 };
+  function body(P) {
+    const H = P.height, sw = 0.23 * H;                      // shoulder-joint to shoulder-joint width
+    const arm = Math.max(12, (P.wingspan - sw) / 2);         // shoulder joint to fingertip
+    return { H, sw, arm, reach: Math.max(8, arm - 3.0) };    // the ball sits about 3 in short of the fingertips
+  }
+  function delivery(P) {
+    const b = body(P), side = P.hand === 'R' ? -1 : 1;        // arm side: -x for a right-hander (catcher's view)
+    const dm = P.delivery;
+    const speedAdj = dm === 'stretch' ? -P.stretchPen : dm === 'slide' ? -P.slidePen : 0;
+    const strideFac = (dm === 'stretch' ? P.stretchStride : dm === 'slide' ? P.slideStride : 100) / 100;
+    const S = (P.stride / 100) * strideFac, lean = P.lean * D2R, slot = P.slot * D2R;
+    const strideIn = S * b.H;
+    const footZ = P.mound - strideIn / 12;                    // mound falls ~1 in per foot in front of the rubber
+    const zsh = b.H * (0.7625 - 0.30 * (1 - Math.cos(lean)) - 0.32 * (S - 0.60));
+    const handZ = b.reach * Math.sin(slot);
+    const fwd = 0.162 * b.H * (0.6 * Math.sin(lean) / 0.5 + 0.4 * b.reach / (0.357 * b.H));
+    const xBody = P.rubberX + strideIn * Math.sin(P.strideDir * D2R);
+    const handX = side * (0.5 * b.sw + b.reach * Math.cos(slot) * 0.85);
+    let zIn = footZ + zsh + handZ, extIn = strideIn + fwd, xIn = xBody + handX;
+    if (P.manual) { zIn = P.relH * 12; extIn = P.relExt * 12; xIn = P.relSide * 12; }
+    const g = {
+      x: xIn * IN, y: RUBBER_Y - extIn * IN, z: zIn * IN, relH: zIn / 12, ext: extIn / 12, side: xIn / 12,
+      strideIn, speedAdj, speed: P.velo + speedAdj, deliveryTime: DELIVERY_TIME[dm] || 1.5,
+      body: b, footZ, zsh, handZ, xBody, fwd, S
+    };
+    return g;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Launch: release velocity and spin vector                            */
+  /* ------------------------------------------------------------------ */
+  function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+  function norm(a) { const n = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / n, a[1] / n, a[2] / n]; }
+  function dirVec(thV, thH) { const cv = Math.cos(thV * D2R); return [cv * Math.sin(thH * D2R), -cv * Math.cos(thH * D2R), Math.sin(thV * D2R)]; }
+  // spin vector (rad/s) for a pitch travelling along unit vector u
+  function spinVector(u, rpm, dirDeg, eff, gyroSign) {
+    const up = [0, 0, 1], dot = up[2] * u[2];
+    const eup = norm([up[0] - dot * u[0], up[1] - dot * u[1], up[2] - dot * u[2]]);
+    const eright = cross(eup, u);                       // the catcher's right-hand side as seen from behind the pitch
+    const d = dirDeg * D2R, c = Math.cos(d), s = Math.sin(d);
+    const m = [c * eup[0] + s * eright[0], c * eup[1] + s * eright[1], c * eup[2] + s * eright[2]];   // direction the lift acts
+    const n = cross(u, m);                              // spin axis that produces that lift: (n x u) = m
+    const ef = Math.max(0, Math.min(1, eff / 100)), ge = Math.sqrt(Math.max(0, 1 - ef * ef)), w = rpm * RPM;
+    return [w * (ef * n[0] + gyroSign * ge * u[0]), w * (ef * n[1] + gyroSign * ge * u[1]), w * (ef * n[2] + gyroSign * ge * u[2])];
+  }
+  function launch(rel, speedMph, thV, thH, sp) {
+    const u = dirVec(thV, thH), v = speedMph * MPH;
+    return { ic: { x: rel.x, y: rel.y, z: rel.z, vx: v * u[0], vy: v * u[1], vz: v * u[2] },
+             w: spinVector(u, sp.rpm, sp.dir, sp.eff, sp.gyroSign || 1), u };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Flight: RK4 with the engine's drag / Magnus / wind / Coriolis        */
+  /* ------------------------------------------------------------------ */
+  const k1 = new Float64Array(6), k2 = new Float64Array(6), k3 = new Float64Array(6), k4 = new Float64Array(6);
+  function fly(c, ic, w, o) {
+    o = o || {};
+    const dt = o.dt || 0.001, rec = !!o.record, yEnd = o.yEnd !== undefined ? o.yEnd : 0, zone = o.zone || null, R = c.R, acc = E.acc;
+    const stride = Math.max(1, Math.round((o.sampleDt || 1 / 240) / dt));
+    let x = ic.x, y = ic.y, z = ic.z, vx = ic.vx, vy = ic.vy, vz = ic.vz, t = 0, step = 0;
+    const sp = { wx: w[0], wy: w[1], wz: w[2], t0: 0 };
+    const res = { front: null, back: null, touch: false, tGround: null, ground: null, state: null, maxSpeed: Math.hypot(vx, vy, vz) };
+    const tr = rec ? { t: [], x: [], y: [], z: [], vx: [], vy: [], vz: [], wx: [], wy: [], wz: [] } : null;
+    function wNow(tt) { const d = Math.exp(-(tt - sp.t0) / c.tau); return [sp.wx * d, sp.wy * d, sp.wz * d]; }
+    function push(tt, X, Y, Z, VX, VY, VZ) {
+      const wv = wNow(tt);
+      tr.t.push(tt); tr.x.push(X); tr.y.push(Y); tr.z.push(Z); tr.vx.push(VX); tr.vy.push(VY); tr.vz.push(VZ); tr.wx.push(wv[0]); tr.wy.push(wv[1]); tr.wz.push(wv[2]);
+    }
+    function touches(X, Z) { return zone && Math.abs(X) <= zone.half + R && Z >= zone.bot - R && Z <= zone.top + R; }
+    if (rec) push(0, x, y, z, vx, vy, vz);
+    if (y <= yEnd) { res.state = { t: 0, x, y, z, vx, vy, vz, w: wNow(0) }; res.tEnd = 0; res.tr = tr; return res; }
+    const h2 = dt * 0.5, d6 = dt / 6;
+    while (t < 3.0) {
+      const px = x, py = y, pz = z, pvx = vx, pvy = vy, pvz = vz, pt = t;
+      E.accel(c, sp, t, x, y, z, vx, vy, vz);
+      k1[0] = vx; k1[1] = vy; k1[2] = vz; k1[3] = acc[0]; k1[4] = acc[1]; k1[5] = acc[2];
+      E.accel(c, sp, t + h2, x + h2 * k1[0], y + h2 * k1[1], z + h2 * k1[2], vx + h2 * k1[3], vy + h2 * k1[4], vz + h2 * k1[5]);
+      k2[0] = vx + h2 * k1[3]; k2[1] = vy + h2 * k1[4]; k2[2] = vz + h2 * k1[5]; k2[3] = acc[0]; k2[4] = acc[1]; k2[5] = acc[2];
+      E.accel(c, sp, t + h2, x + h2 * k2[0], y + h2 * k2[1], z + h2 * k2[2], vx + h2 * k2[3], vy + h2 * k2[4], vz + h2 * k2[5]);
+      k3[0] = vx + h2 * k2[3]; k3[1] = vy + h2 * k2[4]; k3[2] = vz + h2 * k2[5]; k3[3] = acc[0]; k3[4] = acc[1]; k3[5] = acc[2];
+      E.accel(c, sp, t + dt, x + dt * k3[0], y + dt * k3[1], z + dt * k3[2], vx + dt * k3[3], vy + dt * k3[4], vz + dt * k3[5]);
+      k4[0] = vx + dt * k3[3]; k4[1] = vy + dt * k3[4]; k4[2] = vz + dt * k3[5]; k4[3] = acc[0]; k4[4] = acc[1]; k4[5] = acc[2];
+      x += d6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); y += d6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]); z += d6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]);
+      vx += d6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]); vy += d6 * (k1[4] + 2 * k2[4] + 2 * k3[4] + k4[4]); vz += d6 * (k1[5] + 2 * k2[5] + 2 * k3[5] + k4[5]);
+      t += dt; step++;
+      const spd = Math.hypot(vx, vy, vz); if (spd > res.maxSpeed) res.maxSpeed = spd;
+      const at = f => ({ t: pt + f * dt, x: px + f * (x - px), y: py + f * (y - py), z: pz + f * (z - pz), vx: pvx + f * (vx - pvx), vy: pvy + f * (vy - pvy), vz: pvz + f * (vz - pvz) });
+      if (res.tGround === null && z < R && pz >= R) { const f = (pz - R) / (pz - z); res.tGround = pt + f * dt; res.ground = at(f); }
+      if (!res.front && y <= PLATE_Y && py > PLATE_Y) {
+        const f = (py - PLATE_Y) / (py - y), s = at(f); res.front = s;
+        if (rec) push(s.t, s.x, s.y, s.z, s.vx, s.vy, s.vz);
+        if (zone) { if (zone.rule) { if (touches(s.x, s.z)) res.touch = true; } else if (Math.abs(s.x) <= zone.half && s.z >= zone.bot && s.z <= zone.top) res.touch = true; }
+      }
+      if (zone && zone.rule && y <= PLATE_Y && y >= 0 && touches(x, z)) res.touch = true;
+      if (y <= yEnd) {
+        const f = (py - yEnd) / (py - y), s = at(f);
+        if (yEnd <= 0 && !res.back) { res.back = s; if (zone && zone.rule && touches(s.x, s.z)) res.touch = true; }
+        res.state = { t: s.t, x: s.x, y: s.y, z: s.z, vx: s.vx, vy: s.vy, vz: s.vz, w: wNow(s.t) };
+        if (rec) push(s.t, s.x, s.y, s.z, s.vx, s.vy, s.vz);
+        res.tEnd = s.t; break;
+      }
+      if (rec && step % stride === 0) push(t, x, y, z, vx, vy, vz);
+    }
+    if (!res.state) { res.state = { t, x, y, z, vx, vy, vz, w: wNow(t) }; res.tEnd = t; }
+    res.tr = tr;
+    return res;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Context, zone, aiming                                               */
+  /* ------------------------------------------------------------------ */
+  function makeCtx(env, P, over) { return E.prepare(Object.assign({}, env, { clScale: P.pLift * (P.liftK === undefined ? 1 : P.liftK), cd: P.pCd }, over || {})); }
+  function zoneOf(P, R) {
+    const H = P.batH;
+    return { half: PLATE_HALF, bot: H * P.zBot / 100 * IN, top: H * P.zTop / 100 * IN, rule: !!P.ballRule, R: R || 0.0366 };
+  }
+  function spinSpec(P, over) { over = over || {}; return { rpm: over.spin !== undefined ? over.spin : P.spin, dir: over.dir !== undefined ? over.dir : P.dir, eff: over.eff !== undefined ? over.eff : P.eff, gyroSign: P.gyroSign }; }
+  // Solve the two release angles that put the ball centre at (tx, tz) (inches) when it crosses the front of the plate.
+  function solveAim(c, rel, speed, sp, tx, tz, o) {
+    o = o || {};
+    const L = rel.y - PLATE_Y, g = c.g;
+    const tF = L / (speed * MPH * 0.92), drop = 0.5 * g * tF * tF;
+    let thV = Math.atan2(tz * IN + drop - rel.z, L) * R2D, thH = Math.atan2(tx * IN - rel.x, L) * R2D;
+    let r = null, ok = false;
+    for (let i = 0; i < 14; i++) {
+      const l = launch(rel, speed, thV, thH, sp);
+      r = fly(c, l.ic, l.w, { dt: o.dt || 0.002, yEnd: PLATE_Y });
+      if (!r.front) break;
+      const ex = tx * IN - r.front.x, ez = tz * IN - r.front.z;
+      if (Math.abs(ex) < 2e-4 && Math.abs(ez) < 2e-4) { ok = true; break; }
+      thV += (ez / L) * R2D * 0.98; thH += (ex / L) * R2D * 0.98;
+    }
+    return { thV, thH, ok };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* One pitch                                                           */
+  /* ------------------------------------------------------------------ */
+  function run(P, env, o) {
+    o = o || {};
+    P = Object.assign({}, DEFAULTS, P);
+    const d = delivery(P);
+    const off = o.relOff || { x: 0, y: 0, z: 0 };
+    const rel = { x: d.x + off.x, y: d.y + off.y, z: d.z + off.z };
+    const c = o.ctx || makeCtx(env, P);
+    const speed = (o.speed !== undefined ? o.speed : d.speed);
+    const sp = spinSpec(P, o);
+    let thV = P.angV, thH = P.angH, aimOk = true;
+    if (o.angles) { thV = o.angles.thV; thH = o.angles.thH; }
+    else if (P.aim === 'target') { const a = solveAim(c, rel, speed, sp, P.tx, P.tz, { dt: o.aimDt }); thV = a.thV; thH = a.thH; aimOk = a.ok; }
+    if (o.angErr) { thV += o.angErr.v; thH += o.angErr.h; }
+    const l = launch(rel, speed, thV, thH, sp);
+    const zone = zoneOf(P, c.R);
+    const res = fly(c, l.ic, l.w, { dt: o.dt || 0.001, record: o.record, sampleDt: o.sampleDt, yEnd: o.yEnd !== undefined ? o.yEnd : 0, zone });
+    res.P = P; res.d = d; res.rel = rel; res.speed = speed; res.thV = thV; res.thH = thH; res.aimOk = aimOk; res.sp = sp; res.ic = l.ic; res.w0 = l.w; res.ctx = c; res.zone = zone;
+    const f = res.front;
+    if (f) {
+      res.plate = { t: f.t, x: f.x / IN, z: f.z / IN, speed: Math.hypot(f.vx, f.vy, f.vz) / MPH, vaa: Math.atan2(f.vz, -f.vy) * R2D, haa: Math.atan2(f.vx, -f.vy) * R2D, vx: f.vx, vy: f.vy, vz: f.vz };
+      res.strike = res.touch;
+    } else { res.plate = null; res.strike = false; }
+    res.dirt = res.tGround !== null && (!f || res.tGround < f.t);
+    if (o.twin && f) {
+      // the same throw without lift: whatever the ball does beyond that is the movement the spin produced
+      const c2 = makeCtx(env, P, { liftOn: false, clScale: 0 });
+      const r2 = fly(c2, l.ic, l.w, { dt: o.dt || 0.001, yEnd: PLATE_Y });
+      if (r2.front) {
+        res.ivb = (f.z - r2.front.z) / IN; res.hbx = (f.x - r2.front.x) / IN;
+        res.hbArm = res.hbx * (P.hand === 'R' ? -1 : 1);
+        res.twin = { x: r2.front.x / IN, z: r2.front.z / IN, t: r2.front.t, speed: Math.hypot(r2.front.vx, r2.front.vy, r2.front.vz) / MPH };
+        // gravity drop of a pitch with no spin and no air, thrown with the same angles: the break you'd see "against" gravity
+        const t0 = (rel.y - PLATE_Y) / (speed * MPH * Math.cos(thV * D2R) * Math.cos(thH * D2R));
+        res.vacDrop = 0.5 * c.g * t0 * t0 / IN;
+      }
+    }
+    // perceived velocity (Statcast): release speed scaled by how much closer the ball is released
+    res.perceived = speed * 55 / (60.5 - d.ext);
+    res.totalTime = d.deliveryTime + (f ? f.t : 0);
+    return res;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Zone classification                                                 */
+  /* ------------------------------------------------------------------ */
+  // Attack zones (Savant-style): heart = inner 67% of the zone, shadow out to 133%, chase to 200%, waste beyond.
+  function classify(P, x, z) {
+    const zb = P.batH * P.zBot / 100, zt = P.batH * P.zTop / 100, hw = 8.5, hh = (zt - zb) / 2, zc = (zt + zb) / 2;
+    const s = Math.max(Math.abs(x) / hw, Math.abs(z - zc) / hh);
+    const region = s <= 0.67 ? 'heart' : s <= 1.0 ? 'edge' : s <= 1.33 ? 'shadow' : s <= 2.0 ? 'chase' : 'waste';
+    const rhb = P.bat === 'R', inside = rhb ? x < 0 : x > 0;   // a right-handed batter stands on the third-base side (catcher's left)
+    const hx = Math.abs(x) > hw * 0.34 ? (inside ? 'inside' : 'outside') : 'middle';
+    const vz = z > zc + hh * 0.34 ? 'high' : z < zc - hh * 0.34 ? 'low' : 'middle';
+    return { s, region, side: hx, height: vz, label: (vz === 'middle' && hx === 'middle') ? 'middle-middle' : vz + '-' + hx };
+  }
+  // distance in inches from the zone edge (negative = inside the zone)
+  function missDistance(P, x, z) {
+    const zb = P.batH * P.zBot / 100, zt = P.batH * P.zTop / 100;
+    const dx = Math.abs(x) - 8.5, dz = Math.max(zb - z, z - zt);
+    const ox = Math.max(0, dx), oz = Math.max(0, dz);
+    if (ox > 0 || oz > 0) return Math.hypot(ox, oz);
+    return Math.max(dx, dz);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Monte Carlo over pitches                                            */
+  /* ------------------------------------------------------------------ */
+  // spec keys: velo (mph), spin (rpm), dir (deg), eff (%), relH, relSide, relExt (in), angV, angH (deg),
+  //            windMph, windDir, tempF, cd (environment; these rebuild the air for each pitch)
+  function createMC(P, env, spec, n, seed, o) {
+    o = o || {};
+    P = Object.assign({}, DEFAULTS, P);
+    const rnd = E.mulberry32(seed >>> 0), keys = Object.keys(spec).filter(k => spec[k].sd > 0);
+    const c0 = makeCtx(env, P);
+    const d0 = delivery(P), rel0 = { x: d0.x, y: d0.y, z: d0.z };
+    const sp0 = spinSpec(P);
+    const nominal = P.aim === 'target' ? solveAim(c0, rel0, d0.speed, sp0, P.tx, P.tz, {}) : { thV: P.angV, thH: P.angH };
+    const out = {
+      n, done: 0, keys, inputs: {}, nominal, P,
+      x: new Float64Array(n), z: new Float64Array(n), speed: new Float64Array(n), flight: new Float64Array(n), vaa: new Float64Array(n), haa: new Float64Array(n),
+      strike: new Uint8Array(n), dirt: new Uint8Array(n), ivb: new Float64Array(n), hb: new Float64Array(n), miss: new Float64Array(n), region: new Array(n),
+      relX: new Float64Array(n), relZ: new Float64Array(n), release: new Float64Array(n), tracks: [], maxT: 0,
+      hit: (o.swing || o.swingFn) ? { outcome: new Array(n), ev: new Float64Array(n), la: new Float64Array(n), dist: new Float64Array(n), spray: new Float64Array(n), contact: new Uint8Array(n) } : null
+    };
+    keys.forEach(k => { out.inputs[k] = new Float64Array(n); });
+    const envKeys = ['windMph', 'windDir', 'tempF'];
+    const needEnv = keys.some(k => envKeys.indexOf(k) >= 0) || keys.indexOf('pCd') >= 0;
+    function step(count) {
+      const end = Math.min(n, out.done + count);
+      for (let i = out.done; i < end; i++) {
+        const dv = {};
+        for (const k of keys) {
+          const s = spec[k], dev = s.dist === 'uniform' ? (rnd() * 2 - 1) * Math.sqrt(3) * s.sd : E.gauss(rnd) * s.sd;
+          dv[k] = dev;
+          const base = (k in P) ? P[k] : (k in env ? env[k] : 0);
+          out.inputs[k][i] = (k === 'angV' || k === 'angH' || k === 'relH' || k === 'relSide' || k === 'relExt') ? dev : base + dev;
+        }
+        let c = c0, Pi = P;
+        if (dv.pCd !== undefined) Pi = Object.assign({}, P, { pCd: P.pCd + dv.pCd });
+        if (needEnv || dv.pCd !== undefined) {
+          const e2 = Object.assign({}, env);
+          envKeys.forEach(k => { if (dv[k] !== undefined) e2[k] = env[k] + dv[k]; });
+          if (e2.windMph < 0) e2.windMph = 0;
+          c = makeCtx(e2, Pi);
+        }
+        const off = { x: (dv.relSide || 0) * IN, y: -(dv.relExt || 0) * IN, z: (dv.relH || 0) * IN };
+        const spd = d0.speed + (dv.velo || 0);
+        const ov = { spin: P.spin + (dv.spin || 0), dir: P.dir + (dv.dir || 0), eff: Math.max(0, Math.min(100, P.eff + (dv.eff || 0))) };
+        const r = run(P, env, { ctx: c, relOff: off, speed: spd, spin: ov.spin, dir: ov.dir, eff: ov.eff, angles: nominal, angErr: { v: dv.angV || 0, h: dv.angH || 0 }, record: !!o.tracks, sampleDt: o.sampleDt || 1 / 60, dt: o.dt || 0.002, twin: !!o.movement });
+        const p = r.plate;
+        if (p) {
+          out.x[i] = p.x; out.z[i] = p.z; out.speed[i] = p.speed; out.flight[i] = p.t; out.vaa[i] = p.vaa; out.haa[i] = p.haa;
+          out.miss[i] = Math.hypot(p.x - P.tx, p.z - P.tz);
+          out.region[i] = classify(P, p.x, p.z).region;
+          if (r.ivb !== undefined) { out.ivb[i] = r.ivb; out.hb[i] = r.hbArm; }
+        } else { out.x[i] = NaN; out.z[i] = NaN; out.speed[i] = NaN; out.flight[i] = NaN; out.vaa[i] = NaN; out.haa[i] = NaN; out.miss[i] = NaN; out.region[i] = 'waste'; }
+        out.strike[i] = r.strike ? 1 : 0; out.dirt[i] = r.dirt ? 1 : 0;
+        out.relX[i] = r.rel.x / FT; out.relZ[i] = r.rel.z / FT;
+        if (r.tEnd > out.maxT) out.maxT = r.tEnd;
+        if (o.tracks && r.tr) {
+          const T = r.tr, K = T.t.length, arr = new Float32Array(K * 3), ts = new Float32Array(K);
+          for (let j = 0; j < K; j++) { arr[3 * j] = T.x[j]; arr[3 * j + 1] = T.y[j]; arr[3 * j + 2] = T.z[j]; ts[j] = T.t[j]; }
+          out.tracks.push({ p: arr, t: ts, strike: !!r.strike });
+        }
+        if ((o.swing || o.swingFn) && p) {
+          const h = o.swingFn ? o.swingFn(r) : swingAt(r, o.swing, env, { dt: 0.004 });
+          out.hit.contact[i] = h.contact ? 1 : 0;
+          out.hit.outcome[i] = h.outcome; out.hit.ev[i] = h.ev; out.hit.la[i] = h.la; out.hit.dist[i] = h.dist; out.hit.spray[i] = h.spray;
+        }
+      }
+      out.done = end;
+      return out.done >= n;
+    }
+    out.step = step;
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Pitch -> bat: the ball state at the contact point, and the batted ball */
+  /* ------------------------------------------------------------------ */
+  // Re-fly the same pitch to the contact plane y = yc (metres) and report the ball there.
+  function contactState(res, yc) {
+    const l = { x: res.ic.x, y: res.ic.y, z: res.ic.z, vx: res.ic.vx, vy: res.ic.vy, vz: res.ic.vz };
+    const r = fly(res.ctx, l, res.w0, { dt: 0.001, yEnd: yc });
+    return r.state;
+  }
+  // swing = the engine's bat-ball parameters (batMph, attack, offsetIn, sweetIn, faceHead, swingHead, collA ...) plus park/env.
+  function swingParams(res, swing, st) {
+    const p = Object.assign({}, swing, { mode: 'bat', x0: st.x, y0: st.y, contactFt: Math.max(0.35, st.z / FT) });
+    p.pitchV = [st.vx, st.vy, st.vz]; p.pitchW = st.w.slice();
+    p.pitchMph = Math.hypot(st.vx, st.vy, st.vz) / MPH;
+    p.pitchDescent = Math.atan2(-st.vz, Math.hypot(st.vx, st.vy)) * R2D;
+    return p;
+  }
+  function swingAt(res, swing, env, o) {
+    o = o || {};
+    const yc = (swing.y0 !== undefined ? swing.y0 : 0.61);
+    const st = contactState(res, yc);
+    const p = swingParams(res, Object.assign({}, env, swing), st);
+    const contactable = st.z > res.ctx.R * 0.5 && st.z < 2.0 && Math.abs(st.x) < 1.2;
+    if (!contactable) return { contact: false, outcome: 'miss', ev: NaN, la: NaN, dist: NaN, spray: NaN, st, p };
+    const r = E.run(p, { dt: o.dt || 0.002, fence: 'flag', record: !!o.record, sampleDt: o.sampleDt, rollout: !!o.rollout });
+    return { contact: true, outcome: r.outcome, ev: r.meta.ev, la: r.meta.la, spray: r.meta.spray, dist: r.landing ? r.landing.dist : NaN, hang: r.hang, apex: r.apexFt, res: r, st, p, meta: r.meta };
+  }
+
+  return { PLATE_Y, RUBBER_Y, PLATE_HALF, DEFAULTS, TYPES, TYPE_ORDER, TYPE_COLOR, DELIVERY_TIME, applyType, clockText, body, delivery, spinVector, dirVec, launch, fly, makeCtx, zoneOf,
+           solveAim, run, classify, missDistance, createMC, contactState, swingParams, swingAt };
 });
 
 </script>
@@ -1228,7 +1707,7 @@ const OUTCOME = {
 const S = {
   p: Object.assign({}, E.DEFAULTS, { ev: 96, la: 28, spray: 6 }),
   sim: null, ctx: null, fencePts: null, dur: 1, bud: null,
-  view: '3d', tab: 'flight',
+  view: '3d', tab: 'flight', app: 'hit',
   opt: { trail: true, forces: false, compare: false, ens: true },
   cam: { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 },
   play: { t: 0, playing: false, speed: 1, last: 0 },
@@ -1255,8 +1734,9 @@ const PRESETS = [
 
 /* ---------- control schema ---------- */
 const GROUPS = [
-  { id: 'contact', title: 'Contact', open: true, items: [
+  { id: 'contact', title: 'Contact', open: true, app: 'hit', items: [
     { type: 'mode' },
+    { type: 'pitchlink' },
     { type: 'spreadtoggle' },
     { type: 'mcstrip' },
     { key: 'ev', label: 'Exit velocity', unit: 'mph', min: 40, max: 125, step: 0.5, d: 1, m: 'ball' },
@@ -1305,7 +1785,7 @@ const GROUPS = [
     { key: 'rollMu', label: 'Rolling resistance', unit: '', min: 0.04, max: 0.3, step: 0.01, d: 2 },
     { type: 'switches' }
   ] },
-  { id: 'coll', title: 'Collision model', open: false, m: 'bat', items: [
+  { id: 'coll', title: 'Collision model', open: false, m: 'bat', app: 'hit', items: [
     { key: 'collA', label: 'Bat-ball speed transfer (1 + q)', unit: '', min: 1.05, max: 1.4, step: 0.005, d: 3, hint: 'Ball speed off the bat = A·(bat speed) + (A − 1)·(pitch speed)' },
     { key: 'collMu', label: 'Friction coefficient cap', unit: '', min: 0.1, max: 0.9, step: 0.01, d: 2 },
     { key: 'collKt', label: 'Tangential coupling', unit: '', min: 0.2, max: 1.0, step: 0.01, d: 2, hint: 'How much of the ideal spin transfer actually happens' }
@@ -1329,8 +1809,9 @@ let scheduled = false;
 function buildInputs() {
   const root = $('#inputs'); root.innerHTML = '';
   GROUPS.forEach(g => {
-    const det = el('details', g.open ? { open: '' } : {});
+    const det = el('details', g.open ? { open: '' } : {}); det.id = 'grp-' + g.id;
     if (g.m) det.dataset.m = g.m;
+    if (g.app) det.dataset.app = g.app;
     det.appendChild(el('summary', { text: g.title }));
     const body = el('div', { class: 'grp' });
     g.items.forEach(it => body.appendChild(buildItem(it)));
@@ -1358,6 +1839,7 @@ function buildItem(it) {
     return w;
   }
   if (it.type === 'mcstrip') return el('div', { class: 'mcstrip', id: 'mc-strip', hidden: '' });
+  if (it.type === 'pitchlink') return el('div', { class: 'hlink', id: 'pitch-link', 'data-m': 'bat', hidden: '' });
   if (it.type === 'derived') {
     const d = el('div', { class: 'derived', 'data-m': 'bat', id: 'derived' });
     return d;
@@ -1440,8 +1922,8 @@ function buildItem(it) {
     S.p[it.key] = v; if (fromUI) { rg.value = v; if (document.activeElement !== nb) nb.value = v.toFixed(it.d || 0); }
     if (fromUI) changed();
   };
-  rg.addEventListener('input', () => set(parseFloat(rg.value), true));
-  nb.addEventListener('input', () => { const v = parseFloat(nb.value); if (isFinite(v)) { S.p[it.key] = v; rg.value = v; changed(); } });
+  rg.addEventListener('input', () => { dropPitchLink(it.key); set(parseFloat(rg.value), true); });
+  nb.addEventListener('input', () => { const v = parseFloat(nb.value); if (isFinite(v)) { dropPitchLink(it.key); S.p[it.key] = v; rg.value = v; changed(); } });
   nb.addEventListener('blur', () => { nb.value = (+S.p[it.key]).toFixed(it.d || 0); });
   CTL[it.key] = { spin: it.spin, wrap, sync() { const v = S.p[it.key]; rg.value = v; if (document.activeElement !== nb) nb.value = (+v).toFixed(it.d || 0); } };
   return wrap;
@@ -1453,6 +1935,7 @@ function applyMode() {
   const det = $$('#inputs details').find(d => d.dataset.m);
   if (CTL.mode) CTL.mode.sync();
   syncSpinState();
+  if (typeof updatePitchLinkBanner === 'function') updatePitchLinkBanner();
 }
 function syncSpinState() {
   const auto = S.p.mode === 'ball' && S.p.autoSpin;
@@ -1484,6 +1967,7 @@ function applyPreset(i) {
 
 /* ---------- compute ---------- */
 function changed() {
+  if (typeof pitchEnvChanged === 'function') pitchEnvChanged();
   S.mcStale = true; S.sw.stale = true; S.bud = null; S.inVer = (S.inVer || 0) + 1; refreshSpread(); updateMcStrip(); scheduleAutoMC();
   if (scheduled) return; scheduled = true;
   requestAnimationFrame(() => { scheduled = false; recompute(true); });
@@ -2082,7 +2566,7 @@ function drawGhosts(v, t) {
 /* ---------- views ---------- */
 function mcOn() { const mc = S.mc; return !!(mc && mc.tracks.length && mc.visible && S.opt.ens); }
 function draw3D(t, st) {
-  const v = makeView('3d'); drawField(v);
+  const v = makeView('3d'); drawField(v); drawPitchLink(v);
   if (mcOn()) { drawEnsemble(v, t); drawTarget(v); return v; }
   drawGhosts(v, t); drawTarget(v);
   if (S.opt.trail) drawMainTrail(v, t);
@@ -2090,7 +2574,7 @@ function draw3D(t, st) {
   return v;
 }
 function drawTop(t, st) {
-  const v = makeView('top'); drawField(v);
+  const v = makeView('top'); drawField(v); drawPitchLink(v);
   if (mcOn()) { drawEnsemble(v, t); drawTarget(v); return v; }
   drawGhosts(v, t); drawTarget(v);
   if (S.opt.trail) drawMainTrail(v, t);
@@ -2146,6 +2630,7 @@ function drawSide(t, st) {
     g.strokeStyle = T['stand-2']; g.lineWidth = 1; g.beginPath(); g.moveTo(fx, oy - h0 * s); g.lineTo(fx + D * s, oy - h1 * s); g.stroke();
   }
   g.fillStyle = T.ink; g.textAlign = 'right'; g.textBaseline = 'alphabetic'; g.fillText('fence ' + fmt(fz[0] / FT, 0) + ' ft · ' + fmt(fz[1] / FT, 0) + ' ft wall', fx - 8, oy - fh - 22);
+  drawPitchLink(v);
   if (MC) { drawEnsemble(v, t); return v; }
   drawGhosts(v, t);
   if (S.opt.trail) {
@@ -2420,7 +2905,7 @@ function drawSpin(st) {
 function showTab(name) {
   S.tab = name; if (name !== 'hit') $('#tip').hidden = true;
   $$('#tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
-  $$('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + name));
+  $$('#hit-analysis .pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + name));
   if (name === 'phys') fillPhysics();
   if (name === 'mc') renderMcSpec();
   if (name === 'sweep' && (S.sw.stale || !S.sw.data)) runSweep();
@@ -2835,7 +3320,7 @@ $('#val-run').addEventListener('click', () => { $('#val-status').textContent = '
 /* ---------- boot ---------- */
 function resetAll() {
   stopPlay(); clearTimeout(S.mcAutoT); clearTimeout(S.hfT); S.mcJob = (S.mcJob || 0) + 1; S.hf.job++; S.sw.job++;
-  Object.keys(S.p).forEach(k => delete S.p[k]); Object.assign(S.p, S.p0);
+  Object.keys(S.p).forEach(k => delete S.p[k]); Object.assign(S.p, S.p0); S.pitchLink = null;
   Object.assign(S.sigma, S.sigma0);
   S.target = null; S.hf = { rows: null, job: S.hf.job, spin: 'auto', tol: 8, busy: false, sel: null };
   $('#hf-out').innerHTML = '<div class="empty">No spot chosen yet. Switch to the overhead view and click the field.</div>';
@@ -2852,22 +3337,1522 @@ function resetAll() {
   applyMode(); syncAll(); renderMcSpec(); refreshSpread(); updateMcStrip();
   showTab('flight'); recompute(true); updateBudget();
 }
-$('#btn-reset').addEventListener('click', resetAll);
+$('#btn-reset').addEventListener('click', () => { if (S.app === 'pitch') resetPitch(); else resetAll(); });
 (function boot() {
   readTokens(); tokenVersion = document.documentElement.dataset.theme + '|' + (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'd' : 'l');
   buildInputs();
   const sel = $('#preset'); sel.appendChild(el('option', { value: '', text: 'Choose…' }));
   PRESETS.forEach((p, i) => sel.appendChild(el('option', { value: i, text: p.name })));
-  sel.addEventListener('change', () => { if (sel.value !== '') { applyPreset(+sel.value); startPlay(true); } sel.value = ''; });
+  sel.addEventListener('change', () => { if (sel.value !== '') { if (S.app === 'pitch') applyPitchPreset(+sel.value); else { applyPreset(+sel.value); startPlay(true); } } sel.value = ''; });
   syncAll();
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { requestRender(); });
   new MutationObserver(() => requestRender()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-  window.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); if (S.play.playing) stopPlay(); else startPlay(false); } });
+  window.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); if (S.app === 'pitch') { togglePitchPlay(); return; } if (S.play.playing) stopPlay(); else startPlay(false); } });
   recompute(true);
   renderMcSpec(); updateBudget();
   window.addEventListener('resize', () => { drawHF(); if (S.sw.data) drawSweep(); });
   window.BFL_APP = { S, startPlay, recompute, applyPreset, runMC, runSweep, showTab, setTargetFromScreen, runValidation, resetAll };
 })();
 
+/* ===== Pitching: state, controls, compute ===== */
+const PI = BFL.pitch, IN_ = E.IN;
+const PS = {
+  P: Object.assign({}, PI.DEFAULTS),
+  sim: null, ns: null, dur: 0.45, bud: null,
+  view: 'zone', tab: 'data',
+  play: { t: 0, playing: false, speed: 0.25, last: 0 },
+  opt: { trail: true, nospin: true, batter: true, pitcher: true, zones: false, ens: true, arsenal: false, arsMode: 'angles' },
+  cam: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 },
+  sigma: { velo: 1.0, spin: 80, dir: 5, eff: 3, relH: 1.2, relSide: 1.5, relExt: 1.5, angV: 0.55, angH: 0.55, pCd: 0.008 },
+  mc: null, mcStale: false, mcAuto: true, mcSwing: false, mcJob: 0, ver: 0,
+  arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
+};
+PS.P0 = Object.assign({}, PS.P); PS.sigma0 = Object.assign({}, PS.sigma);
+const PCTL = {}, PSPREAD = [];
+const ftin = v => Math.floor(v / 12) + '′' + Math.round(v - Math.floor(v / 12) * 12) + '″';
+function dirWords(dir, hand) {
+  const d = ((dir % 360) + 360) % 360, up = Math.cos(d * D2R), right = Math.sin(d * D2R);   // push toward catcher's right = +x
+  const armIsLeft = hand === 'R';                                                          // a right-hander's arm side is the catcher's left
+  const pushLeft = right < 0, side = Math.abs(right) < 0.17 ? '' : ((pushLeft === armIsLeft) ? 'arm-side' : 'glove-side');
+  const vert = Math.abs(up) < 0.17 ? '' : (up > 0 ? 'rise' : 'drop');
+  if (!side && !vert) return '';
+  if (!side) return up > 0 ? 'pure backspin: rises' : 'pure topspin: drops';
+  if (!vert) return 'pure sidespin: ' + side + ' only';
+  return side + ' + ' + (up > 0 ? 'backspin (rise)' : 'topspin (drop)');
+}
+
+/* ---------- control schema ---------- */
+const PGROUPS = [
+  { id: 'pitcher', title: 'Pitcher', open: true, items: [
+    { type: 'seg', k: 'hand', opts: [['R', 'Right-handed'], ['L', 'Left-handed']], on: 'hand' },
+    { type: 'seg', k: 'delivery', opts: [['windup', 'Windup'], ['stretch', 'Stretch'], ['slide', 'Slide step']] },
+    { k: 'height', label: 'Height', unit: 'in', min: 60, max: 84, step: 1, d: 0, hint: v => ftin(v) },
+    { k: 'wingspan', label: 'Wingspan', unit: 'in', min: 58, max: 92, step: 0.5, d: 1, hint: () => 'Wingspan − height = ' + sgn(PS.P.wingspan - PS.P.height, 1) + ' in' },
+    { k: 'slot', label: 'Arm slot', unit: '°', min: -15, max: 95, step: 1, d: 0, hint: v => v < 0 ? 'Submarine: the hand releases below the shoulder' : v < 20 ? 'Sidearm' : v < 50 ? 'Three-quarters' : v < 80 ? 'High three-quarters' : 'Over the top. 0° is sidearm, 90° is straight up' },
+    { k: 'stride', label: 'Stride length', unit: '% of height', min: 60, max: 110, step: 1, d: 0, hint: () => fmt(PI.delivery(PS.P).strideIn / 12, 1) + ' ft with this delivery' },
+    { k: 'lean', label: 'Trunk lean at release', unit: '°', min: 0, max: 60, step: 1, d: 0, hint: 'Forward tilt of the trunk. More lean = longer extension, lower shoulder' },
+    { k: 'strideDir', label: 'Stride direction', unit: '°', min: -20, max: 20, step: 0.5, d: 1, hint: '+ lands toward first base, − toward third base' },
+    { k: 'rubberX', label: 'Position on the rubber', unit: 'in', min: -10, max: 10, step: 0.5, d: 1, hint: '+ toward first base. The rubber is 24 in long' },
+    { k: 'mound', label: 'Mound height', unit: 'in', min: 0, max: 15, step: 0.5, d: 1, hint: 'Rubber above the plate. 10 in is the rule' },
+    { k: 'stretchPen', label: 'Speed lost from the stretch', unit: 'mph', min: 0, max: 5, step: 0.1, d: 1, show: () => PS.P.delivery === 'stretch' },
+    { k: 'stretchStride', label: 'Stride from the stretch', unit: '% of windup', min: 80, max: 105, step: 1, d: 0, show: () => PS.P.delivery === 'stretch' },
+    { k: 'slidePen', label: 'Speed lost from the slide step', unit: 'mph', min: 0, max: 8, step: 0.1, d: 1, show: () => PS.P.delivery === 'slide' },
+    { k: 'slideStride', label: 'Stride from the slide step', unit: '% of windup', min: 60, max: 100, step: 1, d: 0, show: () => PS.P.delivery === 'slide' },
+    { type: 'check', k: 'manual', label: 'Set the release point by hand' },
+    { k: 'relH', label: 'Release height', unit: 'ft', min: 2, max: 8, step: 0.05, d: 2, show: () => PS.P.manual },
+    { k: 'relExt', label: 'Extension', unit: 'ft', min: 3.5, max: 9, step: 0.05, d: 2, show: () => PS.P.manual, hint: 'Distance from the front of the rubber toward the plate' },
+    { k: 'relSide', label: 'Release side', unit: 'ft', min: -5, max: 5, step: 0.05, d: 2, show: () => PS.P.manual, hint: '+ toward the catcher’s right (first base), − toward his left' },
+    { type: 'pderived' }
+  ] },
+  { id: 'pitch', title: 'Pitch', open: true, items: [
+    { type: 'ptype' },
+    { k: 'velo', label: 'Velocity out of the hand', unit: 'mph', min: 40, max: 106, step: 0.1, d: 1, sig: 'velo', hint: () => PS.P.delivery === 'windup' ? '' : 'Released at ' + fmt(PI.delivery(PS.P).speed, 1) + ' mph from the ' + (PS.P.delivery === 'stretch' ? 'stretch' : 'slide step') },
+    { k: 'spin', label: 'Spin rate', unit: 'rpm', min: 0, max: 3500, step: 10, d: 0, sig: 'spin' },
+    { k: 'dir', label: 'Spin direction', unit: '°', min: 0, max: 360, step: 1, d: 0, sig: 'dir', clock: true, hint: () => PI.clockText(PS.P.dir) + ' as the catcher sees the push · ' + dirWords(PS.P.dir, PS.P.hand) },
+    { k: 'eff', label: 'Spin efficiency', unit: '%', min: 0, max: 100, step: 1, d: 0, sig: 'eff', hint: () => fmt(PS.P.spin * PS.P.eff / 100, 0) + ' rpm of useful spin · ' + fmt(PS.P.spin * Math.sqrt(1 - Math.pow(PS.P.eff / 100, 2)), 0) + ' rpm of gyro spin' },
+    { k: 'liftK', label: 'Seam / wake lift factor', unit: '×', min: 0, max: 8, step: 0.01, d: 2, hint: 'Scales the lift this spin makes. About 1 for fastballs; below 1 for sliders and curves, whose seams cut lift' },
+    { type: 'select', k: 'gyroSign', label: 'Gyro spin sense', opts: [[1, 'Clockwise (from behind the mound)'], [-1, 'Counter-clockwise']] }
+  ] },
+  { id: 'aim', title: 'Aim and command', open: true, items: [
+    { type: 'seg', k: 'aim', opts: [['target', 'Aim at a spot'], ['angles', 'Set release angles']] },
+    { k: 'tx', label: 'Target, side to side', unit: 'in', min: -30, max: 30, step: 0.5, d: 1, dis: () => PS.P.aim !== 'target', hint: '+ toward the catcher’s right (first base). Click the plate view to aim' },
+    { k: 'tz', label: 'Target, height', unit: 'in', min: -6, max: 72, step: 0.5, d: 1, dis: () => PS.P.aim !== 'target', hint: 'Ball centre over the front edge of the plate' },
+    { type: 'tgrid' },
+    { k: 'angV', label: 'Vertical release angle', unit: '°', min: -14, max: 14, step: 0.05, d: 2, sig: 'angV', dis: () => PS.P.aim === 'target', hint: () => PS.P.aim === 'target' ? 'Solved so the pitch crosses the target' : '− is downward. The random ± here is command error' },
+    { k: 'angH', label: 'Horizontal release angle', unit: '°', min: -8, max: 8, step: 0.05, d: 2, sig: 'angH', dis: () => PS.P.aim === 'target', hint: '+ toward the catcher’s right (first base)' }
+  ] },
+  { id: 'batter', title: 'Batter and strike zone', open: false, items: [
+    { type: 'seg', k: 'bat', opts: [['R', 'Right-handed'], ['L', 'Left-handed']] },
+    { k: 'batH', label: 'Batter height', unit: 'in', min: 56, max: 84, step: 1, d: 0, hint: v => ftin(v) },
+    { k: 'zTop', label: 'Zone top', unit: '% of height', min: 45, max: 62, step: 0.1, d: 1, hint: () => fmt(PS.P.batH * PS.P.zTop / 100, 1) + ' in above the ground' },
+    { k: 'zBot', label: 'Zone bottom', unit: '% of height', min: 20, max: 36, step: 0.1, d: 1, hint: () => fmt(PS.P.batH * PS.P.zBot / 100, 1) + ' in above the ground' },
+    { type: 'check', k: 'ballRule', label: 'A pitch is a strike if any part of the ball touches any part of the zone' }
+  ] },
+  { id: 'swing', title: 'Swing (for Pitch → bat)', open: false, items: [
+    { type: 'aimswing' },
+    { t: 'S', k: 'y0', label: 'Contact point, in front of the back of the plate', unit: 'ft', min: 0.2, max: 4.5, step: 0.05, d: 2, to: v => v / FT, from: v => v * FT, hint: 'The pitch is met this far out. The front of the plate is 1.42 ft' },
+    { t: 'S', k: 'batMph', label: 'Bat speed at the sweet spot', unit: 'mph', min: 40, max: 95, step: 0.5, d: 1 },
+    { t: 'S', k: 'attack', label: 'Attack angle', unit: '°', min: -10, max: 35, step: 0.5, d: 1 },
+    { t: 'S', k: 'offsetIn', label: 'Vertical contact offset', unit: 'in', min: -2, max: 2.5, step: 0.05, d: 2, dis: () => PS.aimSwing.on, hint: () => PS.aimSwing.on ? 'Set by where the pitch crosses relative to the barrel’s aim' : '+ bat below ball centre (more loft, more backspin)' },
+    { t: 'S', k: 'sweetIn', label: 'Distance from sweet spot', unit: 'in', min: 0, max: 8, step: 0.1, d: 1, dis: () => PS.aimSwing.on },
+    { t: 'S', k: 'faceHead', label: 'Face heading (horizontal)', unit: '°', min: -45, max: 45, step: 0.5, d: 1, hint: '+ toward right field' },
+    { t: 'S', k: 'swingHead', label: 'Swing path heading', unit: '°', min: -30, max: 30, step: 0.5, d: 1 }
+  ] },
+  { id: 'paero', title: 'Pitch aerodynamics', open: false, items: [
+    { k: 'pCd', label: 'Drag coefficient', unit: '', min: 0.25, max: 0.45, step: 0.002, d: 3, sig: 'pCd', hint: 'Fitted so a 94 mph fastball loses about 8 mph on the way to the plate' },
+    { k: 'pLift', label: 'Lift scale', unit: '×', min: 0.4, max: 1.4, step: 0.01, d: 2, hint: 'Multiplies Nathan’s lift curve. Fitted so a typical four-seamer rises about 16 in' },
+    { type: 'note', text: 'Air density, wind, temperature and the ballpark are shared with the Hitting tab (the groups below).' }
+  ] }
+];
+
+const pcur = it => it.t === 'S' ? S.p : PS.P;
+function afterEdit(it) { if (it.t === 'S') changed(); else pchanged(it.k); }
+
+function buildPitchItem(it) {
+  if (it.type === 'seg') {
+    const box = el('div', { class: 'seg', role: 'group' });
+    it.opts.forEach(([v, t]) => box.appendChild(el('button', { type: 'button', 'data-v': v, text: t, onclick: () => {
+      if (it.on === 'hand') switchHand(v); else { PS.P[it.k] = v; afterEdit(it); }
+      pSyncAll();
+    } })));
+    PCTL[it.k] = { sync() { $$('button', box).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(pcur(it)[it.k])))); } };
+    return box;
+  }
+  if (it.type === 'check') {
+    const cb = el('input', { type: 'checkbox' });
+    cb.addEventListener('change', () => { PS.P[it.k] = cb.checked; if (it.k === 'manual' && cb.checked) { const d = PI.delivery(Object.assign({}, PS.P, { manual: false })); PS.P.relH = +d.relH.toFixed(2); PS.P.relExt = +d.ext.toFixed(2); PS.P.relSide = +d.side.toFixed(2); } afterEdit(it); pSyncAll(); });
+    PCTL[it.k] = { sync() { cb.checked = !!PS.P[it.k]; } };
+    return el('label', { class: 'chk' }, [cb, it.label]);
+  }
+  if (it.type === 'select') {
+    const sel = el('select', { 'aria-label': it.label }); it.opts.forEach(([v, t]) => sel.appendChild(el('option', { value: v, text: t })));
+    sel.addEventListener('change', () => { PS.P[it.k] = isNaN(+sel.value) ? sel.value : +sel.value; afterEdit(it); });
+    PCTL[it.k] = { sync() { sel.value = String(PS.P[it.k]); } };
+    return el('div', { class: 'ctl' }, [el('label', { text: it.label, style: 'grid-column:1/-1' }), sel]);
+  }
+  if (it.type === 'aimswing') {
+    const cb = el('input', { type: 'checkbox' }), mk = (k, lab) => { const n = el('input', { type: 'number', step: 0.5, min: -30, max: 72, 'aria-label': lab }); n.addEventListener('input', () => { const v = parseFloat(n.value); if (isFinite(v)) { PS.aimSwing[k] = v; pSwingEdited(); } }); return n; };
+    const nx = mk('xs', 'Barrel aim, side to side (inches)'), nz = mk('zs', 'Barrel aim, height (inches)');
+    cb.addEventListener('change', () => { PS.aimSwing.on = cb.checked; pSwingEdited(); pSyncAll(); });
+    PCTL.aimswing = { sync() { cb.checked = PS.aimSwing.on; if (document.activeElement !== nx) nx.value = PS.aimSwing.xs; if (document.activeElement !== nz) nz.value = PS.aimSwing.zs; nx.disabled = nz.disabled = !PS.aimSwing.on; } };
+    return el('div', { class: 'ctl' }, [el('label', { class: 'chk', style: 'grid-column:1/-1' }, [cb, 'The barrel is aimed at a fixed spot over the plate']),
+      el('div', { class: 'field-row', style: 'grid-column:1/-1' }, [el('label', {}, ['Side to side (in)', nx]), el('label', {}, ['Height (in)', nz])]),
+      el('div', { class: 'hint', text: 'On: the pitch’s miss from this spot sets the vertical offset and the sweet-spot distance, and a big enough miss is a swing and miss. Off: the offset and sweet-spot boxes below apply to every pitch.' })]);
+  }
+  if (it.type === 'note') return el('div', { class: 'note', text: it.text });
+  if (it.type === 'pderived') return el('div', { class: 'derived', id: 'pderived' });
+  if (it.type === 'ptype') {
+    const sel = el('select', { 'aria-label': 'Pitch type', id: 'ptype' });
+    PI.TYPE_ORDER.forEach(k => sel.appendChild(el('option', { value: k, text: PI.TYPES[k].name })));
+    sel.addEventListener('change', () => {
+      PI.applyType(PS.P, sel.value, false);
+      PS.sigma.dir = sel.value === 'KN' ? 120 : PS.sigma0.dir;
+      PS.mcStaleType = true; pchanged('type'); pSyncAll(); pStartPlay(true);
+    });
+    PCTL.type = { sync() { sel.value = PS.P.type; } };
+    return el('div', { class: 'ctl' }, [el('label', { for: 'ptype', text: 'Pitch type', style: 'grid-column:1/-1' }), sel,
+      el('div', { class: 'hint', text: 'Choosing a type loads a typical velocity, spin and axis. Every box stays editable.' })]);
+  }
+  if (it.type === 'tgrid') {
+    const g = el('div', { class: 'tgrid', role: 'group', 'aria-label': 'Quick targets, catcher’s view' });
+    ['high', 'middle', 'low'].forEach((r, ri) => [-1, 0, 1].forEach(ci => g.appendChild(el('button', { type: 'button', title: r + ' · ' + (ci < 0 ? 'catcher’s left' : ci > 0 ? 'catcher’s right' : 'middle'), onclick: () => {
+      const zb = PS.P.batH * PS.P.zBot / 100, zt = PS.P.batH * PS.P.zTop / 100, hz = (zt - zb) / 3;
+      PS.P.aim = 'target'; PS.P.tx = ci * 5.67; PS.P.tz = ri === 0 ? zt - hz / 2 : ri === 1 ? (zb + zt) / 2 : zb + hz / 2; pchanged('tx'); pSyncAll();
+    } }))));
+    return el('div', { class: 'ctl' }, [el('label', { text: 'Quick targets (catcher’s view)' }), g]);
+  }
+  // slider + number
+  const rg = el('input', { type: 'range', min: it.min, max: it.max, step: it.step, 'aria-label': it.label });
+  const nb = el('input', { type: 'number', min: it.min, max: it.max, step: it.step });
+  const u = el('span', { class: 'unit', text: it.unit || '' });
+  const hintEl = el('div', { class: 'hint' });
+  const wrap = el('div', { class: 'ctl' }, [el('label', { text: it.label }), el('span', { class: 'num' }, [nb, u]), rg, hintEl]);
+  const to = it.to || (v => v), from = it.from || (v => v);
+  const sk = it.sig;
+  if (sk) {
+    const si = el('input', { type: 'number', min: 0, step: it.step >= 1 ? 1 : (it.step >= 0.1 ? 0.1 : 0.01), 'aria-label': 'Random spread, one standard deviation, for ' + it.label });
+    const bar = el('i');
+    const sp = el('div', { class: 'sp' }, [el('span', { class: 'sp-l', text: 'random ±' }), si, el('span', { class: 'unit', text: it.unit || '' }), el('span', { class: 'band', title: 'Shaded: the ±2σ range the Monte Carlo draws from' }, [bar])]);
+    si.addEventListener('input', () => { PS.sigma[sk] = Math.max(0, parseFloat(si.value) || 0); pSigmaChanged(); });
+    wrap.appendChild(sp); PSPREAD.push({ sk, it, si, bar });
+  }
+  const commit = v => { if (!isFinite(v)) return; pcur(it)[it.k] = from(v); afterEdit(it); pSyncSoft(it.k); };
+  rg.addEventListener('input', () => { commit(parseFloat(rg.value)); if (document.activeElement !== nb) nb.value = (+rg.value).toFixed(it.d || 0); });
+  nb.addEventListener('input', () => { const v = parseFloat(nb.value); if (isFinite(v)) { commit(v); rg.value = v; } });
+  nb.addEventListener('blur', () => { nb.value = to(+pcur(it)[it.k]).toFixed(it.d || 0); });
+  PCTL[it.k] = { it, wrap, sync() {
+    const v = to(+pcur(it)[it.k]); rg.value = v; if (document.activeElement !== nb) nb.value = v.toFixed(it.d || 0);
+    const h = typeof it.hint === 'function' ? it.hint(v) : (it.hint || ''); hintEl.textContent = h; hintEl.hidden = !h;
+    if (it.show) wrap.hidden = !it.show();
+    const dis = it.dis ? it.dis() : false; wrap.classList.toggle('disabled', dis); rg.disabled = nb.disabled = dis;
+  } };
+  return wrap;
+}
+function buildPitchInputs() {
+  const root = $('#inputs');
+  const make = g => {
+    const det = el('details', Object.assign({ 'data-app': 'pitch', id: 'grp-' + g.id }, g.open ? { open: '' } : {}));
+    det.appendChild(el('summary', { text: g.title }));
+    const body = el('div', { class: 'grp' }); g.items.forEach(it => body.appendChild(buildPitchItem(it))); det.appendChild(body);
+    return det;
+  };
+  let anchor = $('#grp-contact');
+  PGROUPS.filter(g => g.id !== 'paero').forEach(g => { const d = make(g); anchor.after(d); anchor = d; });
+  $('#grp-aero').after(make(PGROUPS.find(g => g.id === 'paero')));
+}
+function refreshPSpread() {
+  PSPREAD.forEach(r => {
+    const sd = PS.sigma[r.sk] || 0, v = PS.P[r.it.k], span = r.it.max - r.it.min;
+    if (document.activeElement !== r.si) r.si.value = sd;
+    const lo = Math.max(r.it.min, v - 2 * sd), hi = Math.min(r.it.max, v + 2 * sd);
+    r.bar.style.left = (100 * (lo - r.it.min) / span) + '%'; r.bar.style.width = sd > 0 ? Math.max(1.2, 100 * (hi - lo) / span) + '%' : '0';
+  });
+  $$('#ppane-mc input[data-sg]').forEach(i => { if (document.activeElement !== i) i.value = i.dataset.env ? S.sigma[i.dataset.sg] : PS.sigma[i.dataset.sg]; });
+}
+function pSyncSoft(k) {   // refresh hints and visibility without fighting the control being dragged
+  Object.keys(PCTL).forEach(kk => { const c = PCTL[kk]; if (c.it && kk !== k) c.sync(); else if (c.it) { const it = c.it, h = typeof it.hint === 'function' ? it.hint(+pcur(it)[it.k]) : (it.hint || ''); const he = $('.hint', c.wrap); if (he) { he.textContent = h; he.hidden = !h; } } });
+  pUpdateDerived(); refreshPSpread();
+}
+function pSyncAll() {
+  Object.keys(PCTL).forEach(k => PCTL[k].sync && PCTL[k].sync());
+  pUpdateDerived(); refreshPSpread();
+}
+function switchHand(h) {
+  const P = PS.P; if (P.hand === h) return;
+  P.hand = h; P.dir = (360 - P.dir) % 360; P.rubberX = -P.rubberX; P.strideDir = -P.strideDir; if (P.manual) P.relSide = -P.relSide;
+  pchanged('hand');
+}
+function pUpdateDerived() {
+  const box = $('#pderived'); if (!box) return;
+  const d = PI.delivery(PS.P), b = d.body;
+  box.innerHTML = '<span>Release height <b>' + fmt(d.relH, 2) + ' ft</b></span><span>Extension <b>' + fmt(d.ext, 2) + ' ft</b></span>' +
+    '<span>Release side <b>' + sgn(d.side, 2) + ' ft</b></span><span>Stride <b>' + fmt(d.strideIn / 12, 2) + ' ft</b></span>' +
+    '<span>Arm length <b>' + fmt(b.arm, 1) + ' in</b></span><span>Shoulders <b>' + fmt(b.sw, 1) + ' in</b></span>' +
+    '<span>Delivery <b>' + fmt(d.deliveryTime, 2) + ' s</b></span><span>Perceived <b>' + fmt(d.speed * 55 / (60.5 - d.ext), 1) + ' mph</b></span>';
+}
+
+/* ---------- change handling ---------- */
+let pSched = false;
+function pchanged(k) {
+  PS.ver++; PS.mcStale = true; PS.arsenal = null; PS.hitStale = true; PS.hitMap = null; PS.bud = null;
+  pUpdateMcStrip(); schedulePitchMC();
+  if (pSched) return; pSched = true;
+  requestAnimationFrame(() => { pSched = false; pRecompute(true); });
+}
+function pitchEnvChanged() { if (S.app !== 'pitch') return; pchanged('env'); }
+function pSigmaChanged() { PS.ver++; refreshPSpread(); PS.mcStale = true; pUpdateMcStale(); pUpdateMcStrip(); schedulePitchMC(); }
+
+/* ---------- compute ---------- */
+function pRecompute(toEnd) {
+  const P = PS.P;
+  const res = PI.run(P, S.p, { record: true, twin: true, sampleDt: 1 / 240, dt: 0.001 });
+  PS.sim = res;
+  if (P.aim === 'target') { P.angV = +res.thV.toFixed(3); P.angH = +res.thH.toFixed(3); }
+  const c2 = PI.makeCtx(S.p, P, { liftOn: false, clScale: 0 });
+  PS.ns = PI.fly(c2, res.ic, res.w0, { dt: 0.001, record: true, sampleDt: 1 / 120, yEnd: 0 });
+  PS.dur = Math.max(0.2, res.tEnd);
+  if (toEnd) { PS.play.t = pTotalDur(); PS.play.playing = false; pUpdatePlayBtn(); }
+  PS.tr = res.tr;
+  PS.hit = null;
+  pSyncAll(); pUpdateHud(); pFillActiveTab();
+  clearTimeout(PS.budT); PS.budT = setTimeout(pComputeBudget, 160);
+  if (PS.opt.arsenal) { clearTimeout(PS.arsT); PS.arsT = setTimeout(() => { pComputeArsenal(); pRequestRender(); }, 140); }
+  pRequestRender();
+}
+function pTotalDur() {
+  let d = PS.dur;
+  if (pMcOn()) d = Math.max(d, PS.mc.maxT);
+  if (PS.opt.arsenal && PS.arsenal) PS.arsenal.forEach(a => { if (a.res.tEnd > d) d = a.res.tEnd; });
+  return d + 0.05;
+}
+function pMcOn() { const mc = PS.mc; return !!(mc && mc.visible && mc.tracks.length && PS.opt.ens); }
+function pFillActiveTab() {
+  if (PS.tab === 'data') pFillData();
+  else if (PS.tab === 'bat') pFillBat();
+  else if (PS.tab === 'types') pFillTypes();
+  else if (PS.tab === 'phys') pFillPhys();
+}
+// the verdict on this pitch
+function pVerdict(res) {
+  const P = res.P, p = res.plate;
+  if (!p) return { kind: 'none', text: 'Never reaches the plate', short: '—' };
+  const cl = PI.classify(P, p.x, p.z);
+  const strike = res.strike && !res.dirt;
+  if (res.dirt) return { kind: 'ball', text: 'Ball · bounces before the plate', short: 'Ball (dirt)', cl };
+  if (strike) return { kind: 'strike', text: 'Strike · ' + cl.label, short: 'Strike', cl };
+  const zb = P.batH * P.zBot / 100, zt = P.batH * P.zTop / 100, bits = [];
+  if (p.z > zt) bits.push(fmt(p.z - zt, 1) + ' in above'); else if (p.z < zb) bits.push(fmt(zb - p.z, 1) + ' in below');
+  if (Math.abs(p.x) > 8.5) { const inside = P.bat === 'R' ? p.x < 0 : p.x > 0; bits.push(fmt(Math.abs(p.x) - 8.5, 1) + ' in ' + (inside ? 'inside' : 'outside') + ' (' + (p.x < 0 ? 'catcher’s left' : 'catcher’s right') + ')'); }
+  return { kind: 'ball', text: 'Ball · ' + (bits.join(', ') || 'just off the edge') + ' the zone', short: 'Ball', cl };
+}
+
+/* ---------- where the break comes from ---------- */
+function pComputeBudget() {
+  const P = PS.P, res = PS.sim, p = S.p; if (!res || !res.front) return;
+  const mk = (name, f) => {
+    const c = E.prepare(Object.assign({}, p, { clScale: P.pLift * P.liftK, cd: P.pCd }, f));
+    const r = PI.fly(c, res.ic, res.w0, { dt: 0.002, yEnd: PI.PLATE_Y });
+    return { name, x: r.front ? r.front.x / IN_ : NaN, z: r.front ? r.front.z / IN_ : NaN, t: r.front ? r.front.t : NaN, v: r.front ? Math.hypot(r.front.vx, r.front.vy, r.front.vz) / MPH : NaN };
+  };
+  PS.bud = [
+    mk('Vacuum', { dragOn: false, liftOn: false, windOn: false, coriolisOn: false }),
+    mk('Air drag', { dragOn: p.dragOn, liftOn: false, windOn: false, coriolisOn: false }),
+    mk('Magnus lift', { dragOn: p.dragOn, liftOn: p.liftOn, windOn: false, coriolisOn: false }),
+    mk('Wind', { dragOn: p.dragOn, liftOn: p.liftOn, windOn: p.windOn, coriolisOn: false }),
+    mk('Coriolis', { dragOn: p.dragOn, liftOn: p.liftOn, windOn: p.windOn, coriolisOn: p.coriolisOn })
+  ];
+  if (PS.tab === 'data') pUpdateBudget();
+}
+
+/* ---------- Pitch -> bat ---------- */
+PS.aimSwing = { on: false, xs: 0, zs: 30 };
+function pSwingEdited() { PS.hit = null; PS.hitMap = null; pchanged('swing'); }
+// the swing for one pitch: with the aim on, where the pitch crosses relative to the barrel sets the offset and sweet-spot distance
+function pSwingFor(res, dev) {
+  const sw = Object.assign({}, S.p), A = PS.aimSwing;
+  if (dev) { Object.keys(dev).forEach(k => { sw[k] += dev[k]; }); sw.sweetIn = Math.max(0, sw.sweetIn); }
+  if (!A.on) return { sw, whiff: false };
+  const st = PI.contactState(res, sw.y0), dz = st.z / IN_ - A.zs, dx = st.x / IN_ - A.xs;
+  sw.offsetIn = clamp(dz + (dev && dev.offsetIn || 0), -2.5, 2.5); sw.sweetIn = clamp(Math.abs(dx) + (dev && dev.sweetIn || 0), 0, 8);
+  return { sw, st, dx, dz, whiff: Math.abs(dz) > 2.7 || Math.abs(dx) > 7 };
+}
+function pSwingOutcome(res, o, dev) {
+  const f = pSwingFor(res, dev);
+  if (f.whiff) return { contact: false, whiff: true, outcome: 'miss', ev: NaN, la: NaN, dist: NaN, spray: NaN, st: f.st, dx: f.dx, dz: f.dz, p: f.sw };
+  const h = PI.swingAt(res, f.sw, f.sw, Object.assign({ dt: 0.002 }, o || {}));
+  h.dx = f.dx; h.dz = f.dz; return h;
+}
+function pHitKey() { return JSON.stringify([S.p.batMph, S.p.attack, S.p.offsetIn, S.p.sweetIn, S.p.faceHead, S.p.swingHead, S.p.y0, S.p.park, S.p.collA, S.p.collMu, S.p.collKt, PS.aimSwing]); }
+// the swing + contact outcome for the current pitch
+function pHitResult(record) {
+  if (!PS.sim || !PS.sim.front) return null;
+  const key = pHitKey();
+  if (!record && PS.hit && PS.hit.ver === PS.ver && PS.hit.sw === key) return PS.hit;
+  const h = pSwingOutcome(PS.sim, { record: !!record, sampleDt: 1 / 120, rollout: !!record, dt: record ? 0.001 : 0.002 });
+  h.ver = PS.ver; h.sw = key;
+  if (!record) PS.hit = h;
+  return h;
+}
+function sendToHitting() {
+  const h = pHitResult(false); if (!h || !h.contact) return false;
+  const st = h.st, P = PS.P, res = PS.sim;
+  const sd = E.decomposeSpin([st.vx, st.vy, st.vz], st.w);
+  if (h.p) { S.p.offsetIn = h.p.offsetIn; S.p.sweetIn = h.p.sweetIn; }
+  Object.assign(S.p, { mode: 'bat', pitchV: [st.vx, st.vy, st.vz], pitchW: st.w.slice(), x0: st.x, y0: st.y, contactFt: Math.max(0.35, st.z / FT),
+    pitchMph: Math.hypot(st.vx, st.vy, st.vz) / MPH, pitchDescent: Math.atan2(-st.vz, Math.hypot(st.vx, st.vy)) * R2D, pitchSpin: Math.max(0, Math.round(sd.back)) });
+  // the pitch path up to the contact point, for the hitting views
+  const tr = res.tr, pts = [];
+  for (let i = 0; i < tr.t.length; i++) { if (tr.y[i] < st.y) break; pts.push([tr.x[i], tr.y[i], tr.z[i]]); }
+  pts.push([st.x, st.y, st.z]);
+  S.pitchLink = { pts, desc: PI.TYPES[P.type].name + ' · ' + fmt(res.speed, 1) + ' mph · ' + fmt(P.spin, 0) + ' rpm', plate: res.plate, contact: { x: st.x / IN_, z: st.z / IN_ } };
+  S.tab = S.tab || 'flight';
+  return true;
+}
+function dropPitchLink(k) {
+  if (k !== 'pitchMph' && k !== 'pitchDescent' && k !== 'pitchSpin') return;
+  if (!S.p.pitchV) return;
+  delete S.p.pitchV; delete S.p.pitchW; S.pitchLink = null; updatePitchLinkBanner();
+}
+function clearPitchLink() { dropPitchLink('pitchMph'); S.p.x0 = 0; syncAll(); changed(); requestRender(); }
+function updatePitchLinkBanner() {
+  const n = $('#pitch-link'); if (!n) return;
+  const on = !!(S.p.pitchV && S.p.mode === 'bat' && S.pitchLink);
+  n.hidden = !on; if (!on) return;
+  const L = S.pitchLink;
+  n.innerHTML = '<span><b>Pitch from the Pitching tab</b> · ' + L.desc + '</span><span>Crosses the plate ' + sgn(L.plate.x, 1) + ' in side to side, ' + fmt(L.plate.z, 1) + ' in high · met ' + fmt(L.contact.z, 1) + ' in up. The pitch speed, angle and spin below follow it.</span>';
+  const b = el('button', { type: 'button', class: 'btn sm', text: 'Use a plain pitch instead', onclick: clearPitchLink });
+  n.appendChild(b);
+}
+function drawPitchLink(v) {
+  const L = S.pitchLink; if (!L || !S.p.pitchV || S.p.mode !== 'bat') return;
+  v.line(L.pts, T['c-wall'], 2.4, [5, 4]);
+  const c = L.pts[L.pts.length - 1], p = v.pt(c[0], c[1], c[2]);
+  if (p) { const g = v.g; g.strokeStyle = T['c-wall']; g.lineWidth = 2; g.beginPath(); g.arc(p[0], p[1], 5, 0, 7); g.stroke(); }
+}
+
+/* ===== Pitching: stage views (plate, side, overhead, 3-D), figures, playback, interaction ===== */
+const pstage = $('#pstage'), pwrap = $('#pstagewrap');
+let PG = null, PW = 0, PH = 0;
+const BALL_R = 0.0366;
+function pSizeStage() {
+  const r = pstage.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(2, Math.round(r.width * dpr)), h = Math.max(2, Math.round(r.height * dpr));
+  if (pstage.width !== w || pstage.height !== h) { pstage.width = w; pstage.height = h; }
+  PG = pstage.getContext('2d'); PG.setTransform(dpr, 0, 0, dpr, 0, 0); PW = r.width; PH = r.height;
+}
+const P_STRIKE = () => T['c-good'], P_BALL = () => T['c-wall'], P_DIRT = () => T.ghost;
+function pTrackAt(tr, t) {
+  const ts = tr.t, n = ts.length;
+  if (t <= ts[0]) return mk(0, 0);
+  if (t >= ts[n - 1]) return mk(n - 1, 0);
+  let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ts[m] <= t) lo = m; else hi = m; }
+  return mk(lo, (t - ts[lo]) / (ts[hi] - ts[lo]));
+  function mk(i, f) { const j = Math.min(n - 1, i + 1), L = a => a[i] + f * (a[j] - a[i]); return { i, f, t, x: L(tr.x), y: L(tr.y), z: L(tr.z), vx: L(tr.vx), vy: L(tr.vy), vz: L(tr.vz), wx: L(tr.wx), wy: L(tr.wy), wz: L(tr.wz) }; }
+}
+function pPts(tr, t, step) {   // the recorded path up to time t
+  const cur = pTrackAt(tr, t), out = [], st = step || 1;
+  for (let i = 0; i <= cur.i; i += st) out.push([tr.x[i], tr.y[i], tr.z[i]]);
+  out.push([cur.x, cur.y, cur.z]); return out;
+}
+function pGround(pts) {   // cut a path where it would go through the ground
+  const out = []; for (const q of pts) { if (q[2] < BALL_R * 0.5) { out.push([q[0], q[1], BALL_R * 0.5]); break; } out.push(q); } return out;
+}
+
+/* ---------- generic 2-D views ---------- */
+function pView2d(kind, f, s) {
+  const g = PG, v = { kind, g, persp: false, s };
+  v.pt = (x, y, z) => f(x, y, z || 0);
+  v.line = (pts, stroke, lw, dash) => {
+    g.beginPath(); pts.forEach((q, i) => { const p = f(q[0], q[1], q[2] || 0); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); });
+    g.lineWidth = lw || 1; g.strokeStyle = stroke; g.setLineDash(dash || []); g.stroke(); g.setLineDash([]);
+  };
+  v.poly = (pts, fill, stroke, lw) => {
+    g.beginPath(); pts.forEach((q, i) => { const p = f(q[0], q[1], q[2] || 0); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }); g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.lineWidth = lw || 1; g.strokeStyle = stroke; g.stroke(); }
+  };
+  v.rpx = r => r * s;
+  return v;
+}
+/* ---------- 3-D view ---------- */
+const PNEAR = 0.3;
+function pView3d() {
+  const c = PS.cam, cp = Math.cos(c.pitch), sp = Math.sin(c.pitch), g = PG;
+  const C = [c.tx - c.dist * Math.sin(c.yaw) * cp, c.ty - c.dist * Math.cos(c.yaw) * cp, c.tz + c.dist * sp];
+  let f = [c.tx - C[0], c.ty - C[1], c.tz - C[2]]; let n = Math.hypot(f[0], f[1], f[2]); f = f.map(q => q / n);
+  let r = [f[1], -f[0], 0]; n = Math.hypot(r[0], r[1]); r = [r[0] / n, r[1] / n, 0];
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const fpx = PW / (2 * Math.tan(25 * D2R));
+  const v = { kind: '3d', g, persp: true, C, f, r, u, fpx };
+  v.cam = (x, y, z) => { const d0 = x - C[0], d1 = y - C[1], d2 = z - C[2]; return [d0 * r[0] + d1 * r[1] + d2 * r[2], d0 * u[0] + d1 * u[1] + d2 * u[2], d0 * f[0] + d1 * f[1] + d2 * f[2]]; };
+  v.pt = (x, y, z) => { const q = v.cam(x, y, z || 0); if (q[2] < PNEAR) return null; return [PW / 2 + fpx * q[0] / q[2], PH / 2 - fpx * q[1] / q[2], q[2]]; };
+  v.rpx = (rad, x, y, z) => { const q = v.cam(x, y, z || 0); return q[2] < PNEAR ? 0 : fpx * rad / q[2]; };
+  v.line = (pts, stroke, lw, dash) => {
+    g.beginPath(); let any = false;
+    for (let i = 0; i < pts.length - 1; i++) {
+      let a = v.cam(pts[i][0], pts[i][1], pts[i][2] || 0), b = v.cam(pts[i + 1][0], pts[i + 1][1], pts[i + 1][2] || 0);
+      if (a[2] < PNEAR && b[2] < PNEAR) continue;
+      if (a[2] < PNEAR) { const t = (PNEAR - a[2]) / (b[2] - a[2]); a = [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), PNEAR]; }
+      if (b[2] < PNEAR) { const t = (PNEAR - b[2]) / (a[2] - b[2]); b = [b[0] + t * (a[0] - b[0]), b[1] + t * (a[1] - b[1]), PNEAR]; }
+      g.moveTo(PW / 2 + fpx * a[0] / a[2], PH / 2 - fpx * a[1] / a[2]); g.lineTo(PW / 2 + fpx * b[0] / b[2], PH / 2 - fpx * b[1] / b[2]); any = true;
+    }
+    if (!any) return; g.lineWidth = lw || 1; g.strokeStyle = stroke; g.setLineDash(dash || []); g.stroke(); g.setLineDash([]);
+  };
+  v.poly = (pts, fill, stroke, lw) => {
+    const pc = pts.map(q => v.cam(q[0], q[1], q[2] || 0)), out = [];
+    for (let i = 0; i < pc.length; i++) {
+      const a = pc[i], b = pc[(i + 1) % pc.length], ain = a[2] >= PNEAR, bin = b[2] >= PNEAR;
+      if (ain) out.push(a);
+      if (ain !== bin) { const t = (PNEAR - a[2]) / (b[2] - a[2]); out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), PNEAR]); }
+    }
+    if (out.length < 3) return;
+    g.beginPath(); out.forEach((q, i) => { const X = PW / 2 + fpx * q[0] / q[2], Y = PH / 2 - fpx * q[1] / q[2]; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); } if (stroke) { g.lineWidth = lw || 1; g.strokeStyle = stroke; g.stroke(); }
+  };
+  return v;
+}
+
+/* ---------- figures ---------- */
+function pitcherPose(P) {
+  const d = PI.delivery(P), b = d.body, side = P.hand === 'R' ? -1 : 1, yRub = PI.RUBBER_Y;
+  const yF = yRub - d.strideIn * IN_, footZ = d.footZ * IN_, xF = d.xBody * IN_;
+  const trunkLen = 0.30 * b.H * IN_, lean = P.lean * D2R, zSh = footZ + d.zsh * IN_;
+  const trunkF = Math.min(d.fwd * IN_, 0.1944 * b.H * Math.sin(lean) * IN_), ySh = yF - trunkF, sw = b.sw * IN_;
+  const hip = [xF, ySh + trunkLen * Math.sin(lean), zSh - trunkLen * Math.cos(lean)];
+  const shT = [xF + side * sw / 2, ySh, zSh], shG = [xF - side * sw / 2, ySh, zSh];
+  const hand = [d.x, d.y, d.z];
+  const elbow = [(shT[0] + hand[0]) / 2 + side * 0.04, (shT[1] + hand[1]) / 2 + 0.03, (shT[2] + hand[2]) / 2 + 0.05];
+  const gHand = [xF - side * 0.12, ySh - 0.38, zSh - 0.12], gElbow = [shG[0] - side * 0.10, ySh - 0.12, zSh - 0.26];
+  const head = [xF, ySh - 0.02, zSh + 0.12 + 0.011 * b.H];
+  const fF = [xF, yF, footZ], fB = [P.rubberX * IN_, yRub + 0.06, P.mound * IN_];
+  const kF = [(hip[0] + fF[0]) / 2, (hip[1] + fF[1]) / 2 - 0.10, (hip[2] + fF[2]) / 2 + 0.02], kB = [(hip[0] + fB[0]) / 2, (hip[1] + fB[1]) / 2 + 0.05, (hip[2] + fB[2]) / 2 - 0.03];
+  return { hip, shT, shG, hand, elbow, gHand, gElbow, head, fF, fB, kF, kB, headR: 0.095 };
+}
+function batterPose(P) {
+  const rh = P.bat === 'R', sd = rh ? -1 : 1, H = P.batH * IN_, xb = sd * (8.5 + 6 + 11) * IN_, yc = 0.22;
+  const hipZ = 0.53 * H, shZ = 0.818 * H, sw = 0.23 * H;
+  const hip = [xb, yc, hipZ], sh = [xb, yc + 0.03, shZ];
+  const hands = [xb - sd * 0.28, yc + 0.18, 0.72 * H];
+  return { hip, sh, shL: [xb - sd * 0.0, yc + 0.03 + sw / 2 * 0.2, shZ], hands, head: [xb, yc + 0.06, shZ + 0.13 + 0.01 * H], headR: 0.1,
+    fF: [xb, yc + 0.34, 0], fB: [xb, yc - 0.34, 0], kF: [xb, yc + 0.28, 0.27 * H], kB: [xb, yc - 0.26, 0.27 * H],
+    bat0: hands, bat1: [xb - sd * 0.05, yc - 0.30, 0.72 * H + 0.72], xb, sd };
+}
+function pLimb(v, pts, col, wM) {
+  const g = v.g; g.lineCap = 'round'; g.lineJoin = 'round'; g.strokeStyle = col;
+  const p0 = v.pt(pts[0][0], pts[0][1], pts[0][2]); if (!p0) return;
+  let wpx = v.persp ? v.rpx(wM, pts[0][0], pts[0][1], pts[0][2]) : v.rpx(wM);
+  g.lineWidth = Math.max(1.6, wpx);
+  g.beginPath(); let first = true;
+  for (const q of pts) { const p = v.pt(q[0], q[1], q[2]); if (!p) { first = true; continue; } first ? g.moveTo(p[0], p[1]) : g.lineTo(p[0], p[1]); first = false; }
+  g.stroke();
+}
+function pDrawPitcher(v) {
+  const J = pitcherPose(PS.P), col = T['ink-2'], g = v.g;
+  g.save(); g.globalAlpha = 0.62;
+  pLimb(v, [J.fB, J.kB, J.hip], col, 0.12); pLimb(v, [J.fF, J.kF, J.hip], col, 0.12);
+  pLimb(v, [J.hip, [(J.hip[0] + J.shG[0] / 2 + J.shT[0] / 2) / 2, (J.hip[1] + J.shT[1]) / 2, (J.hip[2] + J.shT[2]) / 2], [(J.shT[0] + J.shG[0]) / 2, J.shT[1], J.shT[2]]], col, 0.24);
+  pLimb(v, [J.shG, J.shT], col, 0.12);
+  pLimb(v, [J.shG, J.gElbow, J.gHand], col, 0.075);
+  g.globalAlpha = 0.92; pLimb(v, [J.shT, J.elbow, J.hand], T.accent, 0.085);
+  g.globalAlpha = 0.62;
+  const hp = v.pt(J.head[0], J.head[1], J.head[2]); if (hp) { const r = v.persp ? v.rpx(J.headR, J.head[0], J.head[1], J.head[2]) : v.rpx(J.headR); g.fillStyle = col; g.beginPath(); g.arc(hp[0], hp[1], Math.max(2.5, r), 0, 7); g.fill(); }
+  g.restore();
+}
+function pDrawBatter(v, withBat) {
+  const J = batterPose(PS.P), col = T.ghost, g = v.g;
+  g.save(); g.globalAlpha = 0.55;
+  pLimb(v, [J.fB, J.kB, J.hip], col, 0.13); pLimb(v, [J.fF, J.kF, J.hip], col, 0.13);
+  pLimb(v, [J.hip, J.sh], col, 0.26);
+  pLimb(v, [J.sh, [(J.sh[0] + J.hands[0]) / 2, (J.sh[1] + J.hands[1]) / 2, (J.sh[2] + J.hands[2]) / 2 - 0.08], J.hands], col, 0.085);
+  if (withBat !== false) pLimb(v, [J.bat0, J.bat1], T['dirt-2'], 0.06);
+  const hp = v.pt(J.head[0], J.head[1], J.head[2]); if (hp) { const r = v.persp ? v.rpx(J.headR, J.head[0], J.head[1], J.head[2]) : v.rpx(J.headR); g.fillStyle = col; g.beginPath(); g.arc(hp[0], hp[1], Math.max(2.5, r), 0, 7); g.fill(); }
+  g.restore();
+}
+
+/* ---------- shared pieces ---------- */
+function pBall(v, x, y, z, big) {
+  const g = v.g, p = v.pt(x, y, z); if (!p) return;
+  let r = v.persp ? v.rpx(BALL_R, x, y, z) : v.rpx(BALL_R);
+  r = big ? Math.max(3.4, r) : Math.max(3.2, Math.min(14, r));
+  g.fillStyle = '#fff'; g.strokeStyle = T.ink; g.lineWidth = 1.3; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.stroke();
+  g.strokeStyle = T.accent; g.lineWidth = Math.max(1, r * 0.2); g.beginPath(); g.arc(p[0] - r * 0.55, p[1], r * 0.62, -0.9, 0.9); g.stroke();
+}
+function pLabel(g, txt, x, y, col, align, size) {
+  g.font = '600 ' + (size || 11) + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = align || 'left'; g.textBaseline = 'middle';
+  g.lineWidth = 3; g.strokeStyle = T.surface; g.strokeText(txt, x, y); g.fillStyle = col || T.ink; g.fillText(txt, x, y);
+}
+function pArsenalOn() { return PS.opt.arsenal && PS.arsenal; }
+function pDrawArsenal(v, t) {
+  if (!pArsenalOn()) return;
+  PS.arsenal.forEach(a => {
+    if (a.cur) return;
+    const tr = a.res.tr; if (!tr) return;
+    v.line(pGround(pPts(tr, Math.min(t, tr.t[tr.t.length - 1]), 2)), a.color, 1.8);
+    const c = pTrackAt(tr, Math.min(t, tr.t[tr.t.length - 1])), p = v.pt(c.x, c.y, c.z);
+    if (p) { v.g.fillStyle = a.color; v.g.beginPath(); v.g.arc(p[0], p[1], 3.6, 0, 7); v.g.fill(); }
+  });
+}
+
+/* ---------- plate (catcher's) view ---------- */
+function pZoneMap() {
+  const P = PS.P, zt = P.batH * P.zTop / 100;
+  let x0 = PS.opt.batter ? -40 : -30, x1 = PS.opt.batter ? 40 : 30, z0 = -6, z1 = Math.max(70, zt + 14);
+  const mc = PS.mc;
+  if (pMcOn()) {
+    const xs = Array.from(mc.x).filter(isFinite).sort((a, b) => a - b), zs = Array.from(mc.z).filter(isFinite).sort((a, b) => a - b);
+    if (xs.length) { const lo = xs[Math.floor(xs.length * 0.01)] - 5, hi = xs[Math.floor(xs.length * 0.99)] + 5; x0 = Math.min(x0, Math.max(-70, lo)); x1 = Math.max(x1, Math.min(70, hi)); }
+    if (zs.length) { const lo = zs[Math.floor(zs.length * 0.01)] - 5, hi = zs[Math.floor(zs.length * 0.99)] + 5; z0 = Math.min(z0, Math.max(-24, lo)); z1 = Math.max(z1, Math.min(100, hi)); }
+  }
+  const padL = 34, padR = 12, padT = 12, padB = 26, availW = PW - padL - padR, availH = PH - padT - padB;
+  const s = Math.min(availW / (x1 - x0), availH / (z1 - z0));
+  const ox = padL + availW / 2 - (x0 + x1) / 2 * s, oy = PH - padB - (availH - (z1 - z0) * s) / 2 + z0 * s;
+  return { s, ox, oy, x0, x1, z0, z1, X: x => ox + x * s, Z: z => oy - z * s, inv: (sx, sy) => ({ x: (sx - ox) / s, z: (oy - sy) / s }) };
+}
+function pDrawZone(t) {
+  const g = PG, P = PS.P, m = pZoneMap(), res = PS.sim; PS.zmap = m;
+  const gr = g.createLinearGradient(0, 0, 0, PH); gr.addColorStop(0, T['sky-top']); gr.addColorStop(1, T['sky-bot']); g.fillStyle = gr; g.fillRect(0, 0, PW, PH);
+  g.fillStyle = T['grass-a']; g.fillRect(0, m.Z(0), PW, PH - m.Z(0));
+  const zb = P.batH * P.zBot / 100, zt = P.batH * P.zTop / 100, zc = (zt + zb) / 2, hh = (zt - zb) / 2;
+  const v = pView2d('zone', (x, y, z) => [m.X(x / IN_), m.Z(z / IN_)], m.s * 39.37 / 39.37 / IN_);
+  // grid + axes
+  g.strokeStyle = 'rgba(128,140,134,0.22)'; g.lineWidth = 1; g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.fillStyle = T['ink-2'];
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let x = Math.ceil(m.x0 / 12) * 12; x <= m.x1; x += 12) { g.beginPath(); g.moveTo(m.X(x), m.Z(m.z1)); g.lineTo(m.X(x), m.Z(0)); g.stroke(); g.fillText(x, m.X(x), m.Z(0) + 20); }
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (let z = 0; z <= m.z1; z += 12) { g.beginPath(); g.moveTo(m.X(m.x0), m.Z(z)); g.lineTo(m.X(m.x1), m.Z(z)); g.stroke(); g.fillText(z, m.X(m.x0) - 4, m.Z(z)); }
+  g.textAlign = 'center'; g.textBaseline = 'top'; g.fillStyle = T.muted; g.fillText('inches from the middle of the plate · catcher’s view · + is first base', (m.X(m.x0) + m.X(m.x1)) / 2, PH - 11);
+  // attack zones
+  if (PS.opt.zones) {
+    [[2.0, 'chase', 0.05], [1.33, 'shadow', 0.09], [1.0, 'zone', 0], [0.67, 'heart', 0.15]].forEach(([k, nm, a]) => {
+      if (!a) return; g.save(); g.globalAlpha = a; g.fillStyle = T.accent; g.fillRect(m.X(-8.5 * k), m.Z(zc + hh * k), 17 * k * m.s, 2 * hh * k * m.s); g.restore();
+      g.strokeStyle = 'rgba(128,140,134,0.5)'; g.setLineDash([3, 4]); g.lineWidth = 1; g.strokeRect(m.X(-8.5 * k), m.Z(zc + hh * k), 17 * k * m.s, 2 * hh * k * m.s); g.setLineDash([]);
+      g.fillStyle = T.muted; g.font = '10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(nm, m.X(-8.5 * k) + 3, m.Z(zc + hh * k) - 1);
+    });
+  }
+  // batter
+  if (PS.opt.batter) {
+    const sd = P.bat === 'R' ? -1 : 1, xb = sd * 25, H = P.batH, col = T.ghost;
+    g.save(); g.globalAlpha = 0.5; g.fillStyle = col;
+    const rect = (cx, z0_, z1_, w) => g.fillRect(m.X(cx - w / 2), m.Z(z1_), w * m.s, (z1_ - z0_) * m.s);
+    rect(xb - 4, 0, 0.53 * H, 6.5); rect(xb + 4, 0, 0.53 * H, 6.5); rect(xb, 0.5 * H, 0.83 * H, 17);
+    g.beginPath(); g.arc(m.X(xb), m.Z(0.905 * H), 4.6 * m.s, 0, 7); g.fill();
+    g.restore();
+  }
+  // plate (seen from behind: the point toward the catcher)
+  g.fillStyle = T.chalk; g.strokeStyle = T['ink-2']; g.lineWidth = 1; g.beginPath();
+  [[-8.5, 0], [8.5, 0], [8.5, -1.4], [0, -3.4], [-8.5, -1.4]].forEach((q, i) => i ? g.lineTo(m.X(q[0]), m.Z(q[1])) : g.moveTo(m.X(q[0]), m.Z(q[1]))); g.closePath(); g.fill(); g.stroke();
+  // zone
+  if (P.ballRule) { g.strokeStyle = T['ink-2']; g.setLineDash([3, 3]); g.lineWidth = 1; const r = 1.45; g.strokeRect(m.X(-8.5 - r), m.Z(zt + r), (17 + 2 * r) * m.s, (zt - zb + 2 * r) * m.s); g.setLineDash([]); }
+  g.strokeStyle = T.ink; g.lineWidth = 2; g.strokeRect(m.X(-8.5), m.Z(zt), 17 * m.s, (zt - zb) * m.s);
+  g.strokeStyle = 'rgba(128,140,134,0.6)'; g.lineWidth = 1; g.setLineDash([2, 4]);
+  for (let k = 1; k < 3; k++) { g.beginPath(); g.moveTo(m.X(-8.5 + k * 17 / 3), m.Z(zt)); g.lineTo(m.X(-8.5 + k * 17 / 3), m.Z(zb)); g.stroke(); g.beginPath(); g.moveTo(m.X(-8.5), m.Z(zb + k * (zt - zb) / 3)); g.lineTo(m.X(8.5), m.Z(zb + k * (zt - zb) / 3)); g.stroke(); }
+  g.setLineDash([]);
+  // target
+  if (P.aim === 'target') {
+    const tx = m.X(P.tx), tz = m.Z(P.tz), r = 5;
+    g.strokeStyle = T.accent; g.lineWidth = 1.6; g.beginPath(); g.arc(tx, tz, r + 2, 0, 7); g.moveTo(tx - r - 8, tz); g.lineTo(tx + r + 8, tz); g.moveTo(tx, tz - r - 8); g.lineTo(tx, tz + r + 8); g.stroke();
+  }
+  // monte carlo cloud
+  if (pMcOn()) { pDrawMcZone(g, m, t); pDrawHover(g, m); return v; }
+  // arsenal
+  if (pArsenalOn()) {
+    PS.arsenal.forEach(a => {
+      const f = a.res.front; if (!f) return;
+      if (t >= f.t - 1e-6 || PS.play.t >= PS.dur - 0.01) {
+        const X = m.X(f.x / IN_), Z = m.Z(f.z / IN_), r = 1.45 * m.s;
+        g.fillStyle = a.color; g.globalAlpha = a.cur ? 1 : 0.85; g.beginPath(); g.arc(X, Z, Math.max(4, r), 0, 7); g.fill(); g.globalAlpha = 1;
+        g.strokeStyle = T.ink; g.lineWidth = a.cur ? 2 : 1; g.stroke();
+        pLabel(g, a.key, X + Math.max(4, r) + 3, Z, T.ink, 'left', 10.5);
+      }
+    });
+  }
+  if (res && res.front) {
+    // path as seen from behind, and the same throw with no spin
+    if (PS.opt.nospin && PS.ns && PS.ns.front) {
+      v.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
+    }
+    if (PS.opt.trail) v.line(pGround(pPts(res.tr, t, 1)), T.path, 2.4);
+    const f = res.front;
+    if (t >= f.t - 1e-6) {
+      const ax = m.X(f.x / IN_), az = m.Z(f.z / IN_);
+      if (PS.opt.nospin && PS.ns && PS.ns.front) {
+        const nx = m.X(PS.ns.front.x / IN_), nz = m.Z(PS.ns.front.z / IN_);
+        g.strokeStyle = T.ghost; g.lineWidth = 1.6; g.setLineDash([3, 3]); g.beginPath(); g.arc(nx, nz, 1.45 * m.s, 0, 7); g.stroke(); g.setLineDash([]);
+        arrow(g, nx, nz, ax - nx, az - nz, T['c-in'], '');
+        pLabel(g, fmt(Math.hypot(res.ivb || 0, res.hbx || 0), 1) + ' in of movement', (nx + ax) / 2 + 8, (nz + az) / 2 - 8, T['c-in'], 'left', 10.5);
+      }
+      const verdict = pVerdict(res), col = verdict.kind === 'strike' ? P_STRIKE() : P_BALL();
+      g.fillStyle = col; g.globalAlpha = 0.28; g.beginPath(); g.arc(ax, az, 1.45 * m.s + 5, 0, 7); g.fill(); g.globalAlpha = 1;
+      pBall(v, f.x, 0, f.z, true);
+      // draw to scale at the plate
+      const rr = 1.45 * m.s; g.strokeStyle = col; g.lineWidth = 2.2; g.beginPath(); g.arc(ax, az, Math.max(4, rr), 0, 7); g.stroke();
+    } else {
+      const c = pTrackAt(res.tr, t), p = v.pt(c.x, c.y, c.z), prog = 1 - (c.y - PI.PLATE_Y) / (res.rel.y - PI.PLATE_Y);
+      const r = Math.max(3, 1.45 * m.s * (0.28 + 0.72 * prog * prog));
+      g.fillStyle = '#fff'; g.strokeStyle = T.ink; g.lineWidth = 1.3; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.stroke();
+      g.strokeStyle = T.accent; g.lineWidth = Math.max(1, r * 0.2); g.beginPath(); g.arc(p[0] - r * 0.55, p[1], r * 0.62, -0.9, 0.9); g.stroke();
+    }
+  }
+  pDrawHover(g, m);
+  return v;
+}
+function pDrawHover(g, m) {
+  const h = PS.hover; if (!h || PS.view !== 'zone') return;
+  g.strokeStyle = 'rgba(128,140,134,0.7)'; g.lineWidth = 1; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(m.X(h.x), m.Z(m.z1)); g.lineTo(m.X(h.x), m.Z(0)); g.moveTo(m.X(m.x0), m.Z(h.z)); g.lineTo(m.X(m.x1), m.Z(h.z)); g.stroke(); g.setLineDash([]);
+}
+function pDrawMcZone(g, m, t) {
+  const mc = PS.mc, n = mc.n, byHit = PS.mcSwing && mc.hit && PS.colorHit;
+  const hitCol = o => o === 'hr' ? T['c-hr'] : o === 'wall' ? T['c-wall'] : o === 'inplay' ? T['c-in'] : o === 'foul' ? T['c-foul'] : T.ghost;
+  const showAll = t >= mc.maxT - 1e-3 || true;
+  for (let i = 0; i < mc.done; i++) {
+    if (!isFinite(mc.x[i])) continue;
+    g.fillStyle = byHit ? hitCol(mc.hit.outcome[i]) : (mc.dirt[i] ? P_DIRT() : mc.strike[i] ? P_STRIKE() : P_BALL());
+    g.globalAlpha = 0.75; g.beginPath(); g.arc(m.X(mc.x[i]), m.Z(mc.z[i]), 2.6, 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
+  if (mc.ell68 && mc.done >= mc.n) {
+    [[mc.ell95, true], [mc.ell68, false]].forEach(([e, dash]) => {
+      if (!e) return; g.strokeStyle = T.ink; g.lineWidth = 1.4; g.setLineDash(dash ? [5, 4] : []); g.beginPath();
+      for (let k = 0; k <= 64; k++) { const a = k / 64 * 2 * Math.PI, ex = e.a * Math.cos(a), ey = e.b * Math.sin(a), x = e.cx + ex * Math.cos(e.ang) - ey * Math.sin(e.ang), z = e.cy + ex * Math.sin(e.ang) + ey * Math.cos(e.ang); k ? g.lineTo(m.X(x), m.Z(z)) : g.moveTo(m.X(x), m.Z(z)); }
+      g.stroke(); g.setLineDash([]);
+    });
+    g.strokeStyle = T.ink; g.lineWidth = 2; const cx = m.X(mc.ell68.cx), cz = m.Z(mc.ell68.cy); g.beginPath(); g.moveTo(cx - 6, cz); g.lineTo(cx + 6, cz); g.moveTo(cx, cz - 6); g.lineTo(cx, cz + 6); g.stroke();
+  }
+}
+
+/* ---------- 2-D pan/zoom for the side and overhead views ---------- */
+PS.zoom = { side: { k: 1, px: 0, py: 0 }, top: { k: 1, px: 0, py: 0 } };
+function pLaneMap(kind) {
+  const Z = PS.zoom[kind], ymax = 62.6 * FT, ymin = -3.2 * FT, pad = 14;
+  let s, f;
+  if (kind === 'side') {
+    const zmax = Math.max(2.4, (PS.sim && PS.sim.tr ? Math.max.apply(null, PS.sim.tr.z) + 0.3 : 2.4)), zmin = -0.35;
+    s = Math.min((PW - 2 * pad) / (ymax - ymin), (PH - 2 * pad - 14) / (zmax - zmin)) * Z.k;
+    const ox = PW - pad - (ymax - ymin) * s * 0 - ((PW - 2 * pad) - (ymax - ymin) * s / Z.k * Z.k) / 2 * 0;
+    const bx = pad + ((PW - 2 * pad) - (ymax - ymin) * s) / 2 + Z.px, by = PH - pad - 14 - ((PH - 2 * pad - 14) - (zmax - zmin) * s) / 2 + zmin * s + Z.py;
+    f = (x, y, z) => [bx + (ymax - y) * s, by - z * s];
+  } else {
+    const xr = 9.0 * FT * 2;
+    s = Math.min((PW - 2 * pad) / (ymax - ymin), (PH - 2 * pad) / xr) * Z.k;
+    const bx = pad + ((PW - 2 * pad) - (ymax - ymin) * s) / 2 + Z.px, by = PH / 2 + Z.py;
+    f = (x, y, z) => [bx + (ymax - y) * s, by - x * s];
+  }
+  return { s, f, ymax, ymin };
+}
+function pMoundZ(y) {   // mound profile along the lane, metres (y in metres from the back of the plate)
+  const yf = y / FT, top = PS.P.mound * IN_;
+  if (yf >= 60.0) return top; if (yf <= 50.0) return 0; return Math.max(0, top * (yf - 50.0) / 10.0);
+}
+function pDrawSide(t) {
+  const g = PG, P = PS.P, res = PS.sim, L = pLaneMap('side'), v = pView2d('side', L.f, L.s); PS.lmap = L;
+  const gr = g.createLinearGradient(0, 0, 0, PH); gr.addColorStop(0, T['sky-top']); gr.addColorStop(1, T['sky-bot']); g.fillStyle = gr; g.fillRect(0, 0, PW, PH);
+  const gy = L.f(0, 0, 0)[1]; g.fillStyle = T['grass-a']; g.fillRect(0, gy, PW, PH - gy);
+  // mound
+  const mp = []; for (let yf = 51; yf <= 63; yf += 0.5) mp.push([0, yf * FT, pMoundZ(yf * FT)]); mp.push([0, 63 * FT, 0]); mp.push([0, 51 * FT, 0]);
+  v.poly(mp, T.dirt, T['dirt-2'], 1);
+  v.poly([[0, 60.5 * FT, P.mound * IN_], [0, 61.0 * FT, P.mound * IN_], [0, 61.0 * FT, P.mound * IN_ + 0.03], [0, 60.5 * FT, P.mound * IN_ + 0.03]], T.chalk, T.ink, 1);
+  v.poly([[0, 0, 0], [0, PI.PLATE_Y, 0], [0, PI.PLATE_Y, 0.03], [0, 0, 0.03]], T.chalk, T.ink, 1);
+  // distance ticks
+  g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.fillStyle = T.chalk; g.textAlign = 'center'; g.textBaseline = 'top';
+  [0, 10, 20, 30, 40, 50, 60].forEach(ft => { const p = L.f(0, ft * FT, 0); g.fillText(ft, p[0], gy + 4); });
+  g.textAlign = 'left'; g.fillText('feet from the back of the plate', 10, PH - 12);
+  // zone box
+  const zb = P.batH * P.zBot / 100 * IN_, zt = P.batH * P.zTop / 100 * IN_;
+  v.poly([[0, 0, zb], [0, PI.PLATE_Y, zb], [0, PI.PLATE_Y, zt], [0, 0, zt]], 'rgba(184,50,42,0.18)', T.accent, 1.4);
+  if (PS.opt.batter) pDrawBatter(v, true);
+  if (PS.opt.pitcher) pDrawPitcher(v);
+  if (pMcOn()) { pDrawMcLanes(v, t, 'side'); return v; }
+  pDrawArsenal(v, t);
+  if (res) {
+    if (PS.opt.nospin && PS.ns) v.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
+    if (PS.opt.trail) v.line(pGround(pPts(res.tr, t, 1)), T.path, 2.6);
+    // release dimensions
+    const d = res.d, rp = L.f(res.rel.x, res.rel.y, res.rel.z), rg = L.f(0, res.rel.y, 0);
+    g.strokeStyle = T['ink-2']; g.lineWidth = 1; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(rp[0], rp[1]); g.lineTo(rg[0], rg[1]); g.stroke();
+    const rub = L.f(0, PI.RUBBER_Y, 0); g.beginPath(); g.moveTo(rub[0], gy + 22); g.lineTo(rg[0], gy + 22); g.stroke(); g.setLineDash([]);
+    pLabel(g, 'extension ' + fmt(d.ext, 1) + ' ft', (rub[0] + rg[0]) / 2, gy + 31, T.ink, 'center', 10.5);
+    pLabel(g, 'release ' + fmt(res.rel.z / FT, 1) + ' ft', rp[0] + 6, (rp[1] + rg[1]) / 2, T.ink, 'left', 10.5);
+    const c = pTrackAt(res.tr, t); pBall(v, c.x, c.y, c.z, false);
+    if (res.front && t >= res.front.t - 1e-6) {
+      const pp = L.f(0, PI.PLATE_Y, res.front.z); g.fillStyle = pVerdict(res).kind === 'strike' ? P_STRIKE() : P_BALL(); g.beginPath(); g.arc(pp[0], pp[1], 4.5, 0, 7); g.fill();
+    }
+  }
+  return v;
+}
+function pDrawTop(t) {
+  const g = PG, P = PS.P, res = PS.sim, L = pLaneMap('top'), v = pView2d('top', L.f, L.s); PS.lmap = L;
+  g.fillStyle = T['grass-a']; g.fillRect(0, 0, PW, PH);
+  // home dirt and mound
+  const circ = (cy, r) => { const o = []; for (let i = 0; i < 40; i++) { const a = i / 40 * 2 * Math.PI; o.push([r * Math.cos(a), cy + r * Math.sin(a), 0]); } return o; };
+  v.poly(circ(0.2, 3.96), T.dirt, T.dirt, 1);
+  v.poly(circ(18.44, 2.74), T['dirt-2'], T['dirt-2'], 1);
+  // lane
+  v.poly([[-0.6, 0.4, 0], [0.6, 0.4, 0], [0.6, 18.4, 0], [-0.6, 18.4, 0]], 'rgba(255,255,255,0.05)');
+  // batter's boxes
+  [-1, 1].forEach(sd => v.poly([[sd * (8.5 + 6) * IN_, 0.216 - 0.914, 0], [sd * (8.5 + 6 + 48) * IN_, 0.216 - 0.914, 0], [sd * (8.5 + 6 + 48) * IN_, 0.216 + 0.914, 0], [sd * (8.5 + 6) * IN_, 0.216 + 0.914, 0]], null, T.chalk, 1.4));
+  v.poly([[0, 0, 0], [-0.216, 0.216, 0], [-0.216, 0.432, 0], [0.216, 0.432, 0], [0.216, 0.216, 0]], T.chalk, T.ink, 1);
+  v.poly([[-0.216, 0, 0], [0.216, 0, 0], [0.216, PI.PLATE_Y, 0], [-0.216, PI.PLATE_Y, 0]], 'rgba(184,50,42,0.20)', T.accent, 1.2);
+  v.poly([[-0.30, 18.44, 0], [0.30, 18.44, 0], [0.30, 18.44 + 0.152, 0], [-0.30, 18.44 + 0.152, 0]], T.chalk, T.ink, 1);
+  g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.fillStyle = T.chalk; g.textAlign = 'center'; g.textBaseline = 'top';
+  [0, 10, 20, 30, 40, 50, 60].forEach(ft => { const p = L.f(0, ft * FT, 0), q = L.f(2.4, ft * FT, 0); g.strokeStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.moveTo(p[0], p[1] - 40); g.lineTo(p[0], p[1] + 40); g.stroke(); g.fillText(ft, p[0], PH - 12); });
+  g.textAlign = 'left'; g.fillText('feet from the back of the plate · first base is up', 10, 6);
+  if (PS.opt.batter) { const J = batterPose(P); const p = L.f(J.hip[0], J.hip[1], 0); g.fillStyle = T.ghost; g.globalAlpha = 0.6; g.beginPath(); g.ellipse(p[0], p[1], 0.35 * L.s, 0.2 * L.s, 0, 0, 7); g.fill(); g.globalAlpha = 1; }
+  if (PS.opt.pitcher) {
+    const J = pitcherPose(P), col = T['ink-2']; g.save(); g.globalAlpha = 0.75;
+    pLimb(v, [J.shG, J.shT], col, 0.15); pLimb(v, [J.shT, J.elbow, J.hand], T.accent, 0.09); pLimb(v, [J.shG, J.gElbow, J.gHand], col, 0.08);
+    pLimb(v, [J.fB, J.hip, J.fF], col, 0.12);
+    const hp = L.f(J.head[0], J.head[1], 0); g.fillStyle = col; g.beginPath(); g.arc(hp[0], hp[1], Math.max(3, 0.1 * L.s), 0, 7); g.fill(); g.restore();
+  }
+  if (pMcOn()) { pDrawMcLanes(v, t, 'top'); return v; }
+  pDrawArsenal(v, t);
+  if (res) {
+    if (PS.opt.nospin && PS.ns) v.line(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2), T.ghost, 1.6, [5, 4]);
+    if (PS.opt.trail) v.line(pPts(res.tr, t, 1), T.path, 2.6);
+    const c = pTrackAt(res.tr, t); pBall(v, c.x, c.y, c.z, false);
+    const rp = L.f(res.rel.x, res.rel.y, 0); g.strokeStyle = T.accent; g.lineWidth = 2; g.beginPath(); g.arc(rp[0], rp[1], 5, 0, 7); g.stroke();
+    pLabel(g, 'release ' + sgn(res.rel.x / FT, 1) + ' ft', rp[0], rp[1] + 14, T.ink, 'center', 10.5);
+  }
+  return v;
+}
+function pDrawMcLanes(v, t, kind) {
+  const mc = PS.mc, g = v.g, n = mc.tracks.length;
+  g.globalAlpha = 0.13; g.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const tk = mc.tracks[i], end = Math.min(idxAt(tk.t, t), tk.t.length - 1), pts = [];
+    for (let j = 0; j <= end; j += 1) pts.push([tk.p[3 * j], tk.p[3 * j + 1], tk.p[3 * j + 2]]);
+    v.line(pts, tk.strike ? P_STRIKE() : P_BALL(), 1);
+  }
+  g.globalAlpha = 1;
+  for (let i = 0; i < n; i++) {
+    const tk = mc.tracks[i], k = idxAt(tk.t, t), p = v.pt(tk.p[3 * k], tk.p[3 * k + 1], tk.p[3 * k + 2]); if (!p) continue;
+    g.fillStyle = tk.strike ? P_STRIKE() : P_BALL(); g.globalAlpha = 0.85; g.beginPath(); g.arc(p[0], p[1], 2.4, 0, 7); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+function pDraw3D(t) {
+  const g = PG, P = PS.P, res = PS.sim, v = pView3d(), zb = P.batH * P.zBot / 100 * IN_, zt = P.batH * P.zTop / 100 * IN_;
+  const gr = g.createLinearGradient(0, 0, 0, PH); gr.addColorStop(0, T['sky-top']); gr.addColorStop(1, T['sky-bot']); g.fillStyle = gr; g.fillRect(0, 0, PW, PH);
+  v.poly([[-300, -60, 0], [300, -60, 0], [300, 300, 0], [-300, 300, 0]], T['grass-a']);
+  // stripes
+  for (let k = -2; k < 12; k++) if (k % 2) v.poly([[-30, k * 6.1, 0], [30, k * 6.1, 0], [30, (k + 1) * 6.1, 0], [-30, (k + 1) * 6.1, 0]], T['grass-b']);
+  const circ = (cy, r, z) => { const o = []; for (let i = 0; i < 40; i++) { const a = i / 40 * 2 * Math.PI; o.push([r * Math.cos(a), cy + r * Math.sin(a), z || 0]); } return o; };
+  v.poly(circ(0.2, 3.96), T.dirt, T.dirt, 1);
+  v.poly(circ(18.44, 2.74, 0.001), T.dirt, T['dirt-2'], 1);
+  v.poly(circ(18.44, 1.52, P.mound * IN_), T['dirt-2'], T.dirt, 1);
+  // mound cone sides (cheap): a ring joining plateau and field
+  for (let i = 0; i < 40; i++) { const a0 = i / 40 * 2 * Math.PI, a1 = (i + 1) / 40 * 2 * Math.PI; v.poly([[1.52 * Math.cos(a0), 18.44 + 1.52 * Math.sin(a0), P.mound * IN_], [1.52 * Math.cos(a1), 18.44 + 1.52 * Math.sin(a1), P.mound * IN_], [2.74 * Math.cos(a1), 18.44 + 2.74 * Math.sin(a1), 0], [2.74 * Math.cos(a0), 18.44 + 2.74 * Math.sin(a0), 0]], T.dirt, T.dirt, 0.6); }
+  [-1, 1].forEach(sd => v.line([[sd * (8.5 + 6) * IN_, 0.216 - 0.914, 0], [sd * (8.5 + 6 + 48) * IN_, 0.216 - 0.914, 0], [sd * (8.5 + 6 + 48) * IN_, 0.216 + 0.914, 0], [sd * (8.5 + 6) * IN_, 0.216 + 0.914, 0], [sd * (8.5 + 6) * IN_, 0.216 - 0.914, 0]], T.chalk, 1.4));
+  v.poly([[0, 0, 0.004], [-0.216, 0.216, 0.004], [-0.216, 0.432, 0.004], [0.216, 0.432, 0.004], [0.216, 0.216, 0.004]], T.chalk, T['ink-2'], 1);
+  v.poly([[-0.30, 18.44, P.mound * IN_ + 0.002], [0.30, 18.44, P.mound * IN_ + 0.002], [0.30, 18.44 + 0.152, P.mound * IN_ + 0.002], [-0.30, 18.44 + 0.152, P.mound * IN_ + 0.002]], T.chalk, T['ink-2'], 1);
+  if (PS.opt.batter) pDrawBatter(v, true);
+  if (PS.opt.pitcher) pDrawPitcher(v);
+  // the zone, as a box over the plate
+  const zx = PI.PLATE_HALF, zy0 = 0, zy1 = PI.PLATE_Y;
+  v.poly([[-zx, zy1, zb], [zx, zy1, zb], [zx, zy1, zt], [-zx, zy1, zt]], 'rgba(184,50,42,0.16)', T.accent, 1.6);
+  v.line([[-zx, zy0, zb], [zx, zy0, zb], [zx, zy0, zt], [-zx, zy0, zt], [-zx, zy0, zb]], T.accent, 1);
+  [[-zx, zb], [zx, zb], [zx, zt], [-zx, zt]].forEach(q => v.line([[q[0], zy0, q[1]], [q[0], zy1, q[1]]], T.accent, 1));
+  if (pMcOn()) { pDrawMcLanes(v, t, '3d'); return v; }
+  pDrawArsenal(v, t);
+  if (res) {
+    if (PS.opt.nospin && PS.ns) v.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
+    if (PS.opt.trail) {
+      const pts = pGround(pPts(res.tr, t, 1));
+      v.line(pts.map(q => [q[0], q[1], 0.002]), 'rgba(0,0,0,0.25)', 2);
+      v.line(pts, T.path, 2.6);
+    }
+    const c = pTrackAt(res.tr, t), sp = v.pt(c.x, c.y, 0), p = v.pt(c.x, c.y, c.z);
+    if (p) { const r = Math.max(3.2, v.rpx(BALL_R * 1.3, c.x, c.y, c.z)); if (sp) { g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(sp[0], sp[1], r * 1.1, r * 0.4, 0, 0, 7); g.fill(); } pBall(v, c.x, c.y, c.z, true); }
+  }
+  return v;
+}
+
+/* ---------- render, playback, hud ---------- */
+function pUpdatePlayBtn() {
+  const b = $('#pbtn-play'), pl = PS.play.playing;
+  b.innerHTML = (pl ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg>' : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg>') + '<span>' + (pl ? 'Pause' : 'Throw') + '</span>';
+}
+function pStartPlay(fromStart) { if (fromStart || PS.play.t >= pTotalDur() - 0.01) PS.play.t = 0; PS.play.playing = true; PS.play.last = performance.now(); pUpdatePlayBtn(); pRequestRender(); }
+function pStopPlay() { PS.play.playing = false; pUpdatePlayBtn(); }
+function togglePitchPlay() { if (PS.play.playing) pStopPlay(); else pStartPlay(false); }
+let pRaf = 0;
+function pRequestRender() { if (S.app === 'pitch' && !pRaf) pRaf = requestAnimationFrame(pLoop); }
+function pLoop(ts) {
+  pRaf = 0;
+  if (PS.play.playing) {
+    const dt = Math.min(0.1, (ts - PS.play.last) / 1000); PS.play.last = ts; PS.play.t += dt * PS.play.speed;
+    const d = pTotalDur(); if (PS.play.t >= d) { PS.play.t = d; PS.play.playing = false; pUpdatePlayBtn(); }
+  }
+  pRender();
+  if (PS.play.playing) pRaf = requestAnimationFrame(pLoop);
+}
+function pRender() {
+  if (!PS.sim || S.app !== 'pitch') return;
+  pSizeStage(); readTokensIfNeeded();
+  const g = PG; g.clearRect(0, 0, PW, PH);
+  const d = pTotalDur(), t = clamp(PS.play.t, 0, d);
+  pwrap.classList.toggle('wide', PS.view === 'top'); pwrap.classList.toggle('wide3', PS.view === 'side'); pwrap.classList.toggle('pzone', PS.view === 'zone');
+  if (PS.view === 'zone') pDrawZone(t); else if (PS.view === 'side') pDrawSide(t); else if (PS.view === 'top') pDrawTop(t); else pDraw3D(t);
+  $('#pscrub').value = Math.round(t / d * 1000);
+  $('#ptread').textContent = t.toFixed(3) + ' / ' + d.toFixed(3) + ' s';
+  pUpdateLive(t);
+  if (PS.tab === 'data') pDrawSpinBall(t);
+  const hints = { zone: PS.P.aim === 'target' ? 'Click the plate to aim there' : 'Release angles are set by hand · click to aim at a spot', side: 'Seen from third base · scroll to zoom, drag to pan, double-click to reset', top: 'Seen from above, first base at the top · scroll to zoom, drag to pan', '3d': 'Drag to orbit · scroll to zoom' };
+  $('#pstagehint').textContent = hints[PS.view];
+}
+function pUpdateLive(t) {
+  const box = $('#plive'), res = PS.sim; if (!res) return;
+  const names = pMcOn() ? ['Time', 'Mean speed', 'Mean height', 'To the plate', 'Pitches'] : ['Time', 'Speed', 'Height', 'To the plate', 'Spin'];
+  if (!box.firstChild) names.forEach(() => box.appendChild(el('div', { html: '<small></small><span>–</span>' })));
+  $$('small', box).forEach((e, i) => { if (e.textContent !== names[i]) e.textContent = names[i]; });
+  let vals;
+  if (pMcOn()) {
+    const mc = PS.mc, n = mc.tracks.length; let sv = 0, sz = 0, sd = 0;
+    for (let i = 0; i < n; i++) { const tk = mc.tracks[i], k = idxAt(tk.t, t), k0 = Math.max(0, k - 1), k1 = Math.min(tk.t.length - 1, k + 1), dtk = (tk.t[k1] - tk.t[k0]) || 1;
+      sv += Math.hypot((tk.p[3 * k1] - tk.p[3 * k0]) / dtk, (tk.p[3 * k1 + 1] - tk.p[3 * k0 + 1]) / dtk, (tk.p[3 * k1 + 2] - tk.p[3 * k0 + 2]) / dtk); sz += tk.p[3 * k + 2]; sd += tk.p[3 * k + 1]; }
+    vals = [t.toFixed(3) + ' s', (sv / n / MPH).toFixed(1) + ' mph', (sz / n / FT).toFixed(1) + ' ft', Math.max(0, (sd / n - PI.PLATE_Y) / FT).toFixed(1) + ' ft', n + ''];
+  } else {
+    const c = pTrackAt(res.tr, Math.min(t, res.tr.t[res.tr.t.length - 1])), sp = Math.hypot(c.wx, c.wy, c.wz) / E.RPM;
+    vals = [t.toFixed(3) + ' s', (Math.hypot(c.vx, c.vy, c.vz) / MPH).toFixed(1) + ' mph', (c.z / FT).toFixed(2) + ' ft', Math.max(0, (c.y - PI.PLATE_Y) / FT).toFixed(1) + ' ft', sp.toFixed(0) + ' rpm'];
+  }
+  $$('span', box).forEach((s, i) => { if (s.textContent !== vals[i]) s.textContent = vals[i]; });
+}
+function pUpdateHud() {
+  const hud = $('#phud'), res = PS.sim; hud.innerHTML = ''; if (!res) return;
+  if (pMcOn()) {
+    const mc = PS.mc, st = mc.strike.reduce((a, b) => a + b, 0) / mc.n * 100;
+    hud.appendChild(el('span', { class: 'chip out', style: 'background:var(--accent)', text: 'Monte Carlo' + (PS.mcStale ? ' · updating' : '') }));
+    hud.appendChild(el('span', { class: 'chip', html: '<b>Pitches</b>' + mc.n }));
+    hud.appendChild(el('span', { class: 'chip', style: 'border-left:4px solid ' + P_STRIKE(), html: '<b>Strikes</b>' + fmt(st, 0) + '%' }));
+    hud.appendChild(el('span', { class: 'chip', html: '<b>Miss</b>' + fmt(E.stats(Array.from(mc.miss).filter(isFinite)).mean, 1) + ' in' }));
+    return;
+  }
+  const v = pVerdict(res), col = v.kind === 'strike' ? P_STRIKE() : v.kind === 'ball' ? P_BALL() : P_DIRT();
+  hud.appendChild(el('span', { class: 'chip out', style: 'background:' + col, text: v.short }));
+  if (res.plate) {
+    hud.appendChild(el('span', { class: 'chip', html: '<b>Plate</b>' + fmt(res.plate.speed, 1) + ' mph' }));
+    hud.appendChild(el('span', { class: 'chip', html: '<b>Location</b>' + sgn(res.plate.x, 1) + ', ' + fmt(res.plate.z, 1) + ' in' }));
+    if (res.ivb !== undefined) hud.appendChild(el('span', { class: 'chip', html: '<b>Break</b>' + fmt(res.ivb, 1) + ' up · ' + fmt(Math.abs(res.hbArm), 1) + ' ' + (res.hbArm >= 0 ? 'arm side' : 'glove side') }));
+  }
+}
+
+/* ---------- interaction ---------- */
+const pptr = { down: false, x: 0, y: 0, moved: 0 };
+function pPos(e) { const r = pstage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+pstage.addEventListener('pointerdown', e => { const p = pPos(e); pptr.down = true; pptr.x = p.x; pptr.y = p.y; pptr.moved = 0; pstage.setPointerCapture(e.pointerId); });
+pstage.addEventListener('pointermove', e => {
+  const p = pPos(e);
+  if (pptr.down && (PS.view === '3d' || PS.view === 'side' || PS.view === 'top')) {
+    const dx = p.x - pptr.x, dy = p.y - pptr.y; pptr.moved += Math.abs(dx) + Math.abs(dy);
+    if (PS.view === '3d') { PS.cam.yaw -= dx * 0.006; PS.cam.pitch = clamp(PS.cam.pitch + dy * 0.005, 0.02, 1.45); }
+    else { const Z = PS.zoom[PS.view]; Z.px += dx; Z.py += dy; }
+    pptr.x = p.x; pptr.y = p.y; pRequestRender();
+  } else if (pptr.down) { pptr.moved += Math.abs(p.x - pptr.x) + Math.abs(p.y - pptr.y); pptr.x = p.x; pptr.y = p.y; }
+  pShowHover(p);
+});
+pstage.addEventListener('pointerup', e => {
+  const p = pPos(e);
+  if (pptr.down && pptr.moved < 6 && PS.view === 'zone' && PS.zmap) {
+    const q = PS.zmap.inv(p.x, p.y); PS.P.aim = 'target'; PS.P.tx = clamp(+q.x.toFixed(1), -30, 30); PS.P.tz = clamp(+q.z.toFixed(1), -6, 72);
+    pchanged('tx'); pSyncAll(); pStartPlay(true);
+  }
+  pptr.down = false;
+});
+pstage.addEventListener('pointerleave', () => { $('#ptip').hidden = true; PS.hover = null; pRequestRender(); });
+function pShowHover(p) {
+  const tip = $('#ptip');
+  if (PS.view !== 'zone' || !PS.zmap) { tip.hidden = true; PS.hover = null; return; }
+  const q = PS.zmap.inv(p.x, p.y); PS.hover = q;
+  const cl = PI.classify(PS.P, q.x, q.z);
+  tip.hidden = false; tip.textContent = sgn(q.x, 1) + ' in, ' + fmt(q.z, 1) + ' in · ' + cl.region + (cl.s <= 1 ? ' (in the zone)' : '');
+  const w = pwrap.getBoundingClientRect().width; tip.style.left = Math.min(w - 210, p.x) + 'px'; tip.style.top = p.y + 'px';
+  if (!PS.play.playing) pRequestRender();
+}
+pstage.addEventListener('wheel', e => {
+  if (PS.view === '3d') { e.preventDefault(); PS.cam.dist = clamp(PS.cam.dist * Math.exp(e.deltaY * 0.0012), 3, 60); pRequestRender(); }
+  else if (PS.view === 'side' || PS.view === 'top') {
+    e.preventDefault(); const Z = PS.zoom[PS.view], p = pPos(e), k0 = Z.k, k1 = clamp(k0 * Math.exp(-e.deltaY * 0.0016), 1, 14), r = k1 / k0;
+    Z.px = p.x - (p.x - Z.px - PW / 2) * r - PW / 2 + (PW / 2 - PW / 2); Z.py = p.y - (p.y - Z.py - PH / 2) * r - PH / 2; Z.k = k1;
+    if (k1 === 1) { Z.px = 0; Z.py = 0; } pRequestRender();
+  }
+}, { passive: false });
+pstage.addEventListener('dblclick', () => { if (PS.view === '3d') Object.assign(PS.cam, { yaw: 0.42, pitch: 0.17, dist: 14.5 }); else if (PS.zoom[PS.view]) PS.zoom[PS.view] = { k: 1, px: 0, py: 0 }; pRequestRender(); });
+$('#pbtn-cam').addEventListener('click', () => { Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 }; pRequestRender(); });
+$('#pviews').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; PS.view = b.dataset.view; $$('#pviews button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); pRequestRender(); });
+[['pt-trail', 'trail'], ['pt-nospin', 'nospin'], ['pt-pitcher', 'pitcher'], ['pt-batter', 'batter'], ['pt-zones', 'zones']].forEach(([id, k]) => $('#' + id).addEventListener('change', e => { PS.opt[k] = e.target.checked; pRequestRender(); }));
+$('#pt-ens').addEventListener('change', e => { PS.opt.ens = e.target.checked; PS.play.t = pTotalDur(); pUpdateHud(); pRequestRender(); });
+$('#pt-arsmode').addEventListener('change', e => { PS.opt.arsMode = e.target.value; PS.arsenal = null; if (PS.opt.arsenal) pComputeArsenal(); pRequestRender(); });
+$('#pt-arsenal').addEventListener('change', e => { PS.opt.arsenal = e.target.checked; if (e.target.checked) pComputeArsenal(); pRequestRender(); });
+$('#pbtn-play').addEventListener('click', togglePitchPlay);
+$('#pbtn-replay').addEventListener('click', () => pStartPlay(true));
+$('#pscrub').addEventListener('input', e => { pStopPlay(); PS.play.t = parseFloat(e.target.value) / 1000 * pTotalDur(); pRequestRender(); });
+$('#pspeed').addEventListener('change', e => { PS.play.speed = parseFloat(e.target.value); });
+new ResizeObserver(() => pRequestRender()).observe(pwrap);
+
+/* ===== Pitching: analysis panels ===== */
+const PMC_ROWS = [
+  ['velo', 'Release velocity', 'mph'], ['spin', 'Spin rate', 'rpm'], ['dir', 'Spin direction', '°'], ['eff', 'Spin efficiency', '%'],
+  ['relH', 'Release height', 'in'], ['relSide', 'Release side', 'in'], ['relExt', 'Extension', 'in'],
+  ['angV', 'Vertical command error', '°'], ['angH', 'Horizontal command error', '°'], ['pCd', 'Drag coefficient', '']
+];
+const PMC_ENV = [['windMph', 'Wind speed', 'mph'], ['windDir', 'Wind direction', '°'], ['tempF', 'Temperature', '°F']];
+const PMC_SWING = [['batMph', 'Bat speed', 'mph'], ['attack', 'Attack angle', '°'], ['offsetIn', 'Vertical contact offset', 'in'], ['sweetIn', 'Distance from sweet spot', 'in'], ['faceHead', 'Face heading', '°'], ['swingHead', 'Swing path heading', '°']];
+const pLabelOf = k => { for (const r of PMC_ROWS.concat(PMC_ENV, PMC_SWING)) if (r[0] === k) return r[1]; return k; };
+const pOutcomeCol = o => o === 'hr' ? T['c-hr'] : o === 'wall' ? T['c-wall'] : o === 'inplay' ? T['c-in'] : o === 'foul' ? T['c-foul'] : T.ghost;
+
+/* ---------- tabs ---------- */
+function pShowTab(name) {
+  PS.tab = name; $('#ptip').hidden = true;
+  $$('#ptabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  $$('#panalysis .pane').forEach(p => p.classList.toggle('on', p.id === 'ppane-' + name));
+  if (name === 'mc') pRenderMcSpec();
+  pFillActiveTab();
+  pRequestRender();
+}
+$('#ptabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) pShowTab(b.dataset.tab); });
+
+/* ---------- Pitch data ---------- */
+(function () {
+  $('#ppane-data').innerHTML =
+    '<div id="pverdict"></div><div class="tiles" id="ptiles"></div>' +
+    '<div class="two"><div>' +
+    '<h3>Speed <small>vs. time since release</small></h3><canvas class="plot" id="pch-speed" height="180"></canvas>' +
+    '<h3 style="margin-top:10px">Movement <small>how far the spin has pushed the ball off its no-spin path</small></h3><canvas class="plot" id="pch-move" height="180"></canvas>' +
+    '</div><div style="display:grid;gap:14px;align-content:start">' +
+    '<div><h3>Where the break comes from <small>one effect at a time</small></h3><div class="budget" id="pbudget"></div></div>' +
+    '<div><h3>Ball spin <small>live orientation, seen from third base</small></h3><div class="spin-wrap"><canvas id="pspin-cv" width="236" height="236"></canvas><div id="pspin-read"></div></div></div>' +
+    '</div></div><p class="note" id="penv-note"></p>';
+})();
+function pFillData() {
+  const res = PS.sim; if (!res) return;
+  const P = PS.P, v = pVerdict(res), p = res.plate, d = res.d;
+  const col = v.kind === 'strike' ? T['c-good'] : v.kind === 'ball' ? T['c-wall'] : T.ghost;
+  $('#pverdict').innerHTML = '<div class="tile" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><span class="pill" style="background:' + col + '">' + v.short + '</span><span>' + v.text + (v.cl ? ' · <b>' + v.cl.region + '</b> of the attack zones' : '') + '</span></div>';
+  if (!p) { $('#ptiles').innerHTML = ''; return; }
+  const t = [
+    tile('Release speed', fmt(res.speed, 1), 'mph', 1), tile('Plate speed', fmt(p.speed, 1), 'mph', 1),
+    tile('Perceived speed', fmt(res.perceived, 1), 'mph'), tile('Flight time', fmt(p.t, 3), 's'),
+    tile('At the plate, side', sgn(p.x, 1), 'in'), tile('At the plate, height', fmt(p.z, 1), 'in'),
+    tile('Induced vertical', res.ivb === undefined ? '–' : sgn(res.ivb, 1), 'in'), tile('Horizontal, ' + (res.hbArm >= 0 ? 'arm side' : 'glove side'), res.hbArm === undefined ? '–' : fmt(Math.abs(res.hbArm), 1), 'in'),
+    tile('Drop vs. gravity alone', res.vacDrop === undefined ? '–' : fmt(res.vacDrop, 1), 'in'), tile('Speed lost in flight', fmt(res.speed - p.speed, 1), 'mph'),
+    tile('Vertical approach angle', sgn(p.vaa, 1), '°'), tile('Horizontal approach angle', sgn(p.haa, 1), '°'),
+    tile('Release height', fmt(d.relH, 2), 'ft'), tile('Extension', fmt(d.ext, 2), 'ft'),
+    tile('Release side', sgn(d.side, 2), 'ft'), tile('Vertical release angle', sgn(res.thV, 2), '°'), tile('Horizontal release angle', sgn(res.thH, 2), '°'),
+    tile('Spin axis (clock)', PI.clockText(P.dir), ''), tile('Useful spin', fmt(P.spin * P.eff / 100, 0), 'rpm'),
+    tile('Gyro spin', fmt(P.spin * Math.sqrt(1 - Math.pow(P.eff / 100, 2)), 0), 'rpm'), tile('Delivery + flight', fmt(res.totalTime, 2), 's')
+  ];
+  $('#ptiles').innerHTML = t.join('');
+  // chart data
+  const tr = res.tr, tf = p.t, ts = [], sp = [], iv = [], hz = [];
+  for (let i = 0; i < tr.t.length; i += 2) {
+    if (tr.t[i] > tf + 1e-6) break;
+    ts.push(tr.t[i]); sp.push(Math.hypot(tr.vx[i], tr.vy[i], tr.vz[i]) / MPH);
+    const n = pTrackAt(PS.ns.tr, tr.t[i]); iv.push((tr.z[i] - n.z) / IN_); hz.push((tr.x[i] - n.x) / IN_ * (P.hand === 'R' ? -1 : 1));
+  }
+  PS.cd = { ts, sp, iv, hz, tEnd: tf };
+  const c = res.ctx;
+  $('#penv-note').textContent = 'Air density ' + fmt(c.rho0, 3) + ' kg/m³ at ' + fmt(S.p.tempF, 0) + ' °F, ' + fmt(S.p.elevFt, 0) + ' ft elevation' + (S.p.windMph > 0 ? ', wind ' + fmt(S.p.windMph, 0) + ' mph' : ', no wind') + '. Drag coefficient ' + fmt(P.pCd, 3) + ', lift scale ' + fmt(P.pLift * P.liftK, 2) + '. Movement here means the difference from the same throw with no spin.';
+  pUpdateBudget();
+}
+function pDrawCharts(t) {
+  const d = PS.cd; if (!d || !d.ts.length) return;
+  lineChart($('#pch-speed'), { x: d.ts, series: [{ y: d.sp, color: T.path, label: 'speed (mph)' }], xmax: d.tEnd, xl: 'time since release (s)', cursor: t, y0: Math.floor(Math.min.apply(null, d.sp) / 5) * 5 - 5 });
+  lineChart($('#pch-move'), { x: d.ts, series: [{ y: d.iv, color: T['c-in'], label: 'vertical (in)' }, { y: d.hz, color: T['c-hr'], label: 'arm-side (in)' }], xmax: d.tEnd, xl: 'time since release (s)', cursor: t });
+}
+function pUpdateBudget() {
+  const b = PS.bud, box = $('#pbudget'); if (!box) return;
+  box.innerHTML = '';
+  if (!b) { box.appendChild(el('p', { class: 'note', text: 'Working it out…' })); return; }
+  let mx = 1; for (let i = 1; i < b.length; i++) mx = Math.max(mx, Math.abs(b[i].z - b[i - 1].z), Math.abs(b[i].x - b[i - 1].x));
+  const arm = PS.P.hand === 'R' ? -1 : 1;
+  b.forEach((r, i) => {
+    if (i === 0) { box.appendChild(el('div', { class: 'brow' }, [el('span', { text: 'No air at all' }), el('div', { class: 'bar' }), el('span', { class: 'val', text: fmt(r.z, 1) + ' in' })])); return; }
+    const dz = r.z - b[i - 1].z, dx = (r.x - b[i - 1].x) * arm, big = Math.abs(dz) >= Math.abs(dx) ? dz : dx;
+    const w = Math.abs(big) / mx * 50;
+    box.appendChild(el('div', { class: 'brow' }, [el('span', { html: r.name + (Math.abs(dx) > 0.05 ? ' <small style="color:var(--muted)">' + sgn(dx, 1) + ' in arm side</small>' : '') }),
+      el('div', { class: 'bar' }, [el('i', { style: 'left:' + (big >= 0 ? 50 : 50 - w) + '%;width:' + Math.max(0.5, w) + '%;background:' + (dz >= 0 ? 'var(--c-in)' : 'var(--c-wall)') })]),
+      el('span', { class: 'val', text: sgn(dz, 1) + ' in' })]));
+  });
+  const last = b[b.length - 1];
+  box.appendChild(el('div', { class: 'brow', style: 'border-top:1px solid var(--line);padding-top:4px' }, [el('span', { html: '<b>Crosses at</b>' }), el('div', { class: 'bar' }), el('span', { class: 'val', text: fmt(last.z, 1) + ' in' })]));
+  box.appendChild(el('p', { class: 'note', text: 'Height of the ball at the front of the plate. It starts where gravity alone would put it, then each effect is added in turn. The bars show the change in height; the small text shows the sideways change.' }));
+}
+function pDrawSpinBall(t) {
+  pDrawCharts(t);
+  const cv = $('#pspin-cv'), res = PS.sim; if (!cv || !res || !res.tr) return;
+  const g = cv.getContext('2d'), W = cv.width, c = W / 2, R = W * 0.38, tr = res.tr, tt = Math.min(t, tr.t[tr.t.length - 1]), cur = pTrackAt(tr, tt);
+  const w0 = res.w0, wm0 = Math.hypot(w0[0], w0[1], w0[2]), tau = res.ctx.tau;
+  const ang = wm0 > 1e-6 ? wm0 * tau * (1 - Math.exp(-tt / tau)) : 0, ax = wm0 > 1e-6 ? [w0[0] / wm0, w0[1] / wm0, w0[2] / wm0] : [0, 0, 1];
+  const sa = Math.sin(ang / 2), q = [ax[0] * sa, ax[1] * sa, ax[2] * sa, Math.cos(ang / 2)];
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W);
+  const gr = g.createRadialGradient(c - R * 0.3, c - R * 0.35, R * 0.1, c, c, R); gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#d8d8d2');
+  g.fillStyle = gr; g.beginPath(); g.arc(c, c, R, 0, 7); g.fill(); g.strokeStyle = T['ink-2']; g.lineWidth = 2; g.stroke();
+  // seen from the third-base side: travel (toward -y) runs to the right, the near side is x < 0
+  const pts = SEAM.map(p => qrot(q, p));
+  g.lineWidth = 3.2; g.lineCap = 'round'; g.strokeStyle = '#c0392b';
+  for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1]; if (!(a[0] < 0 && b[0] < 0)) continue; g.beginPath(); g.moveTo(c - a[1] * R, c - a[2] * R); g.lineTo(c - b[1] * R, c - b[2] * R); g.stroke(); }
+  const wm = Math.hypot(cur.wx, cur.wy, cur.wz), v = [cur.vx, cur.vy, cur.vz], sp = Math.hypot(v[0], v[1], v[2]);
+  if (wm > 1) {
+    const a2 = [cur.wx / wm, cur.wy / wm, cur.wz / wm], L = R * 1.18, p1 = [c - a2[1] * L, c - a2[2] * L], p0 = [c + a2[1] * L, c + a2[2] * L];
+    g.strokeStyle = g.fillStyle = T['c-in']; g.lineWidth = 2.5; g.setLineDash(a2[0] < 0 ? [] : [4, 3]); g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(p1[0], p1[1]); g.stroke(); g.setLineDash([]);
+    const dx = p1[0] - p0[0], dy = p1[1] - p0[1], dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
+    g.beginPath(); g.moveTo(p1[0] + ux * 6, p1[1] + uy * 6); g.lineTo(p1[0] - uy * 5, p1[1] + ux * 5); g.lineTo(p1[0] + uy * 5, p1[1] - ux * 5); g.closePath(); g.fill();
+  }
+  const hs = Math.hypot(v[1], v[2]) + 1e-6; g.strokeStyle = g.fillStyle = T['c-hr']; g.lineWidth = 2.5;
+  g.beginPath(); g.moveTo(c - v[1] / hs * (R + 6), c - v[2] / hs * (R + 6)); g.lineTo(c - v[1] / hs * (R + 22), c - v[2] / hs * (R + 22)); g.stroke();
+  const dot = (cur.wx * v[0] + cur.wy * v[1] + cur.wz * v[2]) / (sp || 1), wperp = Math.sqrt(Math.max(0, wm * wm - dot * dot)), Sp = wperp / E.RPM > 0 ? res.ctx.R * wperp / (sp || 1) : 0;
+  const cl = res.P.pLift * res.P.liftK * Sp / (0.4 + 2.32 * Sp);
+  $('#pspin-read').innerHTML = '<span><b class="mono">' + fmt(wm / E.RPM, 0) + '</b> rpm now</span><span><b class="mono">' + fmt(wm > 0 ? wperp / wm * 100 : 0, 0) + '%</b> of it makes lift</span><span><b class="mono">' + fmt(dot / E.RPM, 0) + '</b> rpm gyro (along the path)</span>' +
+    '<span style="color:var(--muted)">spin factor S = <span class="mono">' + fmt(Sp, 3) + '</span>, C<sub>L</sub> = <span class="mono">' + fmt(cl, 3) + '</span></span>' +
+    '<span style="color:var(--muted)"><i style="color:var(--c-in)">blue</i> spin axis · <i style="color:var(--c-hr)">red</i> travel</span>';
+}
+
+/* ---------- Monte Carlo ---------- */
+(function () {
+  $('#ppane-mc').innerHTML =
+    '<div><h3>Throw many pitches <small>each gets its own random draw around yours</small></h3><div class="field-row">' +
+    '<label>Pitches<input type="number" id="pmc-n" value="400" min="10" max="3000" step="50"></label>' +
+    '<label>Seed<input type="number" id="pmc-seed" value="2026" step="1"></label>' +
+    '<label>Distribution<select id="pmc-dist"><option value="gauss">Gaussian</option><option value="uniform">Uniform (same σ)</option></select></label>' +
+    '<button class="btn primary" id="pmc-run" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg><span>Run</span></button>' +
+    '<button class="btn" id="pmc-play" type="button" disabled>Throw all together</button></div></div>' +
+    '<div id="pmc-spec"></div><div class="prog" id="pmc-prog" hidden><i></i></div><div id="pmc-out"></div>';
+  $('#pmc-run').addEventListener('click', () => pRunMC(false));
+  $('#pmc-play').addEventListener('click', () => { if (!PS.mc) return; PS.mc.visible = true; PS.opt.ens = true; $('#pt-ens').checked = true; pStartPlay(true); });
+})();
+function pRenderMcSpec() {
+  const box = $('#pmc-spec');
+  box.innerHTML = '<h3>Randomness <small>one standard deviation per input, shared with the ± boxes on the sliders · 0 turns an input off</small></h3>';
+  const grid = el('div', { class: 'field-row' });
+  PMC_ROWS.concat(PMC_ENV, PS.mcSwing ? PMC_SWING : []).forEach(r => {
+    const env = PMC_ROWS.indexOf(r) < 0, store = env ? S.sigma : PS.sigma;
+    const inp = el('input', { type: 'number', min: 0, step: r[0] === 'pCd' ? 0.001 : 0.1, value: store[r[0]] === undefined ? 0 : store[r[0]], 'data-sg': r[0] });
+    if (env) inp.dataset.env = '1';
+    inp.addEventListener('input', () => { store[r[0]] = Math.max(0, parseFloat(inp.value) || 0); pSigmaChanged(); });
+    grid.appendChild(el('label', {}, [r[1] + (r[2] ? ' (' + r[2] + ')' : ''), inp]));
+  });
+  box.appendChild(grid);
+  const mk = (id, txt, get, set, title) => { const cb = el('input', { type: 'checkbox', id }); cb.checked = get(); cb.addEventListener('change', () => set(cb.checked)); return el('label', { class: 'chk', style: 'margin-top:6px', title: title || '' }, [cb, txt]); };
+  box.appendChild(mk('pmc-auto', 'Keep the cloud live: re-run automatically when any input changes', () => PS.mcAuto, v => { PS.mcAuto = v; if (v) schedulePitchMC(); }));
+  box.appendChild(mk('pmc-swing', 'Also swing at every pitch (uses the Swing group, its spreads below and the barrel aim; slower)', () => PS.mcSwing, v => { PS.mcSwing = v; PS.mcStale = true; pRenderMcSpec(); pUpdateMcStale(); pUpdateMcStrip(); if (PS.mc) schedulePitchMC(); }));
+}
+function pUpdateMcStrip() {
+  const n = $('#pmc-strip'); if (!n) return;
+  const mc = PS.mc; if (!mc || !mc.visible) { n.hidden = true; return; }
+  n.hidden = false; n.classList.toggle('stale', !!PS.mcStale);
+  const xs = E.stats(Array.from(mc.x).filter(isFinite)), zs = E.stats(Array.from(mc.z).filter(isFinite)), st = mc.strike.reduce((a, b) => a + b, 0) / mc.n * 100;
+  let extra = '';
+  if (mc.hit) { const c = mc.hit.contact.reduce((a, b) => a + b, 0), hr = mc.hit.outcome.filter(o => o === 'hr').length; extra = '<span>Contact on ' + fmt(c / mc.n * 100, 0) + '% · ' + fmt(hr / mc.n * 100, 0) + '% home runs</span>'; }
+  n.innerHTML = '<b>' + mc.n + ' random pitches around yours</b><span>' + fmt(st, 0) + '% strikes · lands ' + fmt(xs.sd, 1) + ' in wide, ' + fmt(zs.sd, 1) + ' in tall (1σ)</span>' + extra + (PS.mcStale ? '<em>updating…</em>' : '');
+}
+function pUpdateMcStale() { const n = $('#pmc-stale'); if (n) n.hidden = !PS.mcStale; }
+function schedulePitchMC() {
+  if (!PS.mcAuto || !PS.mc) return;
+  clearTimeout(PS.mcAutoT); PS.mcAutoT = setTimeout(() => pRunMC(true), 500);
+}
+function pRunMC(quiet) {
+  quiet = quiet === true;
+  const n = clamp(parseInt($('#pmc-n').value, 10) || 400, 10, 3000), seed = parseInt($('#pmc-seed').value, 10) || 1, dist = $('#pmc-dist').value;
+  const spec = {};
+  PMC_ROWS.forEach(r => { const sd = PS.sigma[r[0]]; if (sd > 0) spec[r[0]] = { sd, dist }; });
+  PMC_ENV.forEach(r => { const sd = S.sigma[r[0]]; if (sd > 0) spec[r[0]] = { sd, dist }; });
+  const o = { tracks: true, movement: true, dt: quiet ? 0.003 : 0.002, sampleDt: 1 / 60 };
+  if (PS.mcSwing) {
+    const rnd = E.mulberry32((seed + 77) >>> 0), sk = PMC_SWING.map(r => r[0]).filter(k => S.sigma[k] > 0);
+    o.swingFn = r => { const dev = {}; sk.forEach(k => { dev[k] = (dist === 'uniform' ? (rnd() * 2 - 1) * Math.sqrt(3) : E.gauss(rnd)) * S.sigma[k]; }); return pSwingOutcome(r, { dt: 0.004 }, dev); };
+  }
+  const mc = PI.createMC(Object.assign({}, PS.P), Object.assign({}, S.p), spec, n, seed, o);
+  mc.visible = false; mc.ver = PS.ver;
+  const job = PS.mcJob = (PS.mcJob || 0) + 1, prog = $('#pmc-prog');
+  if (!quiet) {
+    PS.mc = mc; PS.mcStale = false; prog.hidden = false; $('i', prog).style.width = '0%';
+    $('#pmc-run').disabled = true; $('#pmc-play').disabled = true; pStopPlay(); $('#pmc-out').innerHTML = '';
+  }
+  (function next() {
+    if (job !== PS.mcJob) return;
+    const t0 = performance.now();
+    while (mc.done < mc.n && performance.now() - t0 < 24) mc.step(PS.mcSwing ? 2 : 10);
+    if (!quiet) $('i', prog).style.width = (mc.done / mc.n * 100) + '%';
+    if (mc.done < mc.n) { setTimeout(next, 0); return; }
+    pFinishMC(mc, quiet);
+  })();
+}
+function pFinishMC(mc, quiet) {
+  PS.mc = mc; PS.mcStale = mc.ver !== PS.ver; if (PS.mcStale) schedulePitchMC();
+  mc.visible = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false; $('#pmc-play').disabled = false;
+  $('#pt-ens-wrap').hidden = false; if (!quiet) { $('#pt-ens').checked = true; PS.opt.ens = true; }
+  const xs = [], zs = []; for (let i = 0; i < mc.n; i++) if (isFinite(mc.x[i])) { xs.push(mc.x[i]); zs.push(mc.z[i]); }
+  mc.ell68 = E.ellipse(xs, zs, 2.296); mc.ell95 = E.ellipse(xs, zs, 5.991);
+  if (quiet) PS.play.t = Math.max(PS.play.t, pTotalDur()); else PS.play.t = 0;
+  pRenderMcResults(); pUpdateMcStrip(); pUpdateHud();
+  if (!quiet) pStartPlay(true); else pRequestRender();
+}
+function pDrawHist(cv, vals, strike, dirt, unit, lo0, hi0) {
+  const { g, W, H } = setupCv(cv), m = { l: 38, r: 10, t: 8, b: 28 }, a = [];
+  for (let i = 0; i < vals.length; i++) if (isFinite(vals[i])) a.push(vals[i]);
+  if (!a.length) return;
+  let lo = lo0 !== undefined ? lo0 : Math.min.apply(null, a), hi = hi0 !== undefined ? hi0 : Math.max.apply(null, a); if (hi - lo < 1e-6) hi = lo + 1;
+  const nb = clamp(Math.round(Math.sqrt(a.length) * 1.1), 8, 40), bw = (hi - lo) / nb, bins = Array.from({ length: nb }, () => [0, 0, 0]);
+  for (let i = 0; i < vals.length; i++) { if (!isFinite(vals[i])) continue; const b = clamp(Math.floor((vals[i] - lo) / bw), 0, nb - 1); bins[b][dirt[i] ? 2 : strike[i] ? 0 : 1]++; }
+  const mx = Math.max.apply(null, bins.map(b => b[0] + b[1] + b[2])) * 1.1, ax = axes(g, W, H, m, lo, hi, 0, mx, unit, 'pitches');
+  const cols = [T['c-good'], T['c-wall'], T.ghost];
+  bins.forEach((b, i) => { let acc = 0; b.forEach((c, k) => { if (!c) return; const y0 = ax.py(acc), y1 = ax.py(acc + c); g.fillStyle = cols[k]; g.fillRect(ax.px(lo + i * bw) + 0.5, y1, ax.px(lo + bw) - ax.px(lo) - 1, y0 - y1); acc += c; }); });
+  const s = E.stats(a); g.strokeStyle = T.ink; g.lineWidth = 1.6; g.beginPath(); g.moveTo(ax.px(s.mean), m.t); g.lineTo(ax.px(s.mean), H - m.b); g.stroke();
+}
+function pDrawHeat(cv, mc) {
+  const { g, W, H } = setupCv(cv), P = PS.P, zt = P.batH * P.zTop / 100, zb = P.batH * P.zBot / 100;
+  const x0 = -26, x1 = 26, z0 = Math.max(0, zb - 22), z1 = zt + 22, bs = 1.5, nx = Math.round((x1 - x0) / bs), nz = Math.round((z1 - z0) / bs);
+  const grid = new Float64Array(nx * nz);
+  for (let i = 0; i < mc.n; i++) { if (!isFinite(mc.x[i])) continue; const ix = Math.floor((mc.x[i] - x0) / bs), iz = Math.floor((mc.z[i] - z0) / bs); if (ix >= 0 && ix < nx && iz >= 0 && iz < nz) grid[iz * nx + ix]++; }
+  const sm = new Float64Array(nx * nz), k = [1, 2, 1];
+  for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) { let s = 0; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const xx = ix + a, zz = iz + b; if (xx >= 0 && xx < nx && zz >= 0 && zz < nz) s += grid[zz * nx + xx] * k[a + 1] * k[b + 1]; } sm[iz * nx + ix] = s; }
+  let mx = 0; for (let i = 0; i < sm.length; i++) if (sm[i] > mx) mx = sm[i];
+  const mg = 8, sc = Math.min((W - 2 * mg) / (x1 - x0), (H - 2 * mg) / (z1 - z0)), ox = (W - sc * (x1 - x0)) / 2, oy = H - mg;
+  const X = x => ox + (x - x0) * sc, Z = z => oy - (z - z0) * sc;
+  g.fillStyle = T['surface-2']; g.fillRect(X(x0), Z(z1), (x1 - x0) * sc, (z1 - z0) * sc);
+  for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) { const f = sm[iz * nx + ix] / (mx || 1); if (f < 0.03) continue; const c = ramp(f); g.fillStyle = 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + (0.25 + 0.7 * f) + ')'; g.fillRect(X(x0 + ix * bs), Z(z0 + (iz + 1) * bs), bs * sc + 0.6, bs * sc + 0.6); }
+  g.strokeStyle = T.ink; g.lineWidth = 1.6; g.strokeRect(X(-8.5), Z(zt), 17 * sc, (zt - zb) * sc);
+  g.strokeStyle = 'rgba(128,140,134,0.7)'; g.setLineDash([3, 3]); g.lineWidth = 1; g.strokeRect(X(-8.5 * 1.33), Z(zb + (zt - zb) / 2 + (zt - zb) / 2 * 1.33), 17 * 1.33 * sc, (zt - zb) * 1.33 * sc); g.setLineDash([]);
+  g.fillStyle = T.muted; g.font = monoFont(10.5); g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText('catcher’s view · dashed = shadow zone', X(x0) + 4, Z(z1) + 4);
+}
+function pRenderMcResults() {
+  const mc = PS.mc, out = $('#pmc-out'), n = mc.n, P = PS.P;
+  const fin = a => Array.from(a).filter(isFinite);
+  const strikes = mc.strike.reduce((a, b) => a + b, 0), dirt = mc.dirt.reduce((a, b) => a + b, 0);
+  const reg = { heart: 0, edge: 0, shadow: 0, chase: 0, waste: 0 }; mc.region.forEach(r => { reg[r] = (reg[r] || 0) + 1; });
+  const xs = E.stats(fin(mc.x)), zs = E.stats(fin(mc.z)), e = mc.ell68, pc = k => fmt(reg[k] / n * 100, 0);
+  const row = (name, s, d, u) => '<tr><td>' + name + '</td><td>' + fmt(s.mean, d) + ' ± ' + fmt(s.sd, d) + '</td><td>' + fmt(s.p50, d) + '</td><td>' + fmt(s.p5, d) + ' – ' + fmt(s.p95, d) + '</td><td>' + u + '</td></tr>';
+  let hitHtml = '';
+  if (mc.hit) {
+    const cnt = { hr: 0, wall: 0, inplay: 0, foul: 0, miss: 0 }; mc.hit.outcome.forEach(o => { if (o in cnt) cnt[o]++; else if (o) cnt.miss++; });
+    const evs = fin(Array.from(mc.hit.ev)), ds = fin(Array.from(mc.hit.dist));
+    hitHtml = '<h3>If he swings at every one <small>the Swing group and barrel aim on the left</small></h3><div class="tiles">' +
+      tile('Swing and miss', fmt(cnt.miss / n * 100, 0), '%', 1) + tile('Home runs', fmt(cnt.hr / n * 100, 1), '%') + tile('Off the wall', fmt(cnt.wall / n * 100, 1), '%') + tile('In play', fmt(cnt.inplay / n * 100, 1), '%') + tile('Foul', fmt(cnt.foul / n * 100, 1), '%') +
+      tile('Mean exit velocity', fmt(E.stats(evs).mean, 1), 'mph') + tile('Mean distance', fmt(E.stats(ds).mean, 0), 'ft') + '</div>' +
+      '<label class="chk"><input type="checkbox" id="pmc-colorhit"' + (PS.colorHit ? ' checked' : '') + '> Colour the plate view by what happened when he swung</label>' +
+      '<div class="legend">' + ['hr', 'wall', 'inplay', 'foul'].map(k => '<span><i style="background:' + T[OUTCOME[k].col] + '"></i>' + OUTCOME[k].label + '</span>').join('') + '<span><i style="background:' + T.ghost + '"></i>Missed</span></div>';
+  }
+  out.innerHTML =
+    '<div id="pmc-stale" class="note" style="color:var(--accent)" hidden>Inputs changed since this run. Press Run to refresh.</div>' +
+    '<div class="tiles">' + tile('Strikes', fmt(strikes / n * 100, 1), '%', 1) + tile('Heart of the zone', pc('heart'), '%') + tile('Edges', pc('edge'), '%') + tile('Shadow', pc('shadow'), '%') + tile('Chase', pc('chase'), '%') + tile('Waste', pc('waste'), '%') +
+    tile('Bounced', fmt(dirt / n * 100, 1), '%') + tile('Mean miss from target', fmt(E.stats(fin(mc.miss)).mean, 1), 'in') +
+    (e ? tile('Location ellipse', fmt(e.a / Math.sqrt(2.296), 1) + ' × ' + fmt(e.b / Math.sqrt(2.296), 1), 'in 1σ') : '') + tile('Pitches thrown', n, '') + '</div>' + hitHtml +
+    '<div class="legend"><span><i style="background:' + T['c-good'] + '"></i>Strike</span><span><i style="background:' + T['c-wall'] + '"></i>Ball</span><span><i style="background:' + T.ghost + '"></i>Bounced</span><span>Plate view: solid ellipse = 68%, dashed = 95% of locations</span></div>' +
+    '<div class="tablewrap"><table class="dt"><thead><tr><th>Measure</th><th>mean ± sd</th><th>median</th><th>5th – 95th pct.</th><th></th></tr></thead><tbody>' +
+    row('Plate side', xs, 1, 'in') + row('Plate height', zs, 1, 'in') + row('Plate speed', E.stats(fin(mc.speed)), 1, 'mph') + row('Flight time', E.stats(fin(mc.flight)), 3, 's') +
+    row('Vertical approach angle', E.stats(fin(mc.vaa)), 2, '°') + row('Horizontal approach angle', E.stats(fin(mc.haa)), 2, '°') +
+    row('Induced vertical', E.stats(fin(mc.ivb)), 1, 'in') + row('Horizontal (arm side)', E.stats(fin(mc.hb)), 1, 'in') + '</tbody></table></div>' +
+    '<div class="two"><div><h3>Side to side <small>stacked by call</small></h3><canvas class="plot" id="pmc-h1" height="180"></canvas></div><div><h3>Height <small>stacked by call</small></h3><canvas class="plot" id="pmc-h2" height="180"></canvas></div></div>' +
+    '<div><h3>Where the pitches cross <small>density</small></h3><canvas class="plot" id="pmc-heat" height="280"></canvas></div>' +
+    '<div class="two"><div><h3>What moves the height <small>share of the variance</small></h3><div class="budget" id="pmc-sens-z"></div></div><div><h3>What moves the side to side</h3><div class="budget" id="pmc-sens-x"></div></div></div>';
+  pDrawHist($('#pmc-h1'), mc.x, mc.strike, mc.dirt, 'in', undefined, undefined); pDrawHist($('#pmc-h2'), mc.z, mc.strike, mc.dirt, 'in');
+  pDrawHeat($('#pmc-heat'), mc);
+  [['pmc-sens-z', mc.z], ['pmc-sens-x', mc.x]].forEach(([id, ys]) => {
+    const box = $('#' + id), items = mc.keys.map(k => { const r = E.corr(mc.inputs[k], ys); return { k, r, v: r * r }; }).sort((a, b) => b.v - a.v), sum = items.reduce((s, x) => s + x.v, 0);
+    items.slice(0, 7).forEach(it => box.appendChild(el('div', { class: 'brow' }, [el('span', { text: pLabelOf(it.k) }), el('div', { class: 'bar' }, [el('i', { style: 'left:0;width:' + Math.min(100, it.v * 100) + '%;background:' + (it.r >= 0 ? 'var(--c-in)' : 'var(--c-wall)') })]), el('span', { class: 'val', text: fmt(it.v * 100, 0) + '% ' + (it.r >= 0 ? '↑' : '↓') })])));
+    box.appendChild(el('div', { class: 'brow' }, [el('span', { text: 'Interactions, other' }), el('div', { class: 'bar' }, [el('i', { style: 'left:0;width:' + Math.max(0, 100 - sum * 100) + '%;background:var(--ghost)' })]), el('span', { class: 'val', text: fmt(Math.max(0, 1 - sum) * 100, 0) + '%' })]));
+  });
+  const ch = $('#pmc-colorhit'); if (ch) ch.addEventListener('change', () => { PS.colorHit = ch.checked; pRequestRender(); });
+  pUpdateMcStale();
+}
+
+/* ---------- All pitch types ---------- */
+// every pitch type from this delivery. mode "target": each re-aimed at the same spot; "angles": thrown on the same release angles as this pitch
+function pComputeArsenal(mode) {
+  const overlay = !mode; mode = mode || PS.opt.arsMode || 'angles';
+  if (overlay) { if (PS.arsenal && PS.arsenalVer === PS.ver && PS.arsenalMode === mode) return PS.arsenal; }
+  else if (PS.arsT && PS.arsT.ver === PS.ver) return PS.arsT.arr;
+  const out = [];
+  PI.TYPE_ORDER.forEach(k => {
+    const cur = k === PS.P.type;
+    if (cur && PS.sim) { out.push({ key: k, name: PI.TYPES[k].name, color: PI.TYPE_COLOR[k], cur: true, P: PS.P, res: PS.sim }); return; }
+    const P2 = Object.assign({}, PS.P); PI.applyType(P2, k, false);
+    if (mode === 'angles') Object.assign(P2, { aim: 'angles', angV: PS.sim.thV, angH: PS.sim.thH }); else P2.aim = 'target';
+    out.push({ key: k, name: PI.TYPES[k].name, color: PI.TYPE_COLOR[k], cur: false, P: P2, res: PI.run(P2, S.p, { record: true, twin: true, sampleDt: 1 / 240, dt: 0.0015 }) });
+  });
+  if (overlay) { PS.arsenal = out; PS.arsenalVer = PS.ver; PS.arsenalMode = mode; } else PS.arsT = { ver: PS.ver, arr: out };
+  return out;
+}
+function pAtY(tr, y) {
+  const n = tr.y.length; let i = 1; while (i < n - 1 && tr.y[i] > y) i++;
+  const f = (tr.y[i - 1] - y) / ((tr.y[i - 1] - tr.y[i]) || 1);
+  return { x: tr.x[i - 1] + f * (tr.x[i] - tr.x[i - 1]), z: tr.z[i - 1] + f * (tr.z[i] - tr.z[i - 1]) };
+}
+(function () {
+  $('#ppane-types').innerHTML = '<div><h3>Every pitch from this delivery <small>same release point, same target, each type’s typical speed and spin</small></h3>' +
+    '<p class="note">The pitch you are editing is highlighted. Click a row to switch to that pitch type. The “tunnel” column is how far each pitch is from yours at the distance on the right, a measure of how long the two look alike to the hitter.</p>' +
+    '<div class="field-row"><label>Tunnel distance from the plate (ft)<input type="number" id="ptunnel" value="23.8" min="5" max="55" step="1"></label></div></div>' +
+    '<div id="ptypes-out"></div>';
+  $('#ptunnel').addEventListener('input', () => { const v = parseFloat($('#ptunnel').value); if (isFinite(v)) { PS.tunnel = clamp(v, 1, 55); pFillTypes(true); } });
+})();
+function pFillTypes(now) {
+  clearTimeout(PS.typT);
+  if (!now) { $('#ptypes-out').innerHTML = '<p class="note">Throwing every pitch…</p>'; PS.typT = setTimeout(() => pFillTypes(true), 140); return; }
+  const arr = pComputeArsenal('target'), cur = arr.find(a => a.cur), ty = PS.tunnel * FT + PI.PLATE_Y, arm = PS.P.hand === 'R' ? -1 : 1;
+  const rows = arr.map(a => {
+    const r = a.res, p = r.plate; if (!p) return '<tr><td class="l">' + a.name + '</td><td colspan="9">never reaches the plate</td></tr>';
+    const A = pAtY(r.tr, ty), B = pAtY(cur.res.tr, ty), gap = Math.hypot(A.x - B.x, A.z - B.z) / IN_;
+    return '<tr data-k="' + a.key + '" class="' + (a.cur ? 'cur' : '') + '" style="cursor:pointer"><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + a.color + ';margin-right:6px"></i>' + a.name + '</td><td>' + fmt(r.speed, 1) + '</td><td>' + fmt(a.P.spin, 0) + '</td><td>' + fmt(a.P.eff, 0) + '</td><td>' + fmt(p.speed, 1) + '</td><td>' + (r.ivb === undefined ? '–' : sgn(r.ivb, 1)) + '</td><td>' + (r.hbArm === undefined ? '–' : sgn(r.hbArm, 1)) + '</td><td>' + sgn(p.x, 1) + ', ' + fmt(p.z, 1) + '</td><td>' + sgn(p.vaa, 1) + '</td><td>' + fmt(p.t, 3) + '</td><td>' + (a.cur ? '–' : fmt(gap, 1)) + '</td></tr>';
+  }).join('');
+  $('#ptypes-out').innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Release mph</th><th>Spin rpm</th><th>Eff. %</th><th>Plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Tunnel in</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="ptype-mv" height="320"></canvas>';
+  $$('#ptypes-out tbody tr').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.k; if (!k) return; PI.applyType(PS.P, k, false); PS.sigma.dir = k === 'KN' ? 120 : PS.sigma0.dir; pchanged('type'); pSyncAll(); pStartPlay(true); }));
+  const { g, W, H } = setupCv($('#ptype-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
+  const ax = axes(g, W, H, m, -R, R, -R, R, 'toward the glove side  ←   horizontal (in)   →  toward the arm side', 'vertical (in)');
+  g.strokeStyle = T['ink-2']; g.lineWidth = 1.2; g.beginPath(); g.moveTo(ax.px(0), m.t); g.lineTo(ax.px(0), H - m.b); g.moveTo(m.l, ax.py(0)); g.lineTo(W - m.r, ax.py(0)); g.stroke();
+  arr.forEach(a => { const r = a.res; if (r.ivb === undefined) return; const x = ax.px(clamp(r.hbArm, -R, R)), y = ax.py(clamp(r.ivb, -R, R)); g.fillStyle = a.color; g.beginPath(); g.arc(x, y, a.cur ? 7 : 5, 0, 7); g.fill(); g.strokeStyle = a.cur ? T.ink : T.surface; g.lineWidth = a.cur ? 2 : 1; g.stroke(); g.fillStyle = T.ink; g.font = monoFont(10.5); g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(a.key, x + 9, y); });
+}
+
+/* ---------- Pitch -> bat ---------- */
+(function () {
+  $('#ppane-bat').innerHTML =
+    '<div><h3>Pitch → bat <small>the pitch you built, met by the swing you built</small></h3>' +
+    '<p class="note">The ball is flown on from the release to the contact point with its exact speed, direction and spin, then the bat-ball model produces the batted ball. The swing is set in the Swing group on the left. Turn on “The barrel meets the ball at a chosen spot” there and the pitch’s miss from that spot sets the vertical offset and the sweet-spot distance; far enough off and it is a swing and miss.</p></div>' +
+    '<div id="pbat-res"></div>' +
+    '<div class="field-row"><button class="btn primary" id="pbat-send" type="button">Send this pitch and swing to the Hitting tab</button><span class="note">Opens the Hitting tab in Bat–ball mode with this pitch drawn on the field, so you can use the Monte Carlo, Hit finder and EV × LA map on this exact contact.</span></div>' +
+    '<div><h3>Swing map <small>the same swing against a pitch thrown to each spot</small></h3>' +
+    '<div class="field-row"><label>Colour by<select id="pbat-metric"><option value="ev">Exit velocity</option><option value="dist">Distance</option><option value="la">Launch angle</option><option value="outcome">Result</option></select></label><button class="btn" id="pbat-run" type="button">Recompute</button><span class="note" id="pbat-status"></span></div>' +
+    '<canvas class="plot" id="pbat-map" height="380" style="cursor:pointer"></canvas><div class="legend" id="pbat-legend"></div><div class="note" id="pbat-tip">Click a cell to throw there.</div></div>';
+  $('#pbat-send').addEventListener('click', () => { if (sendToHitting()) { setApp('hit'); S.p.mode = 'bat'; applyMode(); syncAll(); showTab('flight'); recompute(true); startPlay(true); } });
+  $('#pbat-metric').addEventListener('change', () => { PS.hitMetric = $('#pbat-metric').value; pDrawHitMap(); });
+  $('#pbat-run').addEventListener('click', pRunHitMap);
+})();
+function pFillBat() {
+  const res = PS.sim, box = $('#pbat-res'); if (!res) return;
+  const h = pHitResult(false);
+  if (!h) { box.innerHTML = '<div class="empty">This pitch never reaches the plate.</div>'; return; }
+  const st = h.st, oc = OUTCOME[h.outcome], A = PS.aimSwing;
+  let html = '<div class="tiles">' + tile('Ball at contact, side', sgn(st.x / IN_, 1), 'in') + tile('Ball at contact, height', fmt(st.z / IN_, 1), 'in') +
+    tile('Speed at contact', fmt(Math.hypot(st.vx, st.vy, st.vz) / MPH, 1), 'mph') + tile('Descent angle', fmt(Math.atan2(-st.vz, Math.hypot(st.vx, st.vy)) * R2D, 1), '°');
+  if (A.on && h.dz !== undefined) html += tile('Miss from the barrel, up/down', sgn(h.dz, 1), 'in') + tile('Miss from the barrel, in/out', sgn(h.dx, 1), 'in');
+  html += '</div><div class="tile" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px">';
+  if (!h.contact) html += '<span class="pill" style="background:' + T.ghost + '">Swing and miss</span><span>The barrel is ' + fmt(Math.abs(h.dz), 1) + ' in ' + (h.dz > 0 ? 'under' : 'over') + ' the ball and ' + fmt(Math.abs(h.dx), 1) + ' in off along the barrel.</span>';
+  else html += '<span class="pill" style="background:' + T[(oc || OUTCOME.inplay).col] + '">' + (oc || OUTCOME.inplay).label + '</span><span><b>' + fmt(h.ev, 1) + ' mph</b> at <b>' + fmt(h.la, 1) + '°</b>, spray ' + sgn(h.spray, 1) + '°, <b>' + fmt(h.dist, 0) + ' ft</b>, ' + fmt(h.hang, 1) + ' s in the air</span>';
+  box.innerHTML = html + '</div>';
+  $('#pbat-send').disabled = !h.contact;
+  if (!PS.hitMap || PS.hitMap.ver !== PS.ver) { clearTimeout(PS.hmT); PS.hmT = setTimeout(() => { if (PS.tab === 'bat') pRunHitMap(); }, 350); }
+  else pDrawHitMap();
+}
+function pRunHitMap() {
+  const job = ++PS.bat.job, P = PS.P, zt = P.batH * P.zTop / 100, zb = P.batH * P.zBot / 100;
+  const xs = [], zs = []; for (let x = -15; x <= 15.01; x += 3) xs.push(x); for (let z = Math.max(6, Math.round((zb - 9) / 3) * 3); z <= zt + 9.01; z += 3) zs.push(z);
+  const hm = PS.hitMap = { xs, zs, cells: new Array(xs.length * zs.length), done: 0, ver: PS.ver };
+  $('#pbat-status').textContent = 'Computing…';
+  let i = 0;
+  (function next() {
+    if (job !== PS.bat.job) return;
+    const t0 = performance.now();
+    while (i < hm.cells.length && performance.now() - t0 < 24) {
+      const ix = i % xs.length, iz = Math.floor(i / xs.length), P2 = Object.assign({}, P, { aim: 'target', tx: xs[ix], tz: zs[iz] });
+      const r = PI.run(P2, S.p, { dt: 0.002, aimDt: 0.003 });
+      const c = { x: xs[ix], z: zs[iz], strike: !!(r.strike && !r.dirt) };
+      if (r.front) { const h = pSwingOutcome(r, { dt: 0.004 }); c.contact = h.contact; c.outcome = h.outcome; c.ev = h.ev; c.la = h.la; c.dist = h.dist; c.spray = h.spray; } else c.outcome = 'none';
+      hm.cells[i++] = c;
+    }
+    hm.done = i; pDrawHitMap();
+    if (i < hm.cells.length) setTimeout(next, 0); else $('#pbat-status').textContent = 'Same swing against every location. Cells outlined in black are strikes.';
+  })();
+}
+function pHitMapGeom() {
+  const hm = PS.hitMap, cv = $('#pbat-map'); if (!hm) return null;
+  const { g, W, H } = setupCv(cv), m = { l: 44, r: 10, t: 8, b: 30 }, x0 = hm.xs[0] - 1.5, x1 = hm.xs[hm.xs.length - 1] + 1.5, z0 = hm.zs[0] - 1.5, z1 = hm.zs[hm.zs.length - 1] + 1.5;
+  const sc = Math.min((W - m.l - m.r) / (x1 - x0), (H - m.t - m.b) / (z1 - z0)), ox = m.l + ((W - m.l - m.r) - sc * (x1 - x0)) / 2, oy = H - m.b - ((H - m.t - m.b) - sc * (z1 - z0)) / 2;
+  return { g, W, H, m, x0, x1, z0, z1, sc, X: x => ox + (x - x0) * sc, Z: z => oy - (z - z0) * sc, inv: (px, py) => ({ x: (px - ox) / sc + x0, z: (oy - py) / sc + z0 }) };
+}
+function pDrawHitMap() {
+  const hm = PS.hitMap; if (!hm) return; const G = pHitMapGeom(); if (!G) return; PS.hitGeom = G;
+  const { g } = G, P = PS.P, zt = P.batH * P.zTop / 100, zb = P.batH * P.zBot / 100, metric = PS.hitMetric || 'ev';
+  g.font = monoFont(10.5); g.fillStyle = T.muted; g.textAlign = 'center'; g.textBaseline = 'top';
+  hm.xs.forEach((x, i) => { if (i % 2 === 0) g.fillText(x, G.X(x), G.H - G.m.b + 4); });
+  g.textAlign = 'right'; g.textBaseline = 'middle'; hm.zs.forEach((z, i) => { if (i % 2 === 0) g.fillText(z, G.m.l - 5, G.Z(z)); });
+  g.fillStyle = T['ink-2']; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText('where the pitch crosses (in, + toward first base)', G.m.l + (G.W - G.m.l - G.m.r) / 2, G.H - 1);
+  const w = 3 * G.sc;
+  hm.cells.forEach(c => {
+    if (!c) return;
+    const X = G.X(c.x) - w / 2, Z = G.Z(c.z) - w / 2;
+    let fill;
+    if (c.outcome === 'none') fill = T['surface-2'];
+    else if (!c.contact) fill = T['surface-2'];
+    else if (metric === 'outcome') fill = pOutcomeCol(c.outcome);
+    else { const f = metric === 'ev' ? (c.ev - 50) / 60 : metric === 'dist' ? c.dist / 450 : (c.la + 10) / 60, rc = ramp(f); fill = 'rgb(' + rc[0] + ',' + rc[1] + ',' + rc[2] + ')'; }
+    g.fillStyle = fill; g.fillRect(X, Z, w - 1, w - 1);
+    if (!c.contact && c.outcome !== 'none') { g.strokeStyle = T.ghost; g.lineWidth = 1; g.beginPath(); g.moveTo(X + 3, Z + w - 4); g.lineTo(X + w - 4, Z + 3); g.stroke(); }
+    if (c.strike) { g.strokeStyle = T.ink; g.lineWidth = 1.4; g.strokeRect(X + 0.5, Z + 0.5, w - 2, w - 2); }
+    if (c.contact && metric !== 'outcome' && w > 26) { g.fillStyle = '#fff'; g.font = monoFont(10); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(metric === 'ev' ? fmt(c.ev, 0) : metric === 'dist' ? fmt(c.dist, 0) : fmt(c.la, 0), X + w / 2, Z + w / 2); }
+  });
+  g.strokeStyle = T.ink; g.lineWidth = 2; g.strokeRect(G.X(-8.5), G.Z(zt), 17 * G.sc, (zt - zb) * G.sc);
+  if (PS.aimSwing.on) { const bx = G.X(PS.aimSwing.xs), bz = G.Z(PS.aimSwing.zs); g.strokeStyle = T.accent; g.lineWidth = 2; g.beginPath(); g.arc(bx, bz, 8, 0, 7); g.moveTo(bx - 12, bz); g.lineTo(bx + 12, bz); g.moveTo(bx, bz - 12); g.lineTo(bx, bz + 12); g.stroke(); }
+  if (PS.P.aim === 'target') { const tx = G.X(PS.P.tx), tz = G.Z(PS.P.tz); g.strokeStyle = T.ink; g.setLineDash([3, 3]); g.lineWidth = 1.4; g.beginPath(); g.arc(tx, tz, 5, 0, 7); g.stroke(); g.setLineDash([]); }
+  const leg = metric === 'outcome' ? ['hr', 'wall', 'inplay', 'foul'].map(k => '<span><i style="background:' + T[OUTCOME[k].col] + '"></i>' + OUTCOME[k].label + '</span>').join('') + '<span><i style="background:' + T['surface-2'] + ';border:1px solid ' + T.ghost + '"></i>Swing and miss</span>'
+    : '<span>' + (metric === 'ev' ? 'Exit velocity: dark = 50 mph, bright = 110 mph' : metric === 'dist' ? 'Distance: dark = 0 ft, bright = 450 ft' : 'Launch angle: dark = −10°, bright = 50°') + '</span><span><i style="background:' + T['surface-2'] + ';border:1px solid ' + T.ghost + '"></i>Swing and miss</span>';
+  $('#pbat-legend').innerHTML = leg + '<span>Red cross = barrel aim · dashed circle = current target</span>';
+}
+$('#pbat-map').addEventListener('mousemove', e => {
+  const G = PS.hitGeom, hm = PS.hitMap; if (!G || !hm) return;
+  const r = $('#pbat-map').getBoundingClientRect(), q = G.inv(e.clientX - r.left, e.clientY - r.top);
+  const c = hm.cells.find(c => c && Math.abs(c.x - q.x) <= 1.5 && Math.abs(c.z - q.z) <= 1.5);
+  $('#pbat-tip').textContent = c ? sgn(c.x, 0) + ' in, ' + fmt(c.z, 0) + ' in · ' + (c.strike ? 'strike' : 'ball') + ' · ' + (c.outcome === 'none' ? 'never reaches the plate' : !c.contact ? 'swing and miss' : fmt(c.ev, 1) + ' mph, ' + fmt(c.la, 1) + '°, ' + fmt(c.dist, 0) + ' ft (' + OUTCOME[c.outcome].label + ')') : 'Click a cell to throw there.';
+});
+$('#pbat-map').addEventListener('click', e => {
+  const G = PS.hitGeom, hm = PS.hitMap; if (!G || !hm) return;
+  const r = $('#pbat-map').getBoundingClientRect(), q = G.inv(e.clientX - r.left, e.clientY - r.top);
+  const c = hm.cells.find(c => c && Math.abs(c.x - q.x) <= 1.5 && Math.abs(c.z - q.z) <= 1.5); if (!c) return;
+  PS.P.aim = 'target'; PS.P.tx = c.x; PS.P.tz = c.z; pchanged('tx'); pSyncAll(); pStartPlay(true);
+});
+
+/* ---------- Physics ---------- */
+(function () {
+  $('#ppane-phys').innerHTML = '<div><h3>How the pitch model works</h3><div class="eqs" id="peqs"></div></div>' +
+    '<div><h3>Live constants <small>for the current inputs</small></h3><div class="tablewrap"><table class="dt" id="pconst-tbl"></table></div></div>' +
+    '<div><h3>Typical pitches against the model <small>a 6′2″ right-hander, centre of the zone</small></h3><div class="field-row"><button class="btn" id="pcal-run" type="button">Run the comparison</button><span class="note" id="pcal-status"></span></div><div class="tablewrap"><table class="dt" id="pcal-tbl"></table></div></div>' +
+    '<div><h3>Validation <small>runs in your browser</small></h3><div class="field-row"><button class="btn" id="pval-run" type="button">Run checks</button><span class="note" id="pval-status"></span></div><div class="tablewrap"><table class="dt" id="pval-tbl"></table></div></div>' +
+    '<div id="plimits"></div>';
+  $('#pcal-run').addEventListener('click', () => { $('#pcal-status').textContent = 'Running…'; setTimeout(pRunCalibration, 20); });
+  $('#pval-run').addEventListener('click', () => { $('#pval-status').textContent = 'Running…'; setTimeout(pRunPitchValidation, 20); });
+})();
+function pFillPhys() {
+  const res = PS.sim; if (!res) return;
+  const c = res.ctx, P = PS.P;
+  $('#peqs').textContent =
+    'State:  position r = (x, y, z), velocity v, spin ω.   x → first base, y → the mound, z → up.   A pitch travels toward −y.\n' +
+    'Motion: m dv/dt = F_gravity + F_drag + F_Magnus + F_Coriolis      (RK4, 1 ms steps, the same engine as the Hitting tab)\n\n' +
+    'Release:  height, extension and side come from the pitcher: shoulder height (from stride, trunk lean and height), plus the reach of the arm\n' +
+    '          (wingspan and arm slot), plus how far the trunk has travelled forward. Stride is a share of height; the mound slopes ~1 in per foot.\n' +
+    'Delivery: the stretch and slide step take the speed penalty and stride factor set in the Pitcher group.\n' +
+    'Aim:      the release angles are solved (Newton on the plate-crossing error) so the pitch, spin and air included, reaches the chosen spot.\n' +
+    'Spin:     ω = rpm · [ e · n̂ + s·√(1−e²) · û ]   n̂ = axis whose Magnus push points along the chosen spin direction, û = travel direction, e = efficiency\n' +
+    'Lift:     C_L = k · S / (0.4 + 2.32 S),   S = R|ω⊥|/|v|        k = Lift scale × Seam / wake factor\n' +
+    'Movement: induced vertical and horizontal break = where the pitch crosses minus where the same throw crosses with lift turned off\n' +
+    'Zone:     a pitch is a strike if any part of the ball touches the 3-D prism of the zone above the plate (optional)\n' +
+    'Perceived velocity = release speed × 55 ft / (60.5 ft − extension)\n' +
+    'Pitch → bat: the pitch is flown on to the contact plane; its position, velocity and spin go to the bat-ball collision model in the Hitting tab.';
+  const rows = [['Air density ρ', c.rho0.toFixed(4), 'kg/m³'], ['Gravity g', c.g.toFixed(4), 'm/s²'], ['Ball mass', (c.m * 1000).toFixed(2), 'g'], ['Drag coefficient', P.pCd.toFixed(3), ''],
+    ['Lift scale × seam factor', (P.pLift * P.liftK).toFixed(2), '(' + P.pLift.toFixed(2) + ' × ' + P.liftK.toFixed(2) + ')'], ['Spin decay τ', c.tau >= 1e5 ? 'none' : c.tau.toFixed(0), 's'],
+    ['Wind at 10 m', S.p.windMph.toFixed(1), 'mph'], ['Release speed', res.speed.toFixed(1), 'mph'], ['Flight time', res.plate ? res.plate.t.toFixed(3) : '–', 's'], ['Distance flown', res.plate ? ((res.rel.y - PI.PLATE_Y) / FT).toFixed(1) : '–', 'ft'],
+    ['Terminal fall speed', (Math.sqrt(2 * c.m * c.g / (c.rho0 * c.A * P.pCd)) / MPH).toFixed(0), 'mph']];
+  $('#pconst-tbl').innerHTML = '<tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td style="text-align:left;color:var(--muted)">' + r[2] + '</td></tr>').join('') + '</tbody>';
+  $('#plimits').innerHTML = '<h3>What it leaves out</h3><p class="note">The seam-shifted wake is not modelled; the Seam / wake lift factor stands in for it and is a fitted model input, not a Statcast measurement. Breaking balls are given low factors so that, at their typical spin and efficiency, they move about as much as they do in the majors. The knuckleball is approximated: a near-zero spin, a large lift factor and a random axis that changes each Monte Carlo pitch, which gives the right size of erratic drift but not the real flutter. Release point is built from body proportions with simple rules, so a real pitcher’s arm action will differ. The delivery in the views is a stylised stick figure at release, not motion capture.</p>';
+}
+function pRunCalibration() {
+  const rows = [], base = Object.assign({}, PI.DEFAULTS, { hand: 'R', height: 74, wingspan: 76, aim: 'target', tx: 0, tz: 30 });
+  // approximate public ranges, from memory of league leaderboards: they show whether the model is in the right neighbourhood
+  const ref = { FF: [[13, 19], [5, 12]], SI: [[5, 12], [12, 18]], FC: [[4, 11], [-4, 4]], SL: [[-2, 5], [-8, -1]], CU: [[-14, -6], [-14, -4]], CH: [[4, 10], [11, 18]] };
+  Object.keys(ref).forEach(k => {
+    const P = Object.assign({}, base); PI.applyType(P, k, false);
+    const r = PI.run(P, S.p, { twin: true, dt: 0.001 }), iv = r.ivb, hb = r.hbArm, i0 = ref[k][0], h0 = ref[k][1];
+    const okV = iv >= i0[0] && iv <= i0[1], okH = hb >= h0[0] && hb <= h0[1];
+    rows.push('<tr><td class="l">' + PI.TYPES[k].name + '</td><td>' + fmt(r.speed, 1) + ' → ' + fmt(r.plate.speed, 1) + '</td><td>' + sgn(iv, 1) + '</td><td>' + i0[0] + ' to ' + i0[1] + '</td><td class="' + (okV ? 'ok' : 'bad') + '">' + (okV ? 'in range' : 'check') + '</td><td>' + sgn(hb, 1) + '</td><td>' + h0[0] + ' to ' + h0[1] + '</td><td class="' + (okH ? 'ok' : 'bad') + '">' + (okH ? 'in range' : 'check') + '</td></tr>');
+  });
+  $('#pcal-tbl').innerHTML = '<thead><tr><th class="l">Pitch</th><th>Speed, mph</th><th>Vertical, in</th><th>Typical</th><th></th><th>Arm side, in</th><th>Typical</th><th></th></tr></thead><tbody>' + rows.join('') + '</tbody>';
+  $('#pcal-status').textContent = 'The typical ranges are approximate figures from public leaderboards, remembered rather than fetched, so treat them as a sanity check only.';
+}
+function pRunPitchValidation() {
+  const rows = [], add = (name, expect, got, ok) => rows.push([name, expect, got, ok]), base = Object.assign({}, PI.DEFAULTS, { aim: 'angles' });
+  {
+    const P = Object.assign({}, base, { angV: -1.2, angH: 0.3 }), r0 = PI.run(P, S.p, { dt: 0.001 });
+    const c = PI.makeCtx(S.p, P, { dragOn: false, liftOn: false, windOn: false, coriolisOn: false, latitude: 0 }), d = PI.delivery(P);
+    const l = PI.launch({ x: d.x, y: d.y, z: d.z }, d.speed, P.angV, P.angH, { rpm: 0, dir: 0, eff: 100 });
+    const f = PI.fly(c, l.ic, l.w, { dt: 0.001, yEnd: PI.PLATE_Y });
+    const t = (l.ic.y - PI.PLATE_Y) / (-l.ic.vy), zan = l.ic.z + l.ic.vz * t - 0.5 * c.g * t * t;
+    add('Vacuum flight to the plate', fmt(zan / E.IN, 2) + ' in (closed form)', fmt(f.front.z / E.IN, 2) + ' in', Math.abs(f.front.z - zan) < 0.002);
+    add('Release height and extension, 6′2″ default', '≈ 5.9 ft and 6.2 ft', fmt(d.relH, 2) + ' and ' + fmt(d.ext, 2) + ' ft', Math.abs(d.relH - 5.9) < 0.15 && Math.abs(d.ext - 6.2) < 0.2);
+    add('Perceived velocity', fmt(d.speed * 55 / (60.5 - d.ext), 1) + ' mph from the formula', fmt(r0.perceived, 1) + ' mph', Math.abs(r0.perceived - d.speed * 55 / (60.5 - d.ext)) < 0.01);
+  }
+  {
+    const a = PI.run(Object.assign({}, base, { angV: -1.2 }), S.p, { dt: 0.004 }).plate.z, b = PI.run(Object.assign({}, base, { angV: -1.2 }), S.p, { dt: 0.0005 }).plate.z;
+    add('RK4 step-size convergence', '< 0.01 in apart', fmt(Math.abs(a - b), 4) + ' in', Math.abs(a - b) < 0.01);
+  }
+  {
+    const P = Object.assign({}, base, { spin: 0, angV: -1.2 }), r = PI.run(P, S.p, { twin: true, dt: 0.001 });
+    add('No spin gives no induced movement', '0 in', fmt(r.ivb, 3) + ' in', Math.abs(r.ivb) < 0.01 && Math.abs(r.hbx) < 0.01);
+  }
+  {
+    const P = Object.assign({}, base, { dir: 0, eff: 100, angV: -1.2 }), r = PI.run(P, S.p, { twin: true, dt: 0.001 });
+    add('Pure backspin rises and does not push sideways', 'vertical > 0, side ≈ 0', sgn(r.ivb, 1) + ' in, ' + sgn(r.hbx, 2) + ' in', r.ivb > 5 && Math.abs(r.hbx) < 0.6);
+    const T2 = Object.assign({}, P, { dir: 180 }), r2 = PI.run(T2, S.p, { twin: true, dt: 0.001 });
+    add('Pure topspin drops', 'vertical < 0', sgn(r2.ivb, 1) + ' in', r2.ivb < -5);
+  }
+  {
+    const R = Object.assign({}, base, { angH: 0.4, angV: -1.2, hand: 'R', dir: 300 }), L = Object.assign({}, R, { hand: 'L', dir: 60, angH: -0.4, rubberX: 0 }), a = PI.run(R, S.p, { twin: true, dt: 0.001 }), b = PI.run(L, S.p, { twin: true, dt: 0.001 });
+    add('A left-hander is the mirror image', 'plate x flips, height equal', sgn(a.plate.x, 1) + ' / ' + sgn(b.plate.x, 1) + ' in; ' + fmt(a.plate.z, 1) + ' / ' + fmt(b.plate.z, 1), Math.abs(a.plate.x + b.plate.x) < 0.6 && Math.abs(a.plate.z - b.plate.z) < 0.6);
+  }
+  {
+    const P = Object.assign({}, PI.DEFAULTS, { aim: 'target', tx: 6, tz: 40 }), r = PI.run(P, S.p, { dt: 0.001 });
+    add('Aim solver reaches its target', '< 0.1 in off', fmt(Math.hypot(r.plate.x - 6, r.plate.z - 40), 3) + ' in', Math.hypot(r.plate.x - 6, r.plate.z - 40) < 0.1);
+  }
+  {
+    const Pa = Object.assign({}, PI.DEFAULTS, { aim: 'target', tx: 0, tz: 30 }), r = PI.run(Pa, S.p, { dt: 0.001 }), h = PI.swingAt(r, Object.assign({}, S.p, { y0: 0.61 }), S.p, { dt: 0.002 });
+    add('Pitch → bat hands over the pitch speed', fmt(Math.hypot(h.st.vx, h.st.vy, h.st.vz) / MPH, 1) + ' mph at contact', fmt(h.p.pitchMph, 1) + ' mph into the collision', Math.abs(Math.hypot(h.st.vx, h.st.vy, h.st.vz) / MPH - h.p.pitchMph) < 0.01);
+  }
+  $('#pval-tbl').innerHTML = '<thead><tr><th>Check</th><th>Expected</th><th>Model</th><th></th></tr></thead><tbody>' + rows.map(r => '<tr><td style="white-space:normal">' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td class="' + (r[3] ? 'ok' : 'bad') + '">' + (r[3] ? 'pass' : 'check') + '</td></tr>').join('') + '</tbody>';
+  $('#pval-status').textContent = rows.filter(r => r[3]).length + ' of ' + rows.length + ' checks pass.';
+}
+
+/* ===== Pitching: presets, app tabs, boot ===== */
+const PPRESETS = [
+  { name: 'Four-seamer up in the zone (rising)', type: 'FF', set: { height: 75, wingspan: 78, slot: 55, velo: 97, spin: 2550, eff: 96, tx: 0, tz: 37 } },
+  { name: 'Sweeper to the back foot', type: 'ST', set: { slot: 40, tx: 10, tz: 18 } },
+  { name: '12–6 curveball', type: 'CU', set: { slot: 70, dir: 180, eff: 88, spin: 2800, velo: 80, tx: 0, tz: 22 } },
+  { name: 'Sidearm slider', type: 'SL', set: { slot: 10, lean: 22, rubberX: 6, velo: 84, tx: 8, tz: 22 } },
+  { name: 'Submarine sinker', type: 'SI', set: { slot: -8, lean: 35, velo: 86, spin: 1900, tx: -6, tz: 24 } },
+  { name: 'Tall downhill plane (6′8″)', type: 'FF', set: { height: 80, wingspan: 84, slot: 70, stride: 88, mound: 12, velo: 96, tx: 0, tz: 32 } },
+  { name: 'Lefty cutter in on a lefty', type: 'FC', hand: 'L', bat: 'L', set: { slot: 45, tx: 4, tz: 26 } },
+  { name: 'Changeup off the fastball', type: 'CH', set: { tx: -4, tz: 20 } },
+  { name: 'Splitter in the dirt', type: 'FS', set: { tx: 0, tz: 6 } },
+  { name: 'Fastball from the stretch, slide step', type: 'FF', set: { delivery: 'slide', tx: 0, tz: 30 } },
+  { name: 'Coors Field curveball (thin air)', type: 'CU', park: 'coors', set: { tx: 0, tz: 22 } },
+  { name: 'Eephus lob', type: 'EP', set: { slot: 60, tx: 0, tz: 34 } },
+  { name: 'Knuckleball', type: 'KN', set: { tx: 0, tz: 34, slot: 55 }, sigma: { dir: 120 } },
+  { name: 'Command spread: fastball to the corner', type: 'FF', set: { tx: 7, tz: 26 }, sigma: { angV: 0.7, angH: 0.7, relH: 1.5, relSide: 1.5, relExt: 1.8, velo: 1.2 } }
+];
+function applyPitchPreset(i) {
+  const pr = PPRESETS[i]; if (!pr) return;
+  clearTimeout(PS.mcAutoT); PS.mcJob++;
+  Object.assign(PS.P, PS.P0, { hand: pr.hand || 'R', bat: pr.bat || 'R' });
+  PI.applyType(PS.P, pr.type, false);
+  Object.assign(PS.P, pr.set || {});
+  Object.assign(PS.sigma, PS.sigma0, pr.sigma || {});
+  // the ballpark and weather go back to a plain day, unless the preset asks for something
+  Object.assign(S.p, { windMph: 0, windDir: 0, tempF: 72, rh: 50, elevFt: 0, roofClosed: false, latitude: E.DEFAULTS.latitude, cfAz: E.DEFAULTS.cfAz });
+  applyPark(pr.park || 'generic'); if (!pr.park) { S.p.tempF = 72; S.p.rh = 50; }
+  S.p.windMph = 0;
+  PS.mc = null; PS.mcStale = false; $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; PS.opt.ens = true; $('#pt-ens').checked = true;
+  syncAll(); pchanged('preset'); pSyncAll(); pUpdateMcStrip(); pRenderMcSpec(); pStartPlay(true);
+}
+function resetPitch() {
+  pStopPlay(); clearTimeout(PS.mcAutoT); clearTimeout(PS.hmT); PS.mcJob++; PS.bat.job++;
+  Object.assign(PS.P, PS.P0); Object.assign(PS.sigma, PS.sigma0);
+  Object.keys(S.p).forEach(k => delete S.p[k]); Object.assign(S.p, S.p0); S.pitchLink = null;
+  Object.keys(S.sigma).forEach(k => { S.sigma[k] = S.sigma0[k]; });
+  PS.aimSwing = { on: false, xs: 0, zs: 30 };
+  PS.mc = null; PS.mcStale = false; PS.mcSwing = false; PS.colorHit = false; PS.arsenal = null; PS.hit = null; PS.hitMap = null;
+  PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, zones: false, ens: true, arsenal: false, arsMode: 'angles' };
+  $('#pt-arsmode').value = 'angles';
+  [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
+  $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false;
+  Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 };
+  PS.view = 'zone'; $$('#pviews button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === 'zone')));
+  $('#preset').value = '';
+  applyMode(); syncAll(); pSyncAll(); pRenderMcSpec(); pUpdateMcStrip(); pchanged('reset'); pShowTab('data'); pStartPlay(true);
+}
+
+/* ---------- Hitting / Pitching ---------- */
+const APP_TEXT = {
+  hit: 'Three-dimensional batted-ball trajectories with drag, Magnus lift, weather, Monte Carlo and a reverse hit finder.',
+  pitch: 'Pitched-ball flight from the pitcher’s body and delivery to the plate, with spin, movement, the strike zone, Monte Carlo, and a link to the swing.'
+};
+function fillPresetList() {
+  const sel = $('#preset'); sel.innerHTML = '';
+  sel.appendChild(el('option', { value: '', text: 'Choose…' }));
+  (S.app === 'pitch' ? PPRESETS : PRESETS).forEach((p, i) => sel.appendChild(el('option', { value: i, text: p.name })));
+}
+function setApp(app) {
+  if (S.app === app) return;
+  stopPlay(); pStopPlay();
+  S.app = app; document.body.dataset.app = app;
+  $$('#apptabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.app === app)));
+  $('#subtitle').textContent = APP_TEXT[app]; fillPresetList();
+  document.title = app === 'pitch' ? 'Baseball Flight Lab: Pitching' : document.title.replace(/: Pitching$/, '');
+  if (app === 'pitch') { pSyncAll(); pRecompute(true); pShowTab(PS.tab); pRenderMcSpec(); pUpdateMcStrip(); }
+  else { applyMode(); syncAll(); recompute(true); showTab(S.tab); }
+  try { history.replaceState(null, '', app === 'pitch' ? '#pitching' : location.pathname + location.search); } catch (e) {}
+  window.scrollTo(0, 0);
+}
+$('#apptabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setApp(b.dataset.app); });
+
+(function pboot() {
+  buildPitchInputs();
+  // the strip under the Pitch group heading that summarises a live Monte Carlo cloud
+  const grp = $('#grp-pitch .grp'); if (grp) grp.insertBefore(el('div', { class: 'mcstrip', id: 'pmc-strip', hidden: '' }), grp.firstChild);
+  PI.applyType(PS.P, PS.P.type, false); PS.P0 = Object.assign({}, PS.P);
+  pRenderMcSpec();
+  pSyncAll();
+  pRecompute(true);
+  $('#pbat-metric').value = PS.hitMetric;
+  $('#pt-ens-wrap').hidden = true;
+  try { if (location.hash === '#pitching') setApp('pitch'); } catch (e) {}
+  Object.assign(window.BFL_APP, { PS, PI, setApp, pRecompute, pRunMC, pRunHitMap, applyPitchPreset, resetPitch, pShowTab, sendToHitting, pHitResult, pComputeArsenal, pRunPitchValidation, pRunCalibration, pStartPlay, pRender });
+})();
+
 })();
 </script>
+</body>
+</html>
