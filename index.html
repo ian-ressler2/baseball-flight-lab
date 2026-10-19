@@ -4322,12 +4322,14 @@ function pitcherAt(P, tauIn, anim) {
   const ua = 0.455 * Rr, fa = 0.40 * Rr, hl = 0.145 * Rr;
   const rel = V3.sub(ball, c0.thrSh), K4 = [V3.dot(rel, c0.e) / Rr, V3.dot(rel, c0.f) / Rr, V3.dot(rel, c0.u) / Rr];
   const K0 = [-(sw / 2) / Rr, 0.20 * H / 1.88 / Rr, -0.40], K1 = [0.10, -0.12, -0.95];
-  const K2 = [0.62, -0.05, 0.10], K3 = [0.30, -0.70, 0.35], KF = [-0.55, 0.45, -0.80];
-  let hc = kfTrack(tau, [[T0, K0], [m.brk0, K0], [m.brk1, K1], [m.plant, K2], [m.lay, K3], [0, K4], [0.34, KF]]);
+  const K2 = [0.62, -0.05, 0.10], K3 = [0.30, -0.70, 0.35], KM = [0.10, 0.80, -0.55], KF = [-0.30, 0.38, -0.80];
+  const arc = q => V3.mul(V3.nrm(V3.add(V3.mul(V3.nrm(K4), 1 - q), V3.mul(V3.nrm(KM), q))), 0.98);   // keep the arm at full length through the swing
+  const KA = arc(0.2), KB = arc(0.4), KC = arc(0.6), KMid = arc(0.8);
+  let hc = kfTrack(tau, [[T0, K0], [m.brk0, K0], [m.brk1, K1], [m.plant, K2], [m.lay, K3], [0, K4], [0.02, KA], [0.04, KB], [0.065, KC], [0.09, KMid], [0.16, KM], [0.34, KF]]);
   const humpK = klin(tau, m.lay, 0); hc = [hc[0], hc[1], hc[2] + 0.24 * Math.sin(Math.PI * humpK) * (tau < 0 ? 1 : 0)];
   const hand = V3.add(c.thrSh, V3.add(V3.mul(c.e, hc[0] * Rr), V3.add(V3.mul(c.f, hc[1] * Rr), V3.mul(c.u, hc[2] * Rr))));
   const hdir = V3.nrm(V3.sub(hand, c.thrSh)), wrist = V3.sub(hand, V3.mul(hdir, hl));
-  const elT = ik2(c.thrSh, wrist, ua, fa, V3.add(V3.mul(c.e, 0.4), [0, 0, -0.9]));
+  const pw = clamp(tau / 0.34, 0, 1), elT = ik2(c.thrSh, wrist, ua, fa, V3.add(V3.mul(c.e, 0.4 + 0.3 * pw), [0, 0, -0.9 + 0.3 * pw]));
   // glove arm: chest -> reaching to the plate -> tucked -> relaxed
   const gE = V3.mul(c.e, -1);
   const gAt = (ce, cf, cz) => V3.add(c.gloSh, V3.add(V3.mul(c.e, ce * Rr), V3.add(V3.mul(c.f, cf * Rr), V3.mul(c.u, cz * Rr))));   // ce: toward the midline
