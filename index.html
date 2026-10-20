@@ -4130,7 +4130,7 @@ function pRender() {
 }
 function pUpdateLive(t) {
   const box = $('#plive'), res = PS.sim; if (!res) return;
-  const names = pMcOn() ? ['Time', 'Mean speed', 'Mean height', 'To the plate', 'Pitches'] : ['Time', 'Speed', 'Height', 'To the plate', 'Spin'];
+  const names = pMcOn() ? ['Time', 'Mean speed', 'Mean height', 'To the plate', 'Pitches'] : ['Time', 'Speed now', 'Height', 'To the plate', 'Spin'];
   if (!box.firstChild) names.forEach(() => box.appendChild(el('div', { html: '<small></small><span>–</span>' })));
   $$('small', box).forEach((e, i) => { if (e.textContent !== names[i]) e.textContent = names[i]; });
   let vals;
@@ -4158,7 +4158,8 @@ function pUpdateHud() {
   const v = pVerdict(res), col = v.kind === 'strike' ? P_STRIKE() : v.kind === 'ball' ? P_BALL() : P_DIRT();
   hud.appendChild(el('span', { class: 'chip out', style: 'background:' + col, text: v.short }));
   if (res.plate) {
-    hud.appendChild(el('span', { class: 'chip', html: '<b>Plate</b>' + fmt(res.plate.speed, 1) + ' mph' }));
+    hud.appendChild(el('span', { class: 'chip', title: 'Speed as the ball leaves the hand. This is the number a broadcast or Statcast shows.', html: '<b>Out of hand</b>' + fmt(res.speed, 1) + ' mph' }));
+    hud.appendChild(el('span', { class: 'chip', title: 'Speed as the ball crosses the front of the plate, after air drag.', html: '<b>At the plate</b>' + fmt(res.plate.speed, 1) + ' mph' }));
     hud.appendChild(el('span', { class: 'chip', html: '<b>Location</b>' + sgn(res.plate.x, 1) + ', ' + fmt(res.plate.z, 1) + ' in' }));
     if (res.ivb !== undefined) hud.appendChild(el('span', { class: 'chip', html: '<b>Break</b>' + fmt(res.ivb, 1) + ' up · ' + fmt(Math.abs(res.hbArm), 1) + ' ' + (res.hbArm >= 0 ? 'arm side' : 'glove side') }));
   }
@@ -4575,7 +4576,7 @@ function pFillData() {
   $('#pverdict').innerHTML = '<div class="tile" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px"><span class="pill" style="background:' + col + '">' + v.short + '</span><span>' + v.text + (v.cl ? ' · <b>' + v.cl.region + '</b> of the attack zones' : '') + '</span></div>';
   if (!p) { $('#ptiles').innerHTML = ''; return; }
   const t = [
-    tile('Release speed', fmt(res.speed, 1), 'mph', 1), tile('Plate speed', fmt(p.speed, 1), 'mph', 1),
+    tile('Out-of-hand speed', fmt(res.speed, 1), 'mph', 1), tile('Speed at the plate', fmt(p.speed, 1), 'mph', 1),
     tile('Perceived speed', fmt(res.perceived, 1), 'mph'), tile('Flight time', fmt(p.t, 3), 's'),
     tile('At the plate, side', sgn(p.x, 1), 'in'), tile('At the plate, height', fmt(p.z, 1), 'in'),
     tile('Induced vertical', res.ivb === undefined ? '–' : sgn(res.ivb, 1), 'in'), tile('Horizontal, ' + (res.hbArm >= 0 ? 'arm side' : 'glove side'), res.hbArm === undefined ? '–' : fmt(Math.abs(res.hbArm), 1), 'in'),
@@ -4784,7 +4785,7 @@ function pRenderMcResults() {
     (e ? tile('Location ellipse', fmt(e.a / Math.sqrt(2.296), 1) + ' × ' + fmt(e.b / Math.sqrt(2.296), 1), 'in 1σ') : '') + tile('Pitches thrown', n, '') + '</div>' + hitHtml +
     '<div class="legend"><span><i style="background:' + T['c-good'] + '"></i>Strike</span><span><i style="background:' + T['c-wall'] + '"></i>Ball</span><span><i style="background:' + T.ghost + '"></i>Bounced</span><span>Plate view: solid ellipse = 68%, dashed = 95% of locations</span></div>' +
     '<div class="tablewrap"><table class="dt"><thead><tr><th>Measure</th><th>mean ± sd</th><th>median</th><th>5th – 95th pct.</th><th></th></tr></thead><tbody>' +
-    row('Plate side', xs, 1, 'in') + row('Plate height', zs, 1, 'in') + row('Plate speed', E.stats(fin(mc.speed)), 1, 'mph') + row('Flight time', E.stats(fin(mc.flight)), 3, 's') +
+    row('Plate side', xs, 1, 'in') + row('Plate height', zs, 1, 'in') + row('Speed at the plate', E.stats(fin(mc.speed)), 1, 'mph') + row('Flight time', E.stats(fin(mc.flight)), 3, 's') +
     row('Vertical approach angle', E.stats(fin(mc.vaa)), 2, '°') + row('Horizontal approach angle', E.stats(fin(mc.haa)), 2, '°') +
     row('Induced vertical', E.stats(fin(mc.ivb)), 1, 'in') + row('Horizontal (arm side)', E.stats(fin(mc.hb)), 1, 'in') + '</tbody></table></div>' +
     '<div class="two"><div><h3>Side to side <small>stacked by call</small></h3><canvas class="plot" id="pmc-h1" height="180"></canvas></div><div><h3>Height <small>stacked by call</small></h3><canvas class="plot" id="pmc-h2" height="180"></canvas></div></div>' +
@@ -4839,7 +4840,7 @@ function pFillTypes(now) {
     const A = pAtY(r.tr, ty), B = pAtY(cur.res.tr, ty), gap = Math.hypot(A.x - B.x, A.z - B.z) / IN_;
     return '<tr data-k="' + a.key + '" class="' + (a.cur ? 'cur' : '') + '" style="cursor:pointer"><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + a.color + ';margin-right:6px"></i>' + a.name + '</td><td>' + fmt(r.speed, 1) + '</td><td>' + fmt(a.P.spin, 0) + '</td><td>' + fmt(a.P.eff, 0) + '</td><td>' + fmt(p.speed, 1) + '</td><td>' + (r.ivb === undefined ? '–' : sgn(r.ivb, 1)) + '</td><td>' + (r.hbArm === undefined ? '–' : sgn(r.hbArm, 1)) + '</td><td>' + sgn(p.x, 1) + ', ' + fmt(p.z, 1) + '</td><td>' + sgn(p.vaa, 1) + '</td><td>' + fmt(p.t, 3) + '</td><td>' + (a.cur ? '–' : fmt(gap, 1)) + '</td></tr>';
   }).join('');
-  $('#ptypes-out').innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Release mph</th><th>Spin rpm</th><th>Eff. %</th><th>Plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Tunnel in</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+  $('#ptypes-out').innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Out of hand mph</th><th>Spin rpm</th><th>Eff. %</th><th>At plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Tunnel in</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="ptype-mv" height="320"></canvas>';
   $$('#ptypes-out tbody tr').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.k; if (!k) return; PI.applyType(PS.P, k, false); PS.sigma.dir = k === 'KN' ? 120 : PS.sigma0.dir; pchanged('type'); pSyncAll(); pStartPlay(true); }));
   const { g, W, H } = setupCv($('#ptype-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
@@ -4973,7 +4974,7 @@ function pFillPhys() {
     'Pitch → bat: the pitch is flown on to the contact plane; its position, velocity and spin go to the bat-ball collision model in the Hitting tab.';
   const rows = [['Air density ρ', c.rho0.toFixed(4), 'kg/m³'], ['Gravity g', c.g.toFixed(4), 'm/s²'], ['Ball mass', (c.m * 1000).toFixed(2), 'g'], ['Drag coefficient', P.pCd.toFixed(3), ''],
     ['Lift scale × seam factor', (P.pLift * P.liftK).toFixed(2), '(' + P.pLift.toFixed(2) + ' × ' + P.liftK.toFixed(2) + ')'], ['Spin decay τ', c.tau >= 1e5 ? 'none' : c.tau.toFixed(0), 's'],
-    ['Wind at 10 m', S.p.windMph.toFixed(1), 'mph'], ['Release speed', res.speed.toFixed(1), 'mph'], ['Flight time', res.plate ? res.plate.t.toFixed(3) : '–', 's'], ['Distance flown', res.plate ? ((res.rel.y - PI.PLATE_Y) / FT).toFixed(1) : '–', 'ft'],
+    ['Wind at 10 m', S.p.windMph.toFixed(1), 'mph'], ['Out-of-hand speed', res.speed.toFixed(1), 'mph'], ['Flight time', res.plate ? res.plate.t.toFixed(3) : '–', 's'], ['Distance flown', res.plate ? ((res.rel.y - PI.PLATE_Y) / FT).toFixed(1) : '–', 'ft'],
     ['Terminal fall speed', (Math.sqrt(2 * c.m * c.g / (c.rho0 * c.A * P.pCd)) / MPH).toFixed(0), 'mph']];
   $('#pconst-tbl').innerHTML = '<tbody>' + rows.map(r => '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td style="text-align:left;color:var(--muted)">' + r[2] + '</td></tr>').join('') + '</tbody>';
   $('#plimits').innerHTML = '<h3>What it leaves out</h3><p class="note">The seam-shifted wake is not modelled; the Seam / wake lift factor stands in for it and is a fitted model input, not a Statcast measurement. Breaking balls are given low factors so that, at their typical spin and efficiency, they move about as much as they do in the majors. The knuckleball is approximated: a near-zero spin, a large lift factor and a random axis that changes each Monte Carlo pitch, which gives the right size of erratic drift but not the real flutter. Release point is built from body proportions with simple rules, so a real pitcher’s arm action will differ. The delivery in the views is a stylised stick figure at release, not motion capture.</p>';
@@ -5173,9 +5174,9 @@ function pMatchPitch(P0, velo, spin, ivb, hb) {
   const host = $('#ppane-data'); if (!host) return;
   const box = document.createElement('div'); box.id = 'pmatch-card'; box.style.marginTop = '14px';
   box.innerHTML = '<h3>Match a published pitch <small>enter what Baseball Savant shows, and the model solves the rest</small></h3>' +
-    '<p class="note">Type the pitch’s release speed, spin rate, induced vertical break and horizontal break. Horizontal break is positive toward the pitcher’s arm side and negative toward the glove side. The model then finds the spin direction, the spin efficiency and, only if it must, a lift adjustment, and sets this pitcher’s pitch to match. The body, arm slot and release point stay as they are on the left.</p>' +
+    '<p class="note">Type the pitch’s out-of-hand speed (the number a broadcast shows), spin rate, induced vertical break and horizontal break. Horizontal break is positive toward the pitcher’s arm side and negative toward the glove side. The model then finds the spin direction, the spin efficiency and, only if it must, a lift adjustment, and sets this pitcher’s pitch to match. The body, arm slot and release point stay as they are on the left.</p>' +
     '<div class="field-row">' +
-    '<label>Release speed (mph)<input type="number" id="pm-velo" step="0.1" min="40" max="110" placeholder="e.g. 97.6"></label>' +
+    '<label>Out-of-hand speed (mph)<input type="number" id="pm-velo" step="0.1" min="40" max="110" placeholder="e.g. 97.6"></label>' +
     '<label>Spin rate (rpm)<input type="number" id="pm-spin" step="10" min="0" max="3500" placeholder="e.g. 2400"></label>' +
     '<label>Induced vertical break (in)<input type="number" id="pm-ivb" step="0.1" placeholder="e.g. 17.0"></label>' +
     '<label>Horizontal break (in, arm side +)<input type="number" id="pm-hb" step="0.1" placeholder="e.g. 8.0"></label></div>' +
@@ -5295,7 +5296,7 @@ function pFillCmp(now) {
     }
     return head + '<td class="l">' + P.hand + 'HP · ' + ftin(P.height) + ' · ' + P.delivery + '</td><td>' + fmt(r.speed, 1) + '</td><td>' + fmt(P.spin, 0) + ' / ' + fmt(P.eff, 0) + '</td><td>' + fmt(p.speed, 1) + '</td><td>' + (r.ivb === undefined ? '–' : sgn(r.ivb, 1)) + '</td><td>' + (r.hbArm === undefined ? '–' : sgn(r.hbArm, 1)) + '</td><td>' + sgn(p.x, 1) + ', ' + fmt(p.z, 1) + '</td><td>' + sgn(p.vaa, 1) + '</td><td>' + fmt(p.t, 3) + '</td><td>' + dx + '</td><td>' + gap + '</td>' + btns;
   }).join('');
-  box.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th></th><th class="l">Pitch</th><th class="l">Pitcher</th><th>Release mph</th><th>Spin rpm / eff. %</th><th>Plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Plate vs. first (in)</th><th>Tunnel gap (in)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+  box.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th></th><th class="l">Pitch</th><th class="l">Pitcher</th><th>Out of hand mph</th><th>Spin rpm / eff. %</th><th>At plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Plate vs. first (in)</th><th>Tunnel gap (in)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     (PS.cmpSrc ? '<p class="note"><b>Source.</b> ' + PS.cmpSrc + (PS.cmp.some(c => c.real) ? ' Each pitch’s spin direction and lift were solved so the model’s induced break matches the published figure: ' + PS.cmp.filter(c => c.real).map(c => fmt(c.real.ivb, 1) + '/' + fmt(c.real.hb, 1) + ' → ' + fmt(c.real.fit.ivb, 1) + '/' + fmt(c.real.fit.hb, 1)).join(', ') + ' in (vertical/arm-side).' : '') + '</p>' : '') +
     '<p class="note">“Plate vs. first” and “Tunnel gap” compare each pitch with the first one shown in the list. Vertical and arm-side break are induced movement, measured from each pitcher’s own side.</p>' +
     '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="pcmp-mv" height="320"></canvas>';
