@@ -229,6 +229,19 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
 .derived .full { grid-column: 1 / -1; }
 .clockface { display: flex; align-items: center; gap: 10px; }
 .clockface canvas { width: 54px; height: 54px; flex: none; }
+.matchcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; background: var(--surface, transparent); }
+.matchcard .mc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
+.matchcard h3 { margin: 0; }
+.matchcard .mc-sub { color: var(--muted); font-size: 13px; }
+.matchcard .mc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.matchcard label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); min-width: 0; }
+.matchcard .mc-in { display: flex; align-items: center; gap: 6px; }
+.matchcard .mc-in input { flex: 1 1 auto; min-width: 0; width: 100%; font-size: 15px; padding: 6px 8px; color: var(--ink); background: var(--field, var(--surface)); border: 1px solid var(--line); border-radius: 6px; }
+.matchcard .mc-in input::placeholder { color: var(--muted); opacity: .55; }
+.matchcard .mc-in em { font-style: normal; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.matchcard .mc-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.matchcard .mc-btns .btn { min-height: 36px; }
+.matchcard .mc-more summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 8px; }
 /* Compare tables become cards on a phone */
 @media (max-width: 640px) {
   #ppane-cmp .field-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
@@ -5212,17 +5225,17 @@ function pMatchPitch(P0, velo, spin, ivb, hb) {
 }
 (function () {
   const host = $('#ppane-data'); if (!host) return;
-  const box = document.createElement('div'); box.id = 'pmatch-card'; box.style.marginTop = '14px';
-  box.innerHTML = '<h3>Match a published pitch <small>enter what Baseball Savant shows, and the model solves the rest</small></h3>' +
-    '<p class="note">Type the pitch’s out-of-hand speed (the number a broadcast shows), spin rate, induced vertical break and horizontal break. Horizontal break is positive toward the pitcher’s arm side and negative toward the glove side. The model then finds the spin direction, the spin efficiency and, only if it must, a lift adjustment, and sets this pitcher’s pitch to match. The body, arm slot and release point stay as they are on the left.</p>' +
-    '<div class="field-row">' +
-    '<label>Out-of-hand speed (mph)<input type="number" id="pm-velo" step="0.1" min="40" max="110" placeholder="e.g. 97.6"></label>' +
-    '<label>Spin rate (rpm)<input type="number" id="pm-spin" step="10" min="0" max="3500" placeholder="e.g. 2400"></label>' +
-    '<label>Induced vertical break (in)<input type="number" id="pm-ivb" step="0.1" placeholder="e.g. 17.0"></label>' +
-    '<label>Horizontal break (in, arm side +)<input type="number" id="pm-hb" step="0.1" placeholder="e.g. 8.0"></label></div>' +
-    '<div class="field-row"><button class="btn primary" id="pm-go" type="button">Solve and apply</button><button class="btn" id="pm-add" type="button">Solve, apply and add to Compare</button></div>' +
-    '<p class="note" id="pm-out" aria-live="polite"></p>';
-  host.appendChild(box);
+  const box = document.createElement('div'); box.id = 'pmatch-card'; box.className = 'matchcard';
+  box.innerHTML = '<div class="mc-head"><h3>Match a published pitch</h3><span class="mc-sub">Enter the Savant numbers and the model fits the spin to them</span></div>' +
+    '<div class="mc-grid">' +
+    '<label>Out-of-hand speed<span class="mc-in"><input type="number" id="pm-velo" step="0.1" min="40" max="110" placeholder="97.6"><em>mph</em></span></label>' +
+    '<label>Spin rate<span class="mc-in"><input type="number" id="pm-spin" step="10" min="0" max="3500" placeholder="2400"><em>rpm</em></span></label>' +
+    '<label>Induced vertical break<span class="mc-in"><input type="number" id="pm-ivb" step="0.1" placeholder="17.0"><em>in</em></span></label>' +
+    '<label>Horizontal break<span class="mc-in"><input type="number" id="pm-hb" step="0.1" placeholder="8.0"><em>in, arm side +</em></span></label></div>' +
+    '<div class="mc-btns"><button class="btn primary" id="pm-go" type="button">Solve and apply</button><button class="btn" id="pm-add" type="button">Solve, apply and add to Compare</button></div>' +
+    '<p class="note" id="pm-out" aria-live="polite"></p>' +
+    '<details class="mc-more"><summary>How this works</summary><p class="note">Speed is the out-of-hand number a broadcast shows. Horizontal break is positive toward the pitcher’s arm side and negative toward the glove side. The model finds the spin direction and the spin efficiency that give that movement, and adds a lift adjustment only if even full efficiency falls short. Your body, arm slot and release point stay as they are on the left.</p></details>';
+  host.insertBefore(box, host.firstChild);
   const val = id => parseFloat($(id).value);
   function go(add) {
     const o = $('#pm-out'), v = val('#pm-velo'), sp = val('#pm-spin'), iv = val('#pm-ivb'), hb = val('#pm-hb');
