@@ -5155,6 +5155,49 @@ function pLoadRealPitcher(i) {
   PS.cmpSrc = rp.src; pFillCmp(true); pRequestRender();
 }
 
+/* ---------- match-to-data helper: published velocity, spin, vertical and horizontal break -> spin direction, efficiency, lift ---------- */
+function pMatchPitch(P0, velo, spin, ivb, hb) {
+  const P = Object.assign({}, P0, { velo, spin, eff: 80, liftK: 1 });
+  const dir = pFitMovement(P, ivb, hb).dir; P.dir = dir;
+  const mag = Math.hypot(ivb, hb), brk = (e, k) => { const r = PI.run(Object.assign({}, P, { eff: e, liftK: k }), S.p, { record: false, twin: true, dt: 0.0015 }); return Math.hypot(r.ivb, r.hbArm); };
+  let eff = 100, liftK = 1, capped = false;
+  if (brk(100, 1) >= mag) { let a = 1, b = 100; for (let i = 0; i < 18; i++) { const m = (a + b) / 2; if (brk(m, 1) < mag) a = m; else b = m; } eff = (a + b) / 2; }
+  else { capped = true; let a = 1, b = 4; for (let i = 0; i < 18; i++) { const m = (a + b) / 2; if (brk(100, m) < mag) a = m; else b = m; } liftK = (a + b) / 2; }
+  const fin = Object.assign({}, P, { eff, liftK }), r = PI.run(fin, S.p, { record: false, twin: true, dt: 0.0015 });
+  // spin direction can shift a little once the gyro share is known: refine it once
+  const d2 = pFitMovement(fin, ivb, hb).dir; fin.dir = d2;
+  const r2 = PI.run(fin, S.p, { record: false, twin: true, dt: 0.0015 });
+  return { dir: d2, eff, liftK, capped, ivb: r2.ivb, hb: r2.hbArm, plateSpeed: r2.plate && r2.plate.speed };
+}
+(function () {
+  const host = $('#ppane-data'); if (!host) return;
+  const box = document.createElement('div'); box.id = 'pmatch-card'; box.style.marginTop = '14px';
+  box.innerHTML = '<h3>Match a published pitch <small>enter what Baseball Savant shows, and the model solves the rest</small></h3>' +
+    '<p class="note">Type the pitch’s release speed, spin rate, induced vertical break and horizontal break. Horizontal break is positive toward the pitcher’s arm side and negative toward the glove side. The model then finds the spin direction, the spin efficiency and, only if it must, a lift adjustment, and sets this pitcher’s pitch to match. The body, arm slot and release point stay as they are on the left.</p>' +
+    '<div class="field-row">' +
+    '<label>Release speed (mph)<input type="number" id="pm-velo" step="0.1" min="40" max="110" placeholder="e.g. 97.6"></label>' +
+    '<label>Spin rate (rpm)<input type="number" id="pm-spin" step="10" min="0" max="3500" placeholder="e.g. 2400"></label>' +
+    '<label>Induced vertical break (in)<input type="number" id="pm-ivb" step="0.1" placeholder="e.g. 17.0"></label>' +
+    '<label>Horizontal break (in, arm side +)<input type="number" id="pm-hb" step="0.1" placeholder="e.g. 8.0"></label></div>' +
+    '<div class="field-row"><button class="btn primary" id="pm-go" type="button">Solve and apply</button><button class="btn" id="pm-add" type="button">Solve, apply and add to Compare</button></div>' +
+    '<p class="note" id="pm-out" aria-live="polite"></p>';
+  host.appendChild(box);
+  const val = id => parseFloat($(id).value);
+  function go(add) {
+    const o = $('#pm-out'), v = val('#pm-velo'), sp = val('#pm-spin'), iv = val('#pm-ivb'), hb = val('#pm-hb');
+    if (![v, sp, iv, hb].every(isFinite)) { o.textContent = 'Fill in all four numbers first.'; return; }
+    if (Math.hypot(iv, hb) < 0.5) { o.textContent = 'The break is too small to tell a spin direction. Try a pitch with more movement, or use the Knuckleball preset.'; return; }
+    let r; try { r = pMatchPitch(PS.P, v, sp, iv, hb); } catch (e) { o.textContent = 'The solver could not fit that pitch.'; return; }
+    Object.assign(PS.P, { velo: v, spin: sp, dir: Math.round(r.dir * 10) / 10, eff: Math.round(r.eff * 10) / 10, liftK: Math.round(r.liftK * 1000) / 1000 });
+    pchanged('match'); pSyncAll(); if (add) pCmpAdd(PS.P); pStartPlay(true);
+    const clock = r.dir / 30, hh = Math.floor(clock) || 12, mm = Math.round((clock - Math.floor(clock)) * 60);
+    o.innerHTML = 'Model result: <b>' + fmt(r.ivb, 1) + '</b> in vertical and <b>' + fmt(r.hb, 1) + '</b> in arm-side, against the ' + fmt(iv, 1) + ' and ' + fmt(hb, 1) + ' you entered. Solved spin direction <b>' + fmt(r.dir, 0) + '°</b> (about ' + hh + ':' + String(mm).padStart(2, '0') + ' on a clock), spin efficiency <b>' + fmt(r.eff, 0) + ' %</b>' +
+      (r.capped ? (r.liftK < 1.15 ? ', right at the top of what the spin can do (a lift factor of ' + fmt(r.liftK, 2) + ', within the normal spread between pitches)' : ', and a lift factor of <b>' + fmt(r.liftK, 2) + '</b>, because even 100 % efficiency at the standard lift falls short of that break (seam orientation or the published numbers may account for the rest)') : ', with the standard lift factor') + '. Plate speed ' + fmt(r.plateSpeed, 1) + ' mph.';
+  }
+  $('#pm-go').addEventListener('click', () => go(false));
+  $('#pm-add').addEventListener('click', () => go(true));
+})();
+
 /* ---------- the Compare tab ---------- */
 (function () {
   const opts = PI.TYPE_ORDER.map(k => '<option value="' + k + '">' + PI.TYPES[k].name + '</option>').join('');
