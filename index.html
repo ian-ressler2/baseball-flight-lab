@@ -229,6 +229,22 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
 .derived .full { grid-column: 1 / -1; }
 .clockface { display: flex; align-items: center; gap: 10px; }
 .clockface canvas { width: 54px; height: 54px; flex: none; }
+/* Compare tables become cards on a phone */
+@media (max-width: 640px) {
+  #ppane-cmp .field-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  #ppane-cmp .field-row > label, #ppane-cmp select, #ppane-cmp input[type=number] { max-width: 100%; min-width: 0; }
+  #ppane-cmp .field-row > label:not([style]) { flex: 1 1 100%; }
+  #ppane-cmp select { width: 100%; }
+  #pcmp-out .tablewrap, #pcmp-tunt .tablewrap, #pcmp-mcout .tablewrap { overflow: visible; }
+  .cardtbl, .cardtbl tbody { display: block; width: 100%; }
+  .cardtbl thead { display: none; }
+  .cardtbl tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px 14px; min-width: 0; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: var(--surface, transparent); }
+  .cardtbl td { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; border: 0 !important; padding: 2px 0 !important; text-align: right; min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+  .cardtbl td::before { content: attr(data-label); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); text-align: left; }
+  .cardtbl td.cfull { grid-column: 1 / -1; }
+  .cardtbl td.cfull::before { content: none; }
+  .cardtbl td.cfull input { width: 100%; }
+}
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
 </style>
 </head>
@@ -5283,6 +5299,7 @@ function pCmpTunnel() {
   });
   wrap.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch against #' + (PS.cmp.indexOf(ref) + 1) + '</th><th>Gap at ' + fmt(PS.tunnel, 1) + ' ft (in)</th><th>Gap at the plate (in)</th><th class="l">Apart by one ball-width (' + BALL_D + ' in)</th><th class="l">Clearly apart, two ball-widths (' + (2 * BALL_D) + ' in)</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' +
     '<p class="note">The gap is the straight-line distance between each pitch and the first one shown, measured at the same distance from the plate. A hitter cannot tell two pitches apart while they sit within about one ball-width of each other, so the later they come apart, the harder the pair is to read. Each time is the point after which the gap stays wider than that for the rest of the flight.</p>';
+  pCardify(wrap);
   const { g, W, H } = setupCv(cv), m = { l: 44, r: 14, t: 12, b: 34 };
   const xmin = -Math.ceil((yStart - yP) / FT / 5) * 5; let ymax = BALL_D * 2; series.forEach(s => s.gs.forEach(v => { if (v > ymax) ymax = v; })); ymax = Math.min(ymax * 1.05, 80);
   const ax = axes(g, W, H, m, xmin, 0, 0, ymax, 'feet before the plate', 'gap from #' + (PS.cmp.indexOf(ref) + 1) + ' (in)');
@@ -5336,6 +5353,24 @@ function pCmpMcTable() {
     return '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:6px"></i>' + (PS.cmp.indexOf(c) + 1) + ' ' + c.label.replace(/</g, '&lt;') + '</td><td>' + fmt(mc.strikePct, 0) + ' %</td><td>' + fmt(mc.dirtPct, 0) + ' %</td><td>' + sgn(mc.sx.mean, 1) + ', ' + fmt(mc.sz.mean, 1) + '</td><td>' + fmt(mc.sx.sd, 1) + ' / ' + fmt(mc.sz.sd, 1) + '</td><td>' + (e ? fmt(Math.PI * e.a * e.b, 0) : '–') + '</td></tr>'; }).join('');
   box.innerHTML = '<h3>Where each pitch lands, with its own spread <small>' + list[0].mcObj.n + ' pitches each, using the spreads on the Monte Carlo tab</small></h3><div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Strikes</th><th>In the dirt</th><th>Mean plate x, z (in)</th><th>Spread x / z (in, 1 sd)</th><th>68 % area (sq in)</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<p class="note">Each cloud is drawn in the pitch’s own colour in the plate view, with its 68 % ellipse. Tick “Show the clouds” under the Compare overlay to turn them on or off.</p>';
+  pCardify(box);
+}
+
+/* label each cell so the tables can fold into cards on a phone */
+function pCardify(root) {
+  if (!root) return;
+  root.querySelectorAll('table.dt').forEach(t => {
+    t.classList.add('cardtbl');
+    const heads = [...t.querySelectorAll('thead th')].map(h => h.textContent.trim());
+    t.querySelectorAll('tbody tr').forEach(tr => {
+      const tds = [...tr.children]; if (tds.length === 1 || tds.some(td => td.colSpan > 1)) { tds.forEach(td => { td.classList.add('cfull'); }); return; }
+      tds.forEach((td, i) => {
+        td.dataset.label = heads[i] || '';
+        if (!heads[i] || i === tds.length - 1 && !heads[i] || (i < 2 && heads.length > 8 && root.id === 'pcmp-out')) td.classList.add('cfull');
+        if (i === 0 && root.id !== 'pcmp-out') td.classList.add('cfull');
+      });
+    });
+  });
 }
 
 /* ---------- the Compare tab ---------- */
@@ -5431,7 +5466,7 @@ function pFillCmp(now) {
     g.fillStyle = c.color; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.strokeStyle = T.surface; g.lineWidth = 1.4; g.stroke();
     g.fillStyle = '#fff'; g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(PS.cmp.indexOf(c) + 1, x, y + 0.5);
   });
-  pCmpTunnel(); pCmpMcTable();
+  pCmpTunnel(); pCmpMcTable(); pCardify($('#pcmp-out'));
 }
 
 /* ===== Pitching: presets, app tabs, boot ===== */
