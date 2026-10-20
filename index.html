@@ -5104,6 +5104,57 @@ function pDrawCmpZone(g, m, t) {
   });
 }
 
+
+/* ---------- real pitchers: fit the spin direction and lift so a pitch matches published movement ---------- */
+// ivb = induced vertical break (in), hb = induced horizontal break toward the pitcher's arm side (in), as on Baseball Savant.
+function pFitMovement(P, ivb, hb) {
+  const run = (dir, k) => PI.run(Object.assign({}, P, { dir, liftK: k }), S.p, { record: false, twin: true, dt: 0.0015 });
+  const want = Math.atan2(hb, ivb), wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+  const ang = (dir, k) => { const r = run(dir, k); return Math.atan2(r.hbArm, r.ivb); };
+  let best = 0, bd = 9;
+  for (let d = 0; d < 360; d += 15) { const e = Math.abs(wrap(ang(d, 1) - want)); if (e < bd) { bd = e; best = d; } }
+  let lo = best - 15, hi = best + 15;
+  const f = d => wrap(ang(d, 1) - want);
+  const flo = f(lo), fhi = f(hi);
+  if (flo * fhi < 0 && Math.abs(flo) < 1.5 && Math.abs(fhi) < 1.5) { for (let i = 0; i < 10; i++) { const m = (lo + hi) / 2, fm = f(m); if (fm * f(lo) <= 0) hi = m; else lo = m; } best = (lo + hi) / 2; }
+  const dir = ((best % 360) + 360) % 360, mag = Math.hypot(ivb, hb);
+  let a = 0.1, b = 3;
+  for (let i = 0; i < 16; i++) { const m = (a + b) / 2, r = run(dir, m); if (Math.hypot(r.ivb, r.hbArm) < mag) a = m; else b = m; }
+  const liftK = (a + b) / 2, r = run(dir, liftK);
+  return { dir, liftK, ivb: r.ivb, hb: r.hbArm };
+}
+const SRC_VER = 'Movement and speed: Baseball Savant pitch-movement leaderboard, 2025 season averages. Arm slot, release point and spin rate are estimates.';
+const SRC_APX = 'Rounded from memory of recent Statcast season averages, so treat them as approximate. Arm slot and body are estimates. Use the Pitch types tab or the match-to-data helper to enter exact numbers.';
+const REAL_PITCHERS = [
+  { name: 'Jacob Misiorowski (RHP, 6′7″)', src: SRC_VER, body: { hand: 'R', height: 79, wingspan: 81, slot: 30, stride: 100, lean: 22 },
+    pitches: [['FF', 99.3, 15.9, 9.4, 30], ['SL', 94.1, 6.4, -2.6, 18], ['CU', 87.1, -9.1, -6.4, 12], ['CH', 92.3, 5.5, 16.6, 20]] },
+  { name: 'Tarik Skubal (LHP, 6′3″)', src: SRC_APX, body: { hand: 'L', bat: 'L', height: 75, wingspan: 76, slot: 50 },
+    pitches: [['FF', 97, 17, 6, 31], ['CH', 88, 6, 16, 18], ['SL', 88, 2, -5, 18]] },
+  { name: 'Gerrit Cole (RHP, 6′4″)', src: SRC_APX, body: { hand: 'R', height: 76, wingspan: 78, slot: 52 },
+    pitches: [['FF', 96.5, 17, 8, 31], ['SL', 88, 2, -4, 18], ['CU', 83, -10, -7, 12], ['CH', 89, 6, 15, 20]] },
+  { name: 'Chris Sale (LHP, 6′6″)', src: SRC_APX, body: { hand: 'L', bat: 'L', height: 78, wingspan: 82, slot: 28 },
+    pitches: [['FF', 94.5, 14, 11, 30], ['SL', 80, -1, -17, 14], ['CH', 86, 4, 16, 20]] },
+  { name: 'Emmanuel Clase (RHP, 6′2″)', src: SRC_APX, body: { hand: 'R', height: 74, wingspan: 76, slot: 42 },
+    pitches: [['FC', 99, 7, -1, 28], ['SI', 98, 10, 12, 24], ['SL', 91, 1, -5, 16]] }
+];
+function pLoadRealPitcher(i) {
+  const rp = REAL_PITCHERS[i]; if (!rp) return;
+  PS.cmp = []; PS.cmpMode = 'saved'; PS.cmpSigV = null;
+  const note = $('#pcmp-note'); if (note) note.textContent = '';
+  let first = null;
+  rp.pitches.forEach(([type, velo, ivb, hb, tz]) => {
+    const P = Object.assign({}, PS.P0, rp.body, { bat: rp.body.bat || 'R' });
+    PI.applyType(P, type, false); P.velo = velo; P.aim = 'target'; P.tx = 0; P.tz = tz;
+    const fit = pFitMovement(P, ivb, hb); P.dir = fit.dir; P.liftK = fit.liftK;
+    P.pitchLabel = null;
+    if (!first) first = P;
+    pCmpAdd(P); const c = PS.cmp[PS.cmp.length - 1]; c.label = rp.name.split(' (')[0].split(' ').pop() + ' ' + PI.TYPES[type].name + ' ' + fmt(velo, 1);
+    c.real = { ivb, hb, fit: { ivb: fit.ivb, hb: fit.hb } };
+  });
+  Object.assign(PS.P, first); pchanged('real'); pSyncAll();
+  PS.cmpSrc = rp.src; pFillCmp(true); pRequestRender();
+}
+
 /* ---------- the Compare tab ---------- */
 (function () {
   const opts = PI.TYPE_ORDER.map(k => '<option value="' + k + '">' + PI.TYPES[k].name + '</option>').join('');
@@ -5112,20 +5163,22 @@ function pDrawCmpZone(g, m, t) {
     '<div class="field-row"><button class="btn primary" id="pcmp-add" type="button">Add the current pitch</button>' +
     '<label>Add another pitch type from this pitcher<select id="pcmp-type"><option value="">Choose a type…</option>' + opts + '</select></label>' +
     '<label>How they are thrown<select id="pcmp-mode"><option value="angles">Same release angles as the first (other pitchers: as saved)</option><option value="saved">Each as it was saved</option><option value="target">All aimed at the current target</option></select></label>' +
+    '<label>Load a real pitcher<select id="pcmp-real"><option value="">Choose a pitcher…</option>' + REAL_PITCHERS.map((r, i) => '<option value="' + i + '">' + r.name + '</option>').join('') + '</select></label>' +
     '<label>Tunnel distance from the plate (ft)<input type="number" id="pcmp-tunnel" value="23.8" min="5" max="55" step="1"></label>' +
     '<button class="btn" id="pcmp-clear" type="button">Clear all</button><span class="note" id="pcmp-note"></span></div></div>' +
     '<div id="pcmp-out"></div>';
   const add = $('#pcmp-add');
   add.addEventListener('click', () => pCmpAdd(PS.P));
   $('#pcmp-type').addEventListener('change', e => { const k = e.target.value; e.target.value = ''; if (!k) return; const P2 = Object.assign({}, PS.P); PI.applyType(P2, k, false); P2.aim = 'target'; pCmpAdd(P2); });
+  $('#pcmp-real').addEventListener('change', e => { const k = e.target.value; e.target.value = ''; if (k !== '') pLoadRealPitcher(+k); });
   $('#pcmp-mode').addEventListener('change', e => { PS.cmpMode = e.target.value; pCmpRunAll(); pFillCmp(true); pRequestRender(); });
   $('#pcmp-tunnel').addEventListener('input', e => { const v = parseFloat(e.target.value); if (isFinite(v)) { PS.tunnel = clamp(v, 1, 55); pFillCmp(true); } });
-  $('#pcmp-clear').addEventListener('click', () => { PS.cmp = []; PS.cmpSigV = null; pFillCmp(true); pRequestRender(); });
+  $('#pcmp-clear').addEventListener('click', () => { PS.cmp = []; PS.cmpSrc = null; PS.cmpSigV = null; pFillCmp(true); pRequestRender(); });
   $('#pcmp-out').addEventListener('click', e => {
     const tr = e.target.closest('tr[data-i]'), b = e.target.closest('button[data-act]'); if (!tr || !b) return;
     const i = +tr.dataset.i, c = PS.cmp[i]; if (!c) return;
     if (b.dataset.act === 'del') { PS.cmp.splice(i, 1); pFillCmp(true); pRequestRender(); }
-    else if (b.dataset.act === 'upd') { c.P = Object.assign({}, PS.P); c.label = pCmpLabel(PS.P); pCmpRunAll(); pFillCmp(true); pRequestRender(); }
+    else if (b.dataset.act === 'upd') { c.P = Object.assign({}, PS.P); c.label = pCmpLabel(PS.P); c.real = null; pCmpRunAll(); pFillCmp(true); pRequestRender(); }
     else if (b.dataset.act === 'load') { Object.assign(PS.P, c.P); pchanged('load'); pSyncAll(); pStartPlay(true); }
   });
   $('#pcmp-out').addEventListener('input', e => {
@@ -5158,6 +5211,7 @@ function pFillCmp(now) {
     return head + '<td class="l">' + P.hand + 'HP · ' + ftin(P.height) + ' · ' + P.delivery + '</td><td>' + fmt(r.speed, 1) + '</td><td>' + fmt(P.spin, 0) + ' / ' + fmt(P.eff, 0) + '</td><td>' + fmt(p.speed, 1) + '</td><td>' + (r.ivb === undefined ? '–' : sgn(r.ivb, 1)) + '</td><td>' + (r.hbArm === undefined ? '–' : sgn(r.hbArm, 1)) + '</td><td>' + sgn(p.x, 1) + ', ' + fmt(p.z, 1) + '</td><td>' + sgn(p.vaa, 1) + '</td><td>' + fmt(p.t, 3) + '</td><td>' + dx + '</td><td>' + gap + '</td>' + btns;
   }).join('');
   box.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th></th><th class="l">Pitch</th><th class="l">Pitcher</th><th>Release mph</th><th>Spin rpm / eff. %</th><th>Plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Plate vs. first (in)</th><th>Tunnel gap (in)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    (PS.cmpSrc ? '<p class="note"><b>Source.</b> ' + PS.cmpSrc + (PS.cmp.some(c => c.real) ? ' Each pitch’s spin direction and lift were solved so the model’s induced break matches the published figure: ' + PS.cmp.filter(c => c.real).map(c => fmt(c.real.ivb, 1) + '/' + fmt(c.real.hb, 1) + ' → ' + fmt(c.real.fit.ivb, 1) + '/' + fmt(c.real.fit.hb, 1)).join(', ') + ' in (vertical/arm-side).' : '') + '</p>' : '') +
     '<p class="note">“Plate vs. first” and “Tunnel gap” compare each pitch with the first one shown in the list. Vertical and arm-side break are induced movement, measured from each pitcher’s own side.</p>' +
     '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="pcmp-mv" height="320"></canvas>';
   const { g, W, H } = setupCv($('#pcmp-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
@@ -5210,7 +5264,7 @@ function resetPitch() {
   PS.aimSwing = { on: false, xs: 0, zs: 30 };
   PS.mc = null; PS.mcStale = false; PS.mcSwing = false; PS.colorHit = false; PS.arsenal = null; PS.hit = null; PS.hitMap = null;
   PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false };
-  PS.cmp = []; PS.cmpMode = 'angles'; PS.cmpSigV = null;
+  PS.cmp = []; PS.cmpSrc = null; PS.cmpMode = 'angles'; PS.cmpSigV = null;
   $('#pt-arsmode').value = 'angles';
   [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-cmp', false], ['pt-anim', true], ['pt-hand', true], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
   $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false;
