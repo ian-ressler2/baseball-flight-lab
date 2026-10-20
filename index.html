@@ -397,6 +397,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
         <label title="Trace the throwing hand through the delivery"><input type="checkbox" id="pt-hand" checked> Hand path</label>
         <label><input type="checkbox" id="pt-batter" checked> Batter</label>
         <label title="Shade heart, shadow, chase and waste zones"><input type="checkbox" id="pt-zones"> Attack zones</label>
+        <label title="Draw every pitch saved in the Compare tab, up to ten, from different pitch types or different pitchers"><input type="checkbox" id="pt-cmp"> Compare overlay</label>
         <label title="Draw every pitch type from this release point"><input type="checkbox" id="pt-arsenal"> All pitch types</label>
         <select id="pt-arsmode" aria-label="How the other pitch types are thrown" title="Same release angles shows how differently each type breaks. Same target shows where they tunnel together."><option value="angles">thrown on the same angles</option><option value="target">aimed at the same spot</option></select>
         <label id="pt-ens-wrap" hidden><input type="checkbox" id="pt-ens" checked> Monte Carlo (replaces single pitch)</label>
@@ -427,12 +428,14 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
       <button role="tab" data-tab="data" aria-selected="true">Pitch data</button>
       <button role="tab" data-tab="mc" aria-selected="false">Monte Carlo</button>
       <button role="tab" data-tab="types" aria-selected="false">Pitch types</button>
+      <button role="tab" data-tab="cmp" aria-selected="false">Compare</button>
       <button role="tab" data-tab="bat" aria-selected="false">Pitch → bat</button>
       <button role="tab" data-tab="phys" aria-selected="false">Physics</button>
     </div>
     <div class="pane on" id="ppane-data"></div>
     <div class="pane" id="ppane-mc"></div>
     <div class="pane" id="ppane-types"></div>
+    <div class="pane" id="ppane-cmp"></div>
     <div class="pane" id="ppane-bat"></div>
     <div class="pane" id="ppane-phys"></div>
   </section>
@@ -3365,11 +3368,11 @@ const PS = {
   view: 'zone', tab: 'data',
   play: { t: 0, playing: false, speed: 0.25, last: 0 },
   tauNow: 0,
-  opt: { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles' },
+  opt: { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false },
   cam: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 },
   sigma: { velo: 1.0, spin: 80, dir: 5, eff: 3, relH: 1.2, relSide: 1.5, relExt: 1.5, angV: 0.55, angH: 0.55, pCd: 0.008 },
   mc: null, mcStale: false, mcAuto: true, mcSwing: false, mcJob: 0, ver: 0,
-  arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
+  cmp: [], cmpMode: 'angles', cmpSeq: 0, cmpSigV: null, arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
 };
 PS.P0 = Object.assign({}, PS.P); PS.sigma0 = Object.assign({}, PS.sigma);
 const PCTL = {}, PSPREAD = [];
@@ -3601,6 +3604,7 @@ function pRecompute(toEnd) {
   pSyncAll(); pUpdateHud(); pFillActiveTab();
   clearTimeout(PS.budT); PS.budT = setTimeout(pComputeBudget, 160);
   if (PS.opt.arsenal) { clearTimeout(PS.arsT); PS.arsT = setTimeout(() => { pComputeArsenal(); pRequestRender(); }, 140); }
+  pCmpRefresh();
   pRequestRender();
 }
 // the delivery plays before release when it is on; the timeline is delivery + flight
@@ -3610,6 +3614,7 @@ function pTotalDur() {
   if (PS.opt.anim && PS.opt.pitcher) d = Math.max(d, P_FOLLOW);
   if (pMcOn()) d = Math.max(d, PS.mc.maxT);
   if (PS.opt.arsenal && PS.arsenal) PS.arsenal.forEach(a => { if (a.res.tEnd > d) d = a.res.tEnd; });
+  if (PS.opt.cmp) d = Math.max(d, pCmpDur());
   return d + 0.05 + pPre();
 }
 function pMcOn() { const mc = PS.mc; return !!(mc && mc.visible && mc.tracks.length && PS.opt.ens); }
@@ -3617,6 +3622,7 @@ function pFillActiveTab() {
   if (PS.tab === 'data') pFillData();
   else if (PS.tab === 'bat') pFillBat();
   else if (PS.tab === 'types') pFillTypes();
+  else if (PS.tab === 'cmp') pFillCmp();
   else if (PS.tab === 'phys') pFillPhys();
 }
 // the verdict on this pitch
@@ -3889,6 +3895,7 @@ function pDrawZone(t) {
       }
     });
   }
+  pDrawCmpZone(g, m, t); pDrawCmp(v, t);
   if (res && res.front) {
     // path as seen from behind, and the same throw with no spin
     if (PS.opt.nospin && PS.ns && PS.ns.front) {
@@ -3985,7 +3992,7 @@ function pDrawSide(t) {
   if (PS.opt.batter) pDrawBatter(v, true);
   if (PS.opt.pitcher) pDrawPitcher(v);
   if (pMcOn()) { pDrawMcLanes(v, t, 'side'); return v; }
-  pDrawArsenal(v, t);
+  pDrawArsenal(v, t); pDrawCmp(v, t);
   if (res) {
     if (PS.opt.nospin && PS.ns) v.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
     if (PS.opt.trail) v.line(pGround(pPts(res.tr, t, 1)), T.path, 2.6);
@@ -4022,7 +4029,7 @@ function pDrawTop(t) {
   if (PS.opt.batter) pDrawBatter(v, true);
   if (PS.opt.pitcher) pDrawPitcher(v);
   if (pMcOn()) { pDrawMcLanes(v, t, 'top'); return v; }
-  pDrawArsenal(v, t);
+  pDrawArsenal(v, t); pDrawCmp(v, t);
   if (res) {
     if (PS.opt.nospin && PS.ns) v.line(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2), T.ghost, 1.6, [5, 4]);
     if (PS.opt.trail) v.line(pPts(res.tr, t, 1), T.path, 2.6);
@@ -4071,7 +4078,7 @@ function pDraw3D(t) {
   v.line([[-zx, zy0, zb], [zx, zy0, zb], [zx, zy0, zt], [-zx, zy0, zt], [-zx, zy0, zb]], T.accent, 1);
   [[-zx, zb], [zx, zb], [zx, zt], [-zx, zt]].forEach(q => v.line([[q[0], zy0, q[1]], [q[0], zy1, q[1]]], T.accent, 1));
   if (pMcOn()) { pDrawMcLanes(v, t, '3d'); return v; }
-  pDrawArsenal(v, t);
+  pDrawArsenal(v, t); pDrawCmp(v, t);
   if (res) {
     if (PS.opt.nospin && PS.ns) v.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
     if (PS.opt.trail) {
@@ -4209,6 +4216,7 @@ $('#pt-anim').addEventListener('change', e => { PS.opt.anim = e.target.checked; 
 $('#pt-pitcher').addEventListener('change', () => { PS.play.t = pTotalDur(); pRequestRender(); });
 $('#pt-ens').addEventListener('change', e => { PS.opt.ens = e.target.checked; PS.play.t = pTotalDur(); pUpdateHud(); pRequestRender(); });
 $('#pt-arsmode').addEventListener('change', e => { PS.opt.arsMode = e.target.value; PS.arsenal = null; if (PS.opt.arsenal) pComputeArsenal(); pRequestRender(); });
+$('#pt-cmp').addEventListener('change', e => { PS.opt.cmp = e.target.checked; PS.play.t = pTotalDur(); pStopPlay(); pRequestRender(); });
 $('#pt-arsenal').addEventListener('change', e => { PS.opt.arsenal = e.target.checked; if (e.target.checked) pComputeArsenal(); pRequestRender(); });
 $('#pbtn-play').addEventListener('click', togglePitchPlay);
 $('#pbtn-replay').addEventListener('click', () => pStartPlay(true));
@@ -5022,6 +5030,144 @@ function pRunPitchValidation() {
   $('#pval-status').textContent = rows.filter(r => r[3]).length + ' of ' + rows.length + ' checks pass.';
 }
 
+/* ===== Pitching: compare up to ten pitches (different types, or different pitchers) ===== */
+const CMP_MAX = 10;
+const CMP_COL = ['#d33f2d', '#2a6fb5', '#2c8a57', '#e08a1e', '#7b4bb5', '#16a59a', '#c24b8f', '#8a5a2b', '#4a5d6b', '#a89a12'];
+const pCmpSig = () => JSON.stringify([S.p, PS.cmpMode === 'target' ? [PS.P.tx, PS.P.tz] : 0, PS.cmpMode]);
+function pCmpLabel(P) {
+  const nm = PI.TYPES[P.type] ? PI.TYPES[P.type].name : P.type;
+  return P.hand + 'HP ' + ftin(P.height) + ' · ' + nm + ' ' + fmt(P.velo, 0);
+}
+const CMP_BODY = ['hand', 'height', 'wingspan', 'slot', 'stride', 'lean', 'strideDir', 'rubberX', 'mound', 'delivery', 'manual', 'relH', 'relExt', 'relSide'];
+const pCmpSame = (a, b) => CMP_BODY.every(k => a[k] === b[k]);
+function pCmpRun(c) {
+  const P2 = Object.assign({}, c.P), first = PS.cmp[0];
+  if (PS.cmpMode === 'target') { P2.aim = 'target'; P2.tx = PS.P.tx; P2.tz = PS.P.tz; }
+  else if (PS.cmpMode === 'angles' && first && first !== c && pCmpSame(first.P, c.P) && first.res && first.res.thV !== undefined) { P2.aim = 'angles'; P2.angV = first.res.thV; P2.angH = first.res.thH; }
+  c.P2 = P2;
+  try { c.res = PI.run(P2, S.p, { record: true, twin: true, sampleDt: 1 / 240, dt: 0.0015 }); } catch (e) { c.res = null; }
+}
+function pCmpRunAll() { PS.cmp.forEach((c, i) => { if (i === 0) { const m = PS.cmpMode; if (m === 'angles') PS.cmpMode = 'saved'; pCmpRun(c); PS.cmpMode = m; } else pCmpRun(c); }); PS.cmpSigV = pCmpSig(); }
+function pCmpRefresh() {
+  if (!PS.cmp.length) return;
+  clearTimeout(PS.cmpT);
+  PS.cmpT = setTimeout(() => { if (PS.cmpSigV === pCmpSig()) return; pCmpRunAll(); if (PS.tab === 'cmp') pFillCmp(true); pRequestRender(); }, 150);
+}
+function pCmpAdd(P) {
+  if (PS.cmp.length >= CMP_MAX) { const n = $('#pcmp-note'); if (n) n.textContent = 'That is the most it can hold (' + CMP_MAX + '). Remove one first.'; return; }
+  const used = PS.cmp.map(c => c.color), col = CMP_COL.find(x => used.indexOf(x) < 0) || CMP_COL[0];
+  const c = { id: ++PS.cmpSeq, label: pCmpLabel(P), color: col, vis: true, P: Object.assign({}, P) };
+  PS.cmp.push(c); if (PS.cmp.length === 1 && PS.cmpMode === 'angles') { PS.cmpMode = 'saved'; pCmpRun(c); PS.cmpMode = 'angles'; } else pCmpRun(c); PS.cmpSigV = pCmpSig();
+  PS.opt.cmp = true; $('#pt-cmp').checked = true;
+  pStopPlay(); PS.play.t = pTotalDur(); pUpdatePlayBtn();
+  pFillCmp(true); pRequestRender();
+}
+function pCmpOn() { return PS.opt.cmp && PS.cmp.some(c => c.vis && c.res && c.res.tr); }
+function pCmpDur() { let d = 0; PS.cmp.forEach(c => { if (c.vis && c.res && c.res.tEnd > d) d = c.res.tEnd; }); return d; }
+
+function pDrawCmp(v, t) {
+  if (!pCmpOn()) return;
+  const g = v.g, items = PS.cmp.filter(c => c.vis && c.res && c.res.tr);
+  if (t >= 0) items.forEach(c => {
+    const tr = c.res.tr, te = tr.t[tr.t.length - 1], tt = Math.min(t, te);
+    v.line(pGround(pPts(tr, tt, 2)), c.color, 2.3);
+    const cc = pTrackAt(tr, tt), p = v.pt(cc.x, cc.y, cc.z);
+    if (p) { g.fillStyle = c.color; g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.beginPath(); g.arc(p[0], p[1], 4.4, 0, 7); g.fill(); g.stroke(); }
+  });
+  // legend: a column in the tall views, a wrapped row in the short ones
+  g.save(); g.font = '600 11px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'middle';
+  const txt = c => (PS.cmp.indexOf(c) + 1) + '  ' + c.label, flow = PH < 340;
+  if (!flow) {
+    let y = 52; const w = Math.min(PW - 20, Math.max.apply(null, items.map(c => g.measureText(txt(c)).width)) + 34);
+    g.globalAlpha = 0.82; g.fillStyle = T.surface; g.fillRect(8, y - 12, w, items.length * 17 + 8); g.globalAlpha = 1;
+    items.forEach(c => { g.fillStyle = c.color; g.beginPath(); g.arc(19, y, 5, 0, 7); g.fill(); g.fillStyle = T.ink; g.fillText(txt(c), 30, y); y += 17; });
+  } else {
+    let x = 12, y = 56; const pos = [];
+    items.forEach(c => { const w = g.measureText(txt(c)).width + 30; if (x + w > PW - 8 && x > 12) { x = 12; y += 16; } pos.push([c, x, y, w]); x += w; });
+    g.globalAlpha = 0.82; g.fillStyle = T.surface; g.fillRect(6, 47, PW - 12, y - 47 + 12); g.globalAlpha = 1;
+    pos.forEach(([c, px, py]) => { g.fillStyle = c.color; g.beginPath(); g.arc(px + 6, py, 4.5, 0, 7); g.fill(); g.fillStyle = T.ink; g.fillText(txt(c), px + 16, py); });
+  }
+  g.restore();
+}
+function pDrawCmpZone(g, m, t) {
+  if (!pCmpOn()) return;
+  PS.cmp.forEach(c => {
+    if (!c.vis || !c.res || !c.res.front) return;
+    const f = c.res.front; if (t < f.t - 1e-6) return;
+    const X = m.X(f.x / IN_), Z = m.Z(f.z / IN_), r = Math.max(4, 1.45 * m.s);
+    g.globalAlpha = 0.5; g.fillStyle = c.color; g.beginPath(); g.arc(X, Z, r, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.strokeStyle = c.color; g.lineWidth = 2.2; g.stroke();
+    g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = T.ink; g.fillText(PS.cmp.indexOf(c) + 1, X, Z);
+  });
+}
+
+/* ---------- the Compare tab ---------- */
+(function () {
+  const opts = PI.TYPE_ORDER.map(k => '<option value="' + k + '">' + PI.TYPES[k].name + '</option>').join('');
+  $('#ppane-cmp').innerHTML = '<div><h3>Compare pitches <small>up to ' + CMP_MAX + ', drawn together in every view</small></h3>' +
+    '<p class="note">Build a pitch and a pitcher on the left, then add it here. Change the pitch type to compare one pitcher’s pitches, or change the pitcher (height, arm slot, stride, release, hand) and add the same pitch again to compare pitchers. Each pitch is kept exactly as it was thrown, and flies on its own in every view, so you can watch how the spin shapes each break.</p>' +
+    '<div class="field-row"><button class="btn primary" id="pcmp-add" type="button">Add the current pitch</button>' +
+    '<label>Add another pitch type from this pitcher<select id="pcmp-type"><option value="">Choose a type…</option>' + opts + '</select></label>' +
+    '<label>How they are thrown<select id="pcmp-mode"><option value="angles">Same release angles as the first (other pitchers: as saved)</option><option value="saved">Each as it was saved</option><option value="target">All aimed at the current target</option></select></label>' +
+    '<label>Tunnel distance from the plate (ft)<input type="number" id="pcmp-tunnel" value="23.8" min="5" max="55" step="1"></label>' +
+    '<button class="btn" id="pcmp-clear" type="button">Clear all</button><span class="note" id="pcmp-note"></span></div></div>' +
+    '<div id="pcmp-out"></div>';
+  const add = $('#pcmp-add');
+  add.addEventListener('click', () => pCmpAdd(PS.P));
+  $('#pcmp-type').addEventListener('change', e => { const k = e.target.value; e.target.value = ''; if (!k) return; const P2 = Object.assign({}, PS.P); PI.applyType(P2, k, false); P2.aim = 'target'; pCmpAdd(P2); });
+  $('#pcmp-mode').addEventListener('change', e => { PS.cmpMode = e.target.value; pCmpRunAll(); pFillCmp(true); pRequestRender(); });
+  $('#pcmp-tunnel').addEventListener('input', e => { const v = parseFloat(e.target.value); if (isFinite(v)) { PS.tunnel = clamp(v, 1, 55); pFillCmp(true); } });
+  $('#pcmp-clear').addEventListener('click', () => { PS.cmp = []; PS.cmpSigV = null; pFillCmp(true); pRequestRender(); });
+  $('#pcmp-out').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-i]'), b = e.target.closest('button[data-act]'); if (!tr || !b) return;
+    const i = +tr.dataset.i, c = PS.cmp[i]; if (!c) return;
+    if (b.dataset.act === 'del') { PS.cmp.splice(i, 1); pFillCmp(true); pRequestRender(); }
+    else if (b.dataset.act === 'upd') { c.P = Object.assign({}, PS.P); c.label = pCmpLabel(PS.P); pCmpRunAll(); pFillCmp(true); pRequestRender(); }
+    else if (b.dataset.act === 'load') { Object.assign(PS.P, c.P); pchanged('load'); pSyncAll(); pStartPlay(true); }
+  });
+  $('#pcmp-out').addEventListener('input', e => {
+    const tr = e.target.closest('tr[data-i]'); if (!tr) return; const c = PS.cmp[+tr.dataset.i]; if (!c) return;
+    if (e.target.classList.contains('cl')) { c.label = e.target.value; pRequestRender(); }
+  });
+  $('#pcmp-out').addEventListener('change', e => {
+    const tr = e.target.closest('tr[data-i]'); if (!tr) return; const c = PS.cmp[+tr.dataset.i]; if (!c) return;
+    if (e.target.classList.contains('cv')) { c.vis = e.target.checked; PS.play.t = Math.min(PS.play.t, pTotalDur()); pRequestRender(); }
+  });
+})();
+function pFillCmp(now) {
+  const box = $('#pcmp-out'); if (!box) return;
+  const tn = $('#pcmp-tunnel'); if (tn && document.activeElement !== tn) tn.value = PS.tunnel;
+  const md = $('#pcmp-mode'); if (md) md.value = PS.cmpMode;
+  const cnt = $('#pcmp-note'); if (cnt && !/most it can hold/.test(cnt.textContent)) cnt.textContent = PS.cmp.length + ' of ' + CMP_MAX;
+  if (!PS.cmp.length) { box.innerHTML = '<p class="note">Nothing here yet. Press “Add the current pitch”, then change the pitch or the pitcher and add another.</p>'; return; }
+  if (PS.cmpSigV !== pCmpSig()) pCmpRunAll();
+  const vis = PS.cmp.filter(c => c.vis && c.res && c.res.plate), base = vis[0], ty = PS.tunnel * FT + PI.PLATE_Y;
+  const rows = PS.cmp.map((c, i) => {
+    const r = c.res, p = r && r.plate, P = c.P2 || c.P;
+    const head = '<tr data-i="' + i + '"><td class="l"><b>' + (i + 1) + '</b> <input type="checkbox" class="cv" ' + (c.vis ? 'checked' : '') + ' aria-label="Show"></td><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:6px"></i><input type="text" class="cl" value="' + c.label.replace(/"/g, '&quot;') + '" maxlength="30" style="width:170px" aria-label="Name"></td>';
+    const btns = '<td><button class="btn sm" data-act="load" type="button" title="Make this the pitch being edited">Load</button> <button class="btn sm" data-act="upd" type="button" title="Replace this entry with the current pitch">Update</button> <button class="btn sm" data-act="del" type="button" title="Remove" aria-label="Remove">×</button></td></tr>';
+    if (!p) return head + '<td colspan="11">never reaches the plate</td>' + btns;
+    let dx = '–', gap = '–';
+    if (base && c !== base) {
+      dx = sgn(p.x - base.res.plate.x, 1) + ', ' + sgn(p.z - base.res.plate.z, 1);
+      const A = pAtY(r.tr, ty), B = pAtY(base.res.tr, ty); gap = fmt(Math.hypot(A.x - B.x, A.z - B.z) / IN_, 1);
+    }
+    return head + '<td class="l">' + P.hand + 'HP · ' + ftin(P.height) + ' · ' + P.delivery + '</td><td>' + fmt(r.speed, 1) + '</td><td>' + fmt(P.spin, 0) + ' / ' + fmt(P.eff, 0) + '</td><td>' + fmt(p.speed, 1) + '</td><td>' + (r.ivb === undefined ? '–' : sgn(r.ivb, 1)) + '</td><td>' + (r.hbArm === undefined ? '–' : sgn(r.hbArm, 1)) + '</td><td>' + sgn(p.x, 1) + ', ' + fmt(p.z, 1) + '</td><td>' + sgn(p.vaa, 1) + '</td><td>' + fmt(p.t, 3) + '</td><td>' + dx + '</td><td>' + gap + '</td>' + btns;
+  }).join('');
+  box.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th></th><th class="l">Pitch</th><th class="l">Pitcher</th><th>Release mph</th><th>Spin rpm / eff. %</th><th>Plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Plate vs. first (in)</th><th>Tunnel gap (in)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="note">“Plate vs. first” and “Tunnel gap” compare each pitch with the first one shown in the list. Vertical and arm-side break are induced movement, measured from each pitcher’s own side.</p>' +
+    '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="pcmp-mv" height="320"></canvas>';
+  const { g, W, H } = setupCv($('#pcmp-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
+  const ax = axes(g, W, H, m, -R, R, -R, R, 'toward the glove side  ←   horizontal (in)   →  toward the arm side', 'vertical (in)');
+  g.strokeStyle = T['ink-2']; g.lineWidth = 1.2; g.beginPath(); g.moveTo(ax.px(0), m.t); g.lineTo(ax.px(0), H - m.b); g.moveTo(m.l, ax.py(0)); g.lineTo(W - m.r, ax.py(0)); g.stroke();
+  PS.cmp.forEach(c => {
+    const r = c.res; if (!c.vis || !r || r.ivb === undefined) return;
+    const x = ax.px(clamp(r.hbArm, -R, R)), y = ax.py(clamp(r.ivb, -R, R));
+    g.fillStyle = c.color; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.strokeStyle = T.surface; g.lineWidth = 1.4; g.stroke();
+    g.fillStyle = '#fff'; g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(PS.cmp.indexOf(c) + 1, x, y + 0.5);
+  });
+}
+
 /* ===== Pitching: presets, app tabs, boot ===== */
 const PPRESETS = [
   { name: 'Four-seamer up in the zone (rising)', type: 'FF', set: { height: 75, wingspan: 78, slot: 55, velo: 97, spin: 2550, eff: 96, tx: 0, tz: 37 } },
@@ -5060,9 +5206,10 @@ function resetPitch() {
   Object.keys(S.sigma).forEach(k => { S.sigma[k] = S.sigma0[k]; });
   PS.aimSwing = { on: false, xs: 0, zs: 30 };
   PS.mc = null; PS.mcStale = false; PS.mcSwing = false; PS.colorHit = false; PS.arsenal = null; PS.hit = null; PS.hitMap = null;
-  PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, zones: false, ens: true, arsenal: false, arsMode: 'angles' };
+  PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false };
+  PS.cmp = []; PS.cmpMode = 'angles'; PS.cmpSigV = null;
   $('#pt-arsmode').value = 'angles';
-  [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
+  [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-cmp', false], ['pt-anim', true], ['pt-hand', true], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
   $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false;
   Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 };
   PS.view = 'zone'; $$('#pviews button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === 'zone')));
