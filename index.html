@@ -3850,6 +3850,9 @@ function pDrawZone(t) {
   g.fillStyle = T['grass-a']; g.fillRect(0, m.Z(0), PW, PH - m.Z(0));
   const zb = P.batH * P.zBot / 100, zt = P.batH * P.zTop / 100, zc = (zt + zb) / 2, hh = (zt - zb) / 2;
   const v = pView2d('zone', (x, y, z) => [m.X(x / IN_), m.Z(z / IN_)], m.s * 39.37 / 39.37 / IN_);
+  // pitch paths as the catcher sees them: in perspective from just behind the plate, so a pitch starts small near the middle and grows as it comes in
+  const EYE = 3.2, EYEZ = 1.05, pf = (x, y, zz) => { const k = EYE / (Math.max(y, PI.PLATE_Y) - PI.PLATE_Y + EYE); return [m.X(x * k / IN_), m.Z((EYEZ + (zz - EYEZ) * k) / IN_)]; };
+  const vp = pView2d('zone', pf, m.s / IN_);
   // grid + axes
   g.strokeStyle = 'rgba(128,140,134,0.22)'; g.lineWidth = 1; g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.fillStyle = T['ink-2'];
   g.textAlign = 'center'; g.textBaseline = 'top';
@@ -3895,13 +3898,13 @@ function pDrawZone(t) {
       }
     });
   }
-  pDrawCmpZone(g, m, t); pDrawCmp(v, t);
+  pDrawCmpZone(g, m, t); pDrawCmp(vp, t);
   if (res && res.front) {
     // path as seen from behind, and the same throw with no spin
     if (PS.opt.nospin && PS.ns && PS.ns.front) {
-      v.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
+      vp.line(pGround(pPts(PS.ns.tr, Math.min(t, PS.ns.tr.t[PS.ns.tr.t.length - 1]), 2)), T.ghost, 1.6, [5, 4]);
     }
-    if (PS.opt.trail) v.line(pGround(pPts(res.tr, t, 1)), T.path, 2.4);
+    if (PS.opt.trail) vp.line(pGround(pPts(res.tr, t, 1)), T.path, 2.4);
     const f = res.front;
     if (t >= f.t - 1e-6) {
       const ax = m.X(f.x / IN_), az = m.Z(f.z / IN_);
@@ -3917,7 +3920,7 @@ function pDrawZone(t) {
       // draw to scale at the plate
       const rr = 1.45 * m.s; g.strokeStyle = col; g.lineWidth = 2.2; g.beginPath(); g.arc(ax, az, Math.max(4, rr), 0, 7); g.stroke();
     } else if (t >= 0) {
-      const c = pTrackAt(res.tr, t), p = v.pt(c.x, c.y, c.z), prog = 1 - (c.y - PI.PLATE_Y) / (res.rel.y - PI.PLATE_Y);
+      const c = pTrackAt(res.tr, t), p = vp.pt(c.x, c.y, c.z), prog = 1 - (c.y - PI.PLATE_Y) / (res.rel.y - PI.PLATE_Y);
       const r = Math.max(3, 1.45 * m.s * (0.28 + 0.72 * prog * prog));
       g.fillStyle = '#fff'; g.strokeStyle = T.ink; g.lineWidth = 1.3; g.beginPath(); g.arc(p[0], p[1], r, 0, 7); g.fill(); g.stroke();
       g.strokeStyle = T.accent; g.lineWidth = Math.max(1, r * 0.2); g.beginPath(); g.arc(p[0] - r * 0.55, p[1], r * 0.62, -0.9, 0.9); g.stroke();
@@ -5069,7 +5072,7 @@ function pDrawCmp(v, t) {
   if (!pCmpOn()) return;
   const g = v.g, items = PS.cmp.filter(c => c.vis && c.res && c.res.tr);
   if (t >= 0) items.forEach(c => {
-    const tr = c.res.tr, te = tr.t[tr.t.length - 1], tt = Math.min(t, te);
+    const tr = c.res.tr, te = (v.kind === 'zone' && c.res.front) ? c.res.front.t : tr.t[tr.t.length - 1], tt = Math.min(t, te);
     v.line(pGround(pPts(tr, tt, 2)), c.color, 2.3);
     const cc = pTrackAt(tr, tt), p = v.pt(cc.x, cc.y, cc.z);
     if (p) { g.fillStyle = c.color; g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.beginPath(); g.arc(p[0], p[1], 4.4, 0, 7); g.fill(); g.stroke(); }
