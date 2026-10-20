@@ -3850,6 +3850,7 @@ function pDrawArsenal(v, t) {
 function pZoneMap() {
   const P = PS.P, zt = P.batH * P.zTop / 100;
   let x0 = PS.opt.batter ? -40 : -30, x1 = PS.opt.batter ? 40 : 30, z0 = -6, z1 = Math.max(70, zt + 14);
+  if (PS.opt.batter) { try { const J = batterAt(P); z1 = Math.max(z1, Math.max(J.head[2] + J.headR * 1.4, J.tip[2]) / IN_ + 3); } catch (e) {} }
   const mc = PS.mc;
   if (pMcOn()) {
     const xs = Array.from(mc.x).filter(isFinite).sort((a, b) => a - b), zs = Array.from(mc.z).filter(isFinite).sort((a, b) => a - b);
