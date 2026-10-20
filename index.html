@@ -3372,7 +3372,7 @@ const PS = {
   cam: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 },
   sigma: { velo: 1.0, spin: 80, dir: 5, eff: 3, relH: 1.2, relSide: 1.5, relExt: 1.5, angV: 0.55, angH: 0.55, pCd: 0.008 },
   mc: null, mcStale: false, mcAuto: true, mcSwing: false, mcJob: 0, ver: 0,
-  cmp: [], cmpMode: 'angles', cmpSeq: 0, cmpSigV: null, arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
+  cmp: [], cmpSeqOn: false, cmpGap: 1.2, cmpMode: 'angles', cmpSeq: 0, cmpSigV: null, arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
 };
 PS.P0 = Object.assign({}, PS.P); PS.sigma0 = Object.assign({}, PS.sigma);
 const PCTL = {}, PSPREAD = [];
@@ -5067,16 +5067,20 @@ function pCmpAdd(P) {
   pFillCmp(true); pRequestRender();
 }
 function pCmpOn() { return PS.opt.cmp && PS.cmp.some(c => c.vis && c.res && c.res.tr); }
-function pCmpDur() { let d = 0; PS.cmp.forEach(c => { if (c.vis && c.res && c.res.tEnd > d) d = c.res.tEnd; }); return d; }
+function pCmpOff(c) { if (!PS.cmpSeqOn) return 0; let k = 0; for (const x of PS.cmp) { if (x === c) return k * PS.cmpGap; if (x.vis && x.res && x.res.tr) k++; } return 0; }
+function pCmpDur() { let d = 0; PS.cmp.forEach(c => { if (c.vis && c.res && c.res.tEnd !== undefined && c.res.tEnd + pCmpOff(c) > d) d = c.res.tEnd + pCmpOff(c); }); return d; }
 
 function pDrawCmp(v, t) {
   if (!pCmpOn()) return;
   const g = v.g, items = PS.cmp.filter(c => c.vis && c.res && c.res.tr);
   if (t >= 0) items.forEach(c => {
-    const tr = c.res.tr, te = (v.kind === 'zone' && c.res.front) ? c.res.front.t : tr.t[tr.t.length - 1], tt = Math.min(t, te);
+    const off = pCmpOff(c), tl = t - off; if (tl < 0) return;
+    const tr = c.res.tr, te = (v.kind === 'zone' && c.res.front) ? c.res.front.t : tr.t[tr.t.length - 1], tt = Math.min(tl, te), done = tl >= te;
+    if (PS.cmpSeqOn && done) g.globalAlpha = 0.4;
     v.line(pGround(pPts(tr, tt, 2)), c.color, 2.3);
+    g.globalAlpha = 1;
     const cc = pTrackAt(tr, tt), p = v.pt(cc.x, cc.y, cc.z);
-    if (p) { g.fillStyle = c.color; g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.beginPath(); g.arc(p[0], p[1], 4.4, 0, 7); g.fill(); g.stroke(); }
+    if (p && !(PS.cmpSeqOn && done)) { g.fillStyle = c.color; g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.beginPath(); g.arc(p[0], p[1], 4.4, 0, 7); g.fill(); g.stroke(); }
   });
   // legend: a column in the tall views, a wrapped row in the short ones
   g.save(); g.font = '600 11px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'middle';
@@ -5106,12 +5110,20 @@ function pDrawCmpZone(g, m, t) {
   });
   PS.cmp.forEach(c => {
     if (!c.vis || !c.res || !c.res.front) return;
-    const f = c.res.front; if (t < f.t - 1e-6) return;
+    const f = c.res.front; if (t - pCmpOff(c) < f.t - 1e-6) return;
     const X = m.X(f.x / IN_), Z = m.Z(f.z / IN_), r = Math.max(4, 1.45 * m.s);
     g.globalAlpha = 0.5; g.fillStyle = c.color; g.beginPath(); g.arc(X, Z, r, 0, 7); g.fill(); g.globalAlpha = 1;
     g.strokeStyle = c.color; g.lineWidth = 2.2; g.stroke();
     g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = T.ink; g.fillText(PS.cmp.indexOf(c) + 1, X, Z);
   });
+  if (PS.cmpSeqOn) {
+    const pts = PS.cmp.filter(c => c.vis && c.res && c.res.front && t - pCmpOff(c) >= c.res.front.t - 1e-6).map(c => [m.X(c.res.front.x / IN_), m.Z(c.res.front.z / IN_)]);
+    if (pts.length > 1) {
+      g.save(); g.strokeStyle = T['ink-2']; g.lineWidth = 1.4; g.setLineDash([5, 4]); g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); g.setLineDash([]);
+      g.fillStyle = T['ink-2']; for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k], ang = Math.atan2(b[1] - a[1], b[0] - a[0]), mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; g.save(); g.translate(mx, my); g.rotate(ang); g.beginPath(); g.moveTo(5, 0); g.lineTo(-4, -4); g.lineTo(-4, 4); g.closePath(); g.fill(); g.restore(); }
+      g.restore();
+    }
+  }
 }
 
 
@@ -5212,7 +5224,7 @@ function pMatchPitch(P0, velo, spin, ivb, hb) {
 const CMP_ENV = ['windMph', 'windDir', 'tempF', 'rh', 'elevFt', 'roofClosed'], CMP_KEY = 'bfl-compare-v1';
 function pCmpPack() {
   const env = {}; CMP_ENV.forEach(k => { env[k] = S.p[k]; });
-  return { v: 1, m: PS.cmpMode, t: PS.tunnel, env, c: PS.cmp.map(c => { const p = {}; Object.keys(c.P).forEach(k => { if (c.P[k] !== PS.P0[k]) p[k] = c.P[k]; }); return { l: c.label, k: c.color, v: c.vis ? 1 : 0, p }; }) };
+  return { v: 1, m: PS.cmpMode, t: PS.tunnel, q: PS.cmpSeqOn ? 1 : 0, g: PS.cmpGap, env, c: PS.cmp.map(c => { const p = {}; Object.keys(c.P).forEach(k => { if (c.P[k] !== PS.P0[k]) p[k] = c.P[k]; }); return { l: c.label, k: c.color, v: c.vis ? 1 : 0, p }; }) };
 }
 function pCmpUnpack(o) {
   if (!o || o.v !== 1 || !Array.isArray(o.c) || !o.c.length) throw new Error('bad');
@@ -5222,7 +5234,7 @@ function pCmpUnpack(o) {
     return { id: ++PS.cmpSeq, label: String(e.l || pCmpLabel(P)).slice(0, 60), color: CMP_COL.indexOf(e.k) >= 0 ? e.k : CMP_COL[0], vis: !!e.v, P };
   });
   CMP_ENV.forEach(k => { if (o.env && typeof o.env[k] === typeof S.p[k] && (typeof o.env[k] !== 'number' || isFinite(o.env[k]))) S.p[k] = o.env[k]; });
-  PS.cmp = list; PS.cmpSrc = null; PS.cmpMode = ['angles', 'saved', 'target'].indexOf(o.m) >= 0 ? o.m : 'saved'; PS.tunnel = clamp(+o.t || PS.tunnel, 1, 55);
+  PS.cmp = list; PS.cmpSrc = null; PS.cmpMode = ['angles', 'saved', 'target'].indexOf(o.m) >= 0 ? o.m : 'saved'; PS.tunnel = clamp(+o.t || PS.tunnel, 1, 55); PS.cmpSeqOn = !!o.q; PS.cmpGap = clamp(+o.g || 1.2, 0.3, 6); { const q = $('#pcmp-seq'); if (q) q.checked = PS.cmpSeqOn; const gp = $('#pcmp-gap'); if (gp) gp.value = PS.cmpGap; }
   PS.opt.cmp = true; const cb = $('#pt-cmp'); if (cb) cb.checked = true;
   syncAll(); pSyncAll(); pCmpRunAll(); PS.play.t = Math.min(PS.play.t, pTotalDur()); pFillCmp(true); pRequestRender();
 }
@@ -5337,7 +5349,8 @@ function pCmpMcTable() {
     '<label>Load a real pitcher<select id="pcmp-real"><option value="">Choose a pitcher…</option>' + REAL_PITCHERS.map((r, i) => '<option value="' + i + '">' + r.name + '</option>').join('') + '</select></label>' +
     '<label>Tunnel distance from the plate (ft)<input type="number" id="pcmp-tunnel" value="23.8" min="5" max="55" step="1"></label>' +
     '<button class="btn" id="pcmp-save" type="button" title="Keep this comparison in this browser">Save</button><button class="btn" id="pcmp-load" type="button" title="Bring back the comparison saved in this browser">Load saved</button><button class="btn" id="pcmp-share" type="button" title="Make a link that opens this comparison">Share link</button>' +
-    '<label>Monte Carlo pitches each<input type="number" id="pcmp-mcn" value="200" min="20" max="1500" step="20"></label><button class="btn" id="pcmp-mc" type="button" title="Throw many of each pitch with the spreads from the Monte Carlo tab">Run Monte Carlo on all</button><label><input type="checkbox" id="pcmp-mcshow" checked> Show the clouds</label><span class="note" id="pcmp-mcnote"></span>' +
+    '<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pcmp-seq"> Throw them in order, one after another</label><label>Seconds between pitches<input type="number" id="pcmp-gap" value="1.2" min="0.3" max="6" step="0.1"></label>' +
+    '<label>Monte Carlo pitches each<input type="number" id="pcmp-mcn" value="200" min="20" max="1500" step="20"></label><button class="btn" id="pcmp-mc" type="button" title="Throw many of each pitch with the spreads from the Monte Carlo tab">Run Monte Carlo on all</button><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pcmp-mcshow" checked> Show the clouds</label><span class="note" id="pcmp-mcnote"></span>' +
     '<button class="btn" id="pcmp-clear" type="button">Clear all</button><span class="note" id="pcmp-note"></span></div></div>' +
     '<p class="note" id="pcmp-msg" aria-live="polite"></p><input type="text" id="pcmp-link" readonly hidden aria-label="Share link" style="width:100%">' +
     '<div id="pcmp-out"></div>';
@@ -5361,13 +5374,16 @@ function pCmpMcTable() {
     const done = ok => msg(ok ? 'Link copied. Anyone who opens it sees this comparison.' : 'Select the link below and copy it. Anyone who opens it sees this comparison.');
     try { navigator.clipboard.writeText(url).then(() => done(true), () => done(false)); } catch (e) { done(false); }
   });
+  $('#pcmp-seq').addEventListener('change', e => { PS.cmpSeqOn = e.target.checked; PS.opt.cmp = true; $('#pt-cmp').checked = true; PS.view = PS.view; pStopPlay(); PS.play.t = PS.cmpSeqOn ? 0 : pTotalDur(); pStartPlay(true); pFillCmp(true); });
+  $('#pcmp-gap').addEventListener('change', e => { const v = parseFloat(e.target.value); if (isFinite(v)) { PS.cmpGap = clamp(v, 0.3, 6); if (PS.cmpSeqOn) { PS.play.t = 0; pStartPlay(true); } else pRequestRender(); } });
   $('#pcmp-mc').addEventListener('click', pCmpRunMC);
   $('#pcmp-mcshow').addEventListener('change', e => { PS.opt.cmpMc = e.target.checked; pRequestRender(); });
   $('#pcmp-clear').addEventListener('click', () => { PS.cmpMcJob = (PS.cmpMcJob || 0) + 1; PS.cmp = []; PS.cmpSrc = null; PS.cmpSigV = null; pFillCmp(true); pRequestRender(); });
   $('#pcmp-out').addEventListener('click', e => {
     const tr = e.target.closest('tr[data-i]'), b = e.target.closest('button[data-act]'); if (!tr || !b) return;
     const i = +tr.dataset.i, c = PS.cmp[i]; if (!c) return;
-    if (b.dataset.act === 'del') { PS.cmp.splice(i, 1); pFillCmp(true); pRequestRender(); }
+    if (b.dataset.act === 'up' || b.dataset.act === 'dn') { const k = i + (b.dataset.act === 'up' ? -1 : 1); if (k < 0 || k >= PS.cmp.length) return; const t = PS.cmp[i]; PS.cmp[i] = PS.cmp[k]; PS.cmp[k] = t; pFillCmp(true); pRequestRender(); }
+    else if (b.dataset.act === 'del') { PS.cmp.splice(i, 1); pFillCmp(true); pRequestRender(); }
     else if (b.dataset.act === 'upd') { c.P = Object.assign({}, PS.P); c.label = pCmpLabel(PS.P); c.real = null; pCmpRunAll(); pFillCmp(true); pRequestRender(); }
     else if (b.dataset.act === 'load') { Object.assign(PS.P, c.P); pchanged('load'); pSyncAll(); pStartPlay(true); }
   });
@@ -5391,7 +5407,7 @@ function pFillCmp(now) {
   const rows = PS.cmp.map((c, i) => {
     const r = c.res, p = r && r.plate, P = c.P2 || c.P;
     const head = '<tr data-i="' + i + '"><td class="l"><b>' + (i + 1) + '</b> <input type="checkbox" class="cv" ' + (c.vis ? 'checked' : '') + ' aria-label="Show"></td><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:6px"></i><input type="text" class="cl" value="' + c.label.replace(/"/g, '&quot;') + '" maxlength="30" style="width:170px" aria-label="Name"></td>';
-    const btns = '<td><button class="btn sm" data-act="load" type="button" title="Make this the pitch being edited">Load</button> <button class="btn sm" data-act="upd" type="button" title="Replace this entry with the current pitch">Update</button> <button class="btn sm" data-act="del" type="button" title="Remove" aria-label="Remove">×</button></td></tr>';
+    const btns = '<td><button class="btn sm" data-act="up" type="button" title="Throw this one earlier" aria-label="Move up">↑</button><button class="btn sm" data-act="dn" type="button" title="Throw this one later" aria-label="Move down">↓</button> <button class="btn sm" data-act="load" type="button" title="Make this the pitch being edited">Load</button> <button class="btn sm" data-act="upd" type="button" title="Replace this entry with the current pitch">Update</button> <button class="btn sm" data-act="del" type="button" title="Remove" aria-label="Remove">×</button></td></tr>';
     if (!p) return head + '<td colspan="11">never reaches the plate</td>' + btns;
     let dx = '–', gap = '–';
     if (base && c !== base) {
@@ -5457,12 +5473,13 @@ function resetPitch() {
   PS.aimSwing = { on: false, xs: 0, zs: 30 };
   PS.mc = null; PS.mcStale = false; PS.mcSwing = false; PS.colorHit = false; PS.arsenal = null; PS.hit = null; PS.hitMap = null;
   PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false, cmpMc: true };
-  PS.cmp = []; PS.cmpSrc = null; PS.cmpMode = 'angles'; PS.cmpSigV = null;
+  PS.cmp = []; PS.cmpSrc = null; PS.cmpSeqOn = false; PS.cmpGap = 1.2; PS.cmpMode = 'angles'; PS.cmpSigV = null;
   $('#pt-arsmode').value = 'angles';
   [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-cmp', false], ['pt-anim', true], ['pt-hand', true], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
   $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false;
   Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 };
   PS.view = 'zone'; $$('#pviews button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === 'zone')));
+  { const q = $('#pcmp-seq'); if (q) q.checked = false; }
   $('#preset').value = '';
   applyMode(); syncAll(); pSyncAll(); pRenderMcSpec(); pUpdateMcStrip(); pchanged('reset'); pShowTab('data'); pStartPlay(true);
 }
