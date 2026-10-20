@@ -428,6 +428,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
     <div class="transport">
       <button class="btn primary" id="pbtn-play" type="button"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg><span>Throw</span></button>
       <button class="btn" id="pbtn-replay" type="button" title="Restart from the release"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Replay</span></button>
+      <button class="btn" id="pbtn-real" type="button" title="Play the whole delivery and flight at real speed, the way a hitter sees it">Real time</button>
       <input type="range" id="pscrub" min="0" max="1000" value="1000" aria-label="Timeline">
       <span class="tread mono" id="ptread">0.00 / 0.00 s</span>
       <label class="speed">Speed
@@ -4240,6 +4241,7 @@ $('#pt-cmp').addEventListener('change', e => { PS.opt.cmp = e.target.checked; PS
 $('#pt-arsenal').addEventListener('change', e => { PS.opt.arsenal = e.target.checked; if (e.target.checked) pComputeArsenal(); pRequestRender(); });
 $('#pbtn-play').addEventListener('click', togglePitchPlay);
 $('#pbtn-replay').addEventListener('click', () => pStartPlay(true));
+$('#pbtn-real').addEventListener('click', () => { PS.play.speed = 1; $('#pspeed').value = '1'; PS.opt.anim = true; PS.opt.pitcher = true; { const a = $('#pt-anim'), b = $('#pt-pitcher'); if (a) a.checked = true; if (b) b.checked = true; } pStartPlay(true); });
 $('#pscrub').addEventListener('input', e => { pStopPlay(); PS.play.t = parseFloat(e.target.value) / 1000 * pTotalDur(); pRequestRender(); });
 $('#pspeed').addEventListener('change', e => { PS.play.speed = parseFloat(e.target.value); });
 new ResizeObserver(() => pRequestRender()).observe(pwrap);
