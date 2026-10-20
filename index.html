@@ -5225,6 +5225,57 @@ function pCmpFromUrl() {
   try { pCmpUnpack(JSON.parse(pUnB64(m[1]))); pShowTab('cmp'); return true; } catch (e) { return false; }
 }
 
+/* ---------- tunneling: how long the pitches look alike, and where they come apart ---------- */
+const BALL_D = 2.9;   // baseball diameter, inches
+function pTAtY(tr, y) {
+  const n = tr.y.length; let i = 1; while (i < n - 1 && tr.y[i] > y) i++;
+  const f = (tr.y[i - 1] - y) / ((tr.y[i - 1] - tr.y[i]) || 1);
+  return tr.t[i - 1] + f * (tr.t[i] - tr.t[i - 1]);
+}
+function pCmpTunnel() {
+  const wrap = $('#pcmp-tunt'), cv = $('#pcmp-tun'); if (!wrap || !cv) return;
+  const vis = PS.cmp.filter(c => c.vis && c.res && c.res.tr && c.res.plate), ref = vis[0];
+  if (vis.length < 2) { wrap.innerHTML = '<p class="note">Show at least two pitches to see how they tunnel.</p>'; cv.style.display = 'none'; return; }
+  cv.style.display = '';
+  const yP = PI.PLATE_Y, step = 0.1 * FT;
+  const yStart = Math.min.apply(null, vis.map(c => c.res.tr.y[0])) - 0.05;
+  const rows = [], series = [];
+  vis.slice(1).forEach(c => {
+    const xs = [], gs = [], ys = [];
+    for (let y = yStart; y >= yP; y -= step) {
+      const A = pAtY(c.res.tr, y), B = pAtY(ref.res.tr, y);
+      xs.push(-(y - yP) / FT); ys.push(y); gs.push(Math.hypot(A.x - B.x, A.z - B.z) / IN_);
+    }
+    series.push({ c, xs, gs });
+    const gAt = y => { const A = pAtY(c.res.tr, y), B = pAtY(ref.res.tr, y); return Math.hypot(A.x - B.x, A.z - B.z) / IN_; };
+    const tTun = PS.tunnel * FT + yP, last = gs[gs.length - 1];
+    // the point after which the gap stays wider than th for the rest of the flight
+    const apart = th => {
+      let k = -1; for (let i = 0; i < gs.length; i++) if (gs[i] <= th) k = i;
+      if (k === gs.length - 1) return 'never';
+      if (k < 0) return 'already apart at release';
+      const y = ys[k + 1], ft = (y - yP) / FT, tl = c.res.plate.t - pTAtY(c.res.tr, y);
+      return fmt(ft, 1) + ' ft out · ' + fmt(tl * 1000, 0) + ' ms before the plate';
+    };
+    const when = apart(BALL_D), when2 = apart(2 * BALL_D);
+    rows.push('<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:6px"></i>' + (PS.cmp.indexOf(c) + 1) + ' ' + c.label.replace(/</g, '&lt;') + '</td><td>' + fmt(gAt(tTun), 1) + '</td><td>' + fmt(last, 1) + '</td><td class="l">' + when + '</td><td class="l">' + when2 + '</td></tr>');
+  });
+  wrap.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch against #' + (PS.cmp.indexOf(ref) + 1) + '</th><th>Gap at ' + fmt(PS.tunnel, 1) + ' ft (in)</th><th>Gap at the plate (in)</th><th class="l">Apart by one ball-width (' + BALL_D + ' in)</th><th class="l">Clearly apart, two ball-widths (' + (2 * BALL_D) + ' in)</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' +
+    '<p class="note">The gap is the straight-line distance between each pitch and the first one shown, measured at the same distance from the plate. A hitter cannot tell two pitches apart while they sit within about one ball-width of each other, so the later they come apart, the harder the pair is to read. Each time is the point after which the gap stays wider than that for the rest of the flight.</p>';
+  const { g, W, H } = setupCv(cv), m = { l: 44, r: 14, t: 12, b: 34 };
+  const xmin = -Math.ceil((yStart - yP) / FT / 5) * 5; let ymax = BALL_D * 2; series.forEach(s => s.gs.forEach(v => { if (v > ymax) ymax = v; })); ymax = Math.min(ymax * 1.05, 80);
+  const ax = axes(g, W, H, m, xmin, 0, 0, ymax, 'feet before the plate', 'gap from #' + (PS.cmp.indexOf(ref) + 1) + ' (in)');
+  g.fillStyle = 'rgba(120,120,120,0.16)'; g.fillRect(m.l, ax.py(BALL_D), W - m.l - m.r, ax.py(0) - ax.py(BALL_D));
+  g.strokeStyle = T['ink-2']; g.setLineDash([5, 4]); g.lineWidth = 1.2; g.beginPath(); g.moveTo(m.l, ax.py(BALL_D)); g.lineTo(W - m.r, ax.py(BALL_D)); g.stroke(); g.setLineDash([]);
+  g.fillStyle = T['ink-2']; g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText('one ball-width', m.l + 6, ax.py(BALL_D) - 2);
+  const tx = ax.px(-PS.tunnel); if (tx > m.l && tx < W - m.r) { g.strokeStyle = T.accent; g.lineWidth = 1.2; g.beginPath(); g.moveTo(tx, m.t); g.lineTo(tx, H - m.b); g.stroke(); g.fillStyle = T.accent; g.textAlign = 'right'; g.textBaseline = 'top'; g.fillText('tunnel distance', tx - 4, m.t + 2); }
+  series.forEach(s => {
+    g.strokeStyle = s.c.color; g.lineWidth = 2.2; g.beginPath();
+    s.xs.forEach((x, i) => { const X = ax.px(x), Y = ax.py(Math.min(s.gs[i], ymax)); i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+    g.stroke();
+  });
+}
+
 /* ---------- the Compare tab ---------- */
 (function () {
   const opts = PI.TYPE_ORDER.map(k => '<option value="' + k + '">' + PI.TYPES[k].name + '</option>').join('');
@@ -5299,6 +5350,7 @@ function pFillCmp(now) {
   box.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th></th><th class="l">Pitch</th><th class="l">Pitcher</th><th>Out of hand mph</th><th>Spin rpm / eff. %</th><th>At plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Plate vs. first (in)</th><th>Tunnel gap (in)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     (PS.cmpSrc ? '<p class="note"><b>Source.</b> ' + PS.cmpSrc + (PS.cmp.some(c => c.real) ? ' Each pitch’s spin direction and lift were solved so the model’s induced break matches the published figure: ' + PS.cmp.filter(c => c.real).map(c => fmt(c.real.ivb, 1) + '/' + fmt(c.real.hb, 1) + ' → ' + fmt(c.real.fit.ivb, 1) + '/' + fmt(c.real.fit.hb, 1)).join(', ') + ' in (vertical/arm-side).' : '') + '</p>' : '') +
     '<p class="note">“Plate vs. first” and “Tunnel gap” compare each pitch with the first one shown in the list. Vertical and arm-side break are induced movement, measured from each pitcher’s own side.</p>' +
+    '<h3>Tunneling <small>how long the pitches look alike, and where they come apart</small></h3><div id="pcmp-tunt"></div><canvas class="plot" id="pcmp-tun" height="260"></canvas>' +
     '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="pcmp-mv" height="320"></canvas>';
   const { g, W, H } = setupCv($('#pcmp-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
   const ax = axes(g, W, H, m, -R, R, -R, R, 'toward the glove side  ←   horizontal (in)   →  toward the arm side', 'vertical (in)');
@@ -5309,6 +5361,7 @@ function pFillCmp(now) {
     g.fillStyle = c.color; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.strokeStyle = T.surface; g.lineWidth = 1.4; g.stroke();
     g.fillStyle = '#fff'; g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(PS.cmp.indexOf(c) + 1, x, y + 0.5);
   });
+  pCmpTunnel();
 }
 
 /* ===== Pitching: presets, app tabs, boot ===== */
