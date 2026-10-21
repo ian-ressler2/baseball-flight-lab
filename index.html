@@ -77,6 +77,19 @@ button, select, input { font: inherit; color: inherit; }
 .kbd dt { font-family: var(--font-mono); }
 .kbd dd { margin: 0; color: var(--ink-2); }
 .kbd kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 7px; background: var(--surface-2); font-family: var(--font-mono); font-size: 13px; }
+body[data-embed="1"] header.top, body[data-embed="1"] .apptabs, body[data-embed="1"] #inputs { display: none !important; }
+body[data-embed="1"] .app { grid-template-columns: minmax(0, 1fr) !important; grid-template-areas: "stage" "analysis" !important; }
+body[data-embed="1"] .stage-card { position: static; }
+.xtoast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 60; max-width: calc(100vw - 32px); }
+.xtoast[hidden] { display: none; }
+@media print {
+  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, #btn-keys { display: none !important; }
+  body, html { background: #fff !important; color: #000; }
+  .app { display: block !important; }
+  .card { break-inside: avoid; box-shadow: none !important; border-color: #bbb !important; margin-bottom: 10px; }
+  .stage-card { position: static !important; }
+  .stage-wrap { max-height: none !important; }
+}
 .ezonly { display: none; }
 body[data-ez="1"] .ezonly { display: block; }
 body[data-ez="1"] .adv, body[data-ez="1"] #inputs .sp, body[data-ez="1"] #inputs .mcstrip, body[data-ez="1"] #inputs .hint { display: none !important; }
@@ -5776,13 +5789,26 @@ async function xRecordGif(app) {
   xSave(xGif(frames, w, h, 7), (pit ? 'pitch-' : 'hit-') + xStamp() + '.gif');
   st.play.t = t0; draw(); sel.options[0].text = 'Save…';
 }
+let xToastT = 0;
+function xToast(msg) {
+  let t = $('#xtoast'); if (!t) { t = el('div', { class: 'xtoast', id: 'xtoast', role: 'status', 'aria-live': 'polite' }); document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(xToastT); xToastT = setTimeout(() => { t.hidden = true; }, 4500);
+}
+function xEmbed(pit) {
+  const base = location.protocol === 'file:' ? 'https://baseballflightlab.com/' : location.origin + location.pathname;
+  const parts = (location.search || '').replace(/^\?/, '').split('&').filter(x => x && !/^embed=/.test(x)); parts.push('embed=1');
+  const full = base + '?' + parts.join('&') + (pit ? '#pitching' : '');
+  const code = '<iframe src="' + full + '" title="Baseball Flight Lab" width="100%" height="820" style="border:0" loading="lazy"></iframe>';
+  const done = ok => xToast(ok ? 'Embed code copied. Paste it into your page.' : code);
+  try { navigator.clipboard.writeText(code).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+}
 (function xMount() {
   const mk = (id, opts) => { const s = el('select', { id, 'aria-label': 'Save', title: 'Save an image, an animated GIF or the numbers' }); s.appendChild(el('option', { value: '', text: 'Save…' })); opts.forEach(([v, t]) => s.appendChild(el('option', { value: v, text: t }))); return s; };
-  const hs = mk('exp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Ball flight (CSV)']]);
-  const ps = mk('pexp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Pitch track (CSV)'], ['cmp', 'Comparison table (CSV)']]);
+  const hs = mk('exp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Ball flight (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
+  const ps = mk('pexp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Pitch track (CSV)'], ['cmp', 'Comparison table (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
   $('#btn-cam').after(hs); $('#pbtn-cam').after(ps);
-  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
-  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
+  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(false); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
+  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(true); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
 })();
 
 /* ===== Pitching: presets, app tabs, boot ===== */
@@ -5919,6 +5945,7 @@ function setEZ(on) {
 }
 $('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
 
+(function embedBoot() { try { if (/[?&]embed=1/.test(location.search)) document.body.dataset.embed = '1'; } catch (e) {} })();
 (function pboot() {
   buildPitchInputs(); pMountMatch(); pEnvMount(); ezTag();
   // the strip under the Pitch group heading that summarises a live Monte Carlo cloud
