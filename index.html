@@ -338,6 +338,8 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
       </div>
       <button class="btn sm" id="btn-cam" type="button" title="Back to the default 3-D camera (double-click the field does the same)"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 5.5h2.2l1-1.7h5.6l1 1.7H14V13H2zM8 6.6a2.6 2.6 0 100 5.2 2.6 2.6 0 000-5.2z" fill="currentColor"/></svg><span>Reset camera</span></button>
       <div class="toggles">
+        <span class="seg" id="hbat" role="group" aria-label="Batter hits from" title="Which side of the plate the batter stands on. The flight physics is the same either way; it sets the swing animation and which side counts as pull."><button type="button" data-v="R" aria-pressed="true">Right-handed</button><button type="button" data-v="L" aria-pressed="false">Left-handed</button></span>
+        <label title="A batter swings and the pitch arrives before the ball leaves the bat (3-D view)"><input type="checkbox" id="t-swing" checked> Batter swings</label>
         <label><input type="checkbox" id="t-trail" checked> Trail</label>
         <label><input type="checkbox" id="t-forces"> Force vectors</label>
         <label><input type="checkbox" id="t-stands" checked> Stands</label>
@@ -1791,9 +1793,9 @@ const S = {
   p: Object.assign({}, E.DEFAULTS, { ev: 96, la: 28, spray: 6 }),
   sim: null, ctx: null, fencePts: null, dur: 1, bud: null,
   view: '3d', tab: 'flight', app: 'hit',
-  opt: { trail: true, forces: false, compare: false, ens: true },
+  opt: { trail: true, forces: false, compare: false, ens: true, swing: true },
   cam: { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 },
-  play: { t: 0, playing: false, speed: 1, last: 0 },
+  play: { t: 0, playing: false, speed: 1, last: 0, intro: false },
   mc: null, mcStale: false,
   target: null, hf: { rows: null, job: 0, spin: 'auto', tol: 8, busy: false, sel: null },
   sw: { data: null, job: 0, stale: true }, showSpread: true, mcAuto: true
@@ -2201,9 +2203,11 @@ function updatePlayButton() {
   b.innerHTML = (pl ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg>' : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg>') + '<span>' + (pl ? 'Pause' : 'Play') + '</span>';
 }
 function startPlay(fromStart) {
-  if (fromStart || S.play.t >= totalDur() - 0.01) S.play.t = 0;
+  if (fromStart || S.play.t >= totalDur() - 0.01) { const pre = swingOn() ? SW_PRE : 0; S.play.t = -pre; S.play.intro = pre > 0; }
   S.play.playing = true; S.play.last = performance.now(); updatePlayButton(); requestRender();
 }
+// the batter swings (and the pitch arrives) only in the 3-D view; the clock runs negative until contact
+function swingOn() { return !!S.opt.swing && S.view === '3d' && S.app === 'hit'; }
 function stopPlay() { S.play.playing = false; updatePlayButton(); }
 let rafId = 0;
 function requestRender() { if (!rafId) rafId = requestAnimationFrame(loop); }
@@ -2648,13 +2652,50 @@ function drawGhosts(v, t) {
 
 /* ---------- views ---------- */
 function mcOn() { const mc = S.mc; return !!(mc && mc.tracks.length && mc.visible && S.opt.ens); }
-function draw3D(t, st) {
+function draw3D(t, st, tp) {
+  tp = tp === undefined ? t : tp;
+  const sw = swingOn(), keep = sw && S.play.intro ? introCam(tp) : null;
   const v = makeView('3d'); drawField(v); drawPitchLink(v);
-  if (mcOn()) { drawEnsemble(v, t); drawTarget(v); return v; }
+  if (mcOn()) { drawEnsemble(v, t); drawTarget(v); if (sw) drawSwing(v, tp); if (keep) Object.assign(S.cam, keep); return v; }
   drawGhosts(v, t); drawTarget(v);
   if (S.opt.trail) drawMainTrail(v, t);
-  drawLanding(v); drawBall(v, st); if (S.opt.forces) drawForces(v, st);
+  drawLanding(v); if (!(sw && tp < 0)) drawBall(v, st); if (S.opt.forces) drawForces(v, st);
+  if (sw) drawSwing(v, tp);
+  if (keep) Object.assign(S.cam, keep);
   return v;
+}
+// the first second of a played hit starts close on the plate and eases out to the camera the person chose
+const SWING_CAM = { yaw: 2.44, pitch: 0.13, dist: 5.4, tx: 0, ty: 0.4, tz: 1.0 };
+function introCam(tp) {
+  const w = 1 - kseg(tp, 0.2, 1.8);
+  if (w <= 0.002) { S.play.intro = false; return null; }
+  const keep = Object.assign({}, S.cam), C = SWING_CAM, L = (a, b) => a + (b - a) * w;
+  S.cam.yaw = L(keep.yaw, PS.P.bat === 'R' ? -C.yaw : C.yaw); S.cam.pitch = L(keep.pitch, C.pitch); S.cam.dist = Math.exp(L(Math.log(keep.dist), Math.log(C.dist)));
+  S.cam.tx = L(keep.tx, C.tx); S.cam.ty = L(keep.ty, C.ty); S.cam.tz = L(keep.tz, C.tz);
+  return keep;
+}
+function swingAttack() { return S.p.mode === 'bat' ? S.p.attack : clamp(S.sim.meta.la * 0.55, -4, 30); }
+function drawSwing(v, tp) {
+  const tr = S.sim.tr, c = [tr.x[0], tr.y[0], tr.z[0]], g = v.g;
+  const J = batterSwingAt(PS.P, Math.min(tp, SW_POST), c, swingAttack(), S.sim.meta.spray);
+  // the pitch on its way in: released SW_PRE before contact and dropping a little on the way
+  if (tp < 0) {
+    const mph = S.p.mode === 'bat' ? S.p.pitchMph : 92, T = SW_PRE, u = (tp + T) / T, s = mph * MPH * 0.9 * T;
+    const r0 = [PS.P.bat === 'R' ? 0.15 : -0.15, c[1] + s, 1.75], vz = (c[2] - r0[2] + 4.9 * T * T) / T;
+    const at = q => ({ x: r0[0] + (c[0] - r0[0]) * q, y: r0[1] + (c[1] - r0[1]) * q, z: r0[2] + vz * q * T - 4.9 * q * q * T * T });
+    for (let k = 4; k >= 1; k--) { const q = Math.max(0, u - k * 0.035), p = at(q), sp = v.pt(p.x, p.y, p.z); if (sp) { g.fillStyle = 'rgba(255,255,255,' + (0.5 - k * 0.1) + ')'; g.beginPath(); g.arc(sp[0], sp[1], 3.2 - k * 0.4, 0, 7); g.fill(); } }
+    drawBall(v, at(u));
+  }
+  pDrawBatter(v, true, J);
+  // a crack of contact
+  if (tp >= 0 && tp < 0.2) {
+    const p = v.pt(c[0], c[1], c[2]); if (p) {
+      const k = tp / 0.2, R = 6 + 34 * Math.sqrt(k); g.save(); g.globalAlpha = 1 - k; g.strokeStyle = T.accent; g.lineWidth = 2.2;
+      g.beginPath(); g.arc(p[0], p[1], R, 0, 7); g.stroke();
+      for (let i = 0; i < 8; i++) { const an = i / 8 * 6.2832 + 0.4; g.beginPath(); g.moveTo(p[0] + Math.cos(an) * R * 1.15, p[1] + Math.sin(an) * R * 1.15); g.lineTo(p[0] + Math.cos(an) * (R * 1.15 + 9 * (1 - k)), p[1] + Math.sin(an) * (R * 1.15 + 9 * (1 - k))); g.stroke(); }
+      g.restore();
+    }
+  }
 }
 function drawTop(t, st) {
   const v = makeView('top'); drawField(v); drawPitchLink(v);
@@ -2740,12 +2781,12 @@ function render() {
   sizeStage(); if (!S.geo || S.geoKey !== S.fencePts) { buildGeo(); S.geoKey = S.fencePts; }
   readTokensIfNeeded();
   const g = SG; g.clearRect(0, 0, SW, SH);
-  const d = totalDur(), t = clamp(S.play.t, 0, d), st = trackAt(S.sim.tr, Math.min(t, S.sim.tr.t[S.sim.tr.t.length - 1]));
+  const d = totalDur(), tp = clamp(S.play.t, swingOn() ? -SW_PRE : 0, d), t = Math.max(tp, 0), st = trackAt(S.sim.tr, Math.min(t, S.sim.tr.t[S.sim.tr.t.length - 1]));
   S.curState = st;
-  lastView = S.view === 'top' ? drawTop(t, st) : S.view === 'side' ? drawSide(t, st) : draw3D(t, st);
+  lastView = S.view === 'top' ? drawTop(t, st) : S.view === 'side' ? drawSide(t, st) : draw3D(t, st, tp);
   $('#scrub').value = Math.round(t / d * 1000);
-  $('#tread').textContent = t.toFixed(2) + ' / ' + d.toFixed(2) + ' s';
-  updateLive(st, t);
+  $('#tread').textContent = tp.toFixed(2) + ' / ' + d.toFixed(2) + ' s';
+  updateLive(st, t); if (hbatSeen !== PS.P.bat || S.sim !== hbatSim) { hbatSim = S.sim; syncHbat(); }
   if (S.tab === 'flight') { drawFlightCharts(t); drawSpin(st); }
   stageWrap.classList.toggle('wide', S.view === 'side');
   const hf = S.tab === 'hit';
@@ -2785,7 +2826,7 @@ function updateLive(st, t) {
 /* ---------- interaction ---------- */
 const ptr = { down: false, x: 0, y: 0, moved: 0, id: null };
 function stagePos(e) { const r = stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
-stage.addEventListener('pointerdown', e => { const p = stagePos(e); ptr.down = true; ptr.x = p.x; ptr.y = p.y; ptr.moved = 0; ptr.id = e.pointerId; stage.setPointerCapture(e.pointerId); });
+stage.addEventListener('pointerdown', e => { S.play.intro = false; const p = stagePos(e); ptr.down = true; ptr.x = p.x; ptr.y = p.y; ptr.moved = 0; ptr.id = e.pointerId; stage.setPointerCapture(e.pointerId); });
 stage.addEventListener('pointermove', e => {
   const p = stagePos(e);
   if (ptr.down && S.view === '3d') {
@@ -2802,6 +2843,7 @@ stage.addEventListener('pointerup', e => {
 });
 stage.addEventListener('pointerleave', () => { $('#tip').hidden = true; });
 function resetCamera() {
+  S.play.intro = false;
   Object.assign(S.cam, { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 });
   const b = $('#views button[data-view="3d"]'); if (S.view !== '3d' && b) b.click();
   requestRender();
@@ -2810,7 +2852,7 @@ $('#btn-cam').addEventListener('click', resetCamera);
 stage.addEventListener('dblclick', () => { if (S.view === '3d') { Object.assign(S.cam, { yaw: 0.55, pitch: 0.36, dist: 215 }); requestRender(); } });
 stage.addEventListener('wheel', e => {
   if (S.view !== '3d') return; e.preventDefault();
-  S.cam.dist = clamp(S.cam.dist * Math.exp(e.deltaY * 0.0012), 35, 420); requestRender();
+  S.play.intro = false; S.cam.dist = clamp(S.cam.dist * Math.exp(e.deltaY * 0.0012), 35, 420); requestRender();
 }, { passive: false });
 function groundAt(p) { if (!lastView || !lastView.inv) return null; if (S.view === 'side') return null; return lastView.inv(p.x, p.y); }
 function describeSpot(g) {
@@ -2849,9 +2891,25 @@ $('#t-stands').addEventListener('change', e => {
   S.inVer = (S.inVer || 0) + 1; S.mcStale = true;
   recompute(); if (typeof scheduleAutoMC === 'function') scheduleAutoMC(); requestRender();
 });
+$('#t-swing').addEventListener('change', e => { S.opt.swing = e.target.checked; if (!S.opt.swing) S.play.intro = false; requestRender(); });
+// batter handedness is one setting shared with the Pitching app; it never changes the ball flight, only the swing, the pull side and the labels
+let hbatSeen = '', hbatSim = null;
+function syncHbat() {
+  hbatSeen = PS.P.bat; $$('#hbat button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === PS.P.bat)));
+  const sh = document.querySelector('[data-k="spray"] .hint');
+  if (sh && S.sim) {
+    if (!sh.dataset.base) sh.dataset.base = sh.textContent;
+    const a = PS.P.bat === 'R' ? 1 : -1, sp = S.sim.meta.spray, pull = -a * sp, side = Math.abs(sp) < 4 ? 'up the middle' : pull > 0 ? 'pulled' : 'opposite field';
+    sh.textContent = sh.dataset.base + ' · ' + side + ' for a ' + (a > 0 ? 'right' : 'left') + '-handed batter';
+  }
+}
+$('#hbat').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || PS.P.bat === b.dataset.v) return;
+  PS.P.bat = b.dataset.v; pchanged('bat'); pSyncAll(); syncHbat(); requestRender();
+});
 $('#btn-play').addEventListener('click', () => { if (S.play.playing) stopPlay(); else startPlay(false); });
 $('#btn-replay').addEventListener('click', () => startPlay(true));
-$('#scrub').addEventListener('input', e => { stopPlay(); S.play.t = parseFloat(e.target.value) / 1000 * totalDur(); requestRender(); });
+$('#scrub').addEventListener('input', e => { stopPlay(); S.play.intro = false; S.play.t = parseFloat(e.target.value) / 1000 * totalDur(); requestRender(); });
 $('#speed').addEventListener('change', e => { S.play.speed = parseFloat(e.target.value); });
 new ResizeObserver(() => requestRender()).observe(stageWrap);
 
@@ -4493,6 +4551,67 @@ function batterAt(P) {
     elL: elL.j, wrL: elL.end, elB: elB.j, wrB: elB.end, hands, handL, head, headR, knob, tip, sw, hw, thigh, shank };
 }
 
+/* ---------- batter swing (hitting app) ---------- */
+// Time is seconds from contact (negative = before). The pitch is released SW_PRE before contact; the finish settles SW_POST after.
+const SW_PRE = 0.46, SW_POST = 0.55;
+function slerp3(a, b, k) {
+  const w = Math.acos(clamp(V3.dot(a, b), -1, 1)); if (w < 1e-4) return b;
+  const s = Math.sin(w); return V3.add(V3.mul(a, Math.sin((1 - k) * w) / s), V3.mul(b, Math.sin(k * w) / s));
+}
+function rotZ(v, o, th) { const dx = v[0] - o[0], dy = v[1] - o[1], c = Math.cos(th), s = Math.sin(th); return [o[0] + dx * c - dy * s, o[1] + dx * s + dy * c, v[2]]; }
+// c = where the barrel meets the ball, att = attack angle (deg), psi = spray angle (deg, + toward right field).
+// A swing sends the ball along the barrel's path, so the bat lies across that path: out in front of the hands for a pulled ball, behind them for an opposite-field one.
+function batterSwingAt(P, tau, c, att, psi) {
+  const J0 = batterAt(P), a = J0.a, sd = J0.sd, H = J0.H;
+  const sr = psi * D2R, ar = clamp(att, -8, 38) * D2R;
+  const axis = V3.nrm([a * Math.cos(sr) * Math.cos(ar), -a * Math.sin(sr) * Math.cos(ar), -Math.sin(ar) * 0.9]);
+  const hC = V3.sub(c, V3.mul(axis, 0.60));
+  // progress curves
+  const ld = kseg(tau, -0.42, -0.24), sLift = kseg(tau, -0.36, -0.27) * (1 - kseg(tau, -0.27, -0.17)), sSt = kseg(tau, -0.34, -0.17);
+  const sw = Math.pow(klin(tau, -0.22, 0), 1.7), fo = klin(tau, 0, 0.5), fe = 1 - (1 - fo) * (1 - fo);
+  const phiC = 82 * D2R, phi = tau <= 0 ? phiC * Math.pow(klin(tau, -0.22, 0), 1.5) : phiC + 48 * D2R * (1 - Math.pow(1 - klin(tau, 0, 0.45), 2));
+  const th = a * phi * 0.72, thS = a * phi;
+  // pelvis
+  const pelvis = [J0.pelvis[0] + a * 0.07 * sSt, J0.pelvis[1] + 0.20 * sSt - 0.05 * ld, J0.pelvis[2] - 0.035 * ld - 0.03 * sSt + 0.02 * fe];
+  const b = [-a * Math.sin(phi * 0.72), Math.cos(phi * 0.72), 0];
+  const hipL = V3.add(pelvis, V3.mul(b, J0.hw / 2)), hipB = V3.sub(pelvis, V3.mul(b, J0.hw / 2));
+  // feet
+  const ankH = J0.ankL[2], ftd = 0.115 * H;
+  const ankB = [J0.ankB[0], J0.ankB[1], ankH + 0.07 * kseg(tau, -0.08, 0.12)];
+  const ankL = [J0.ankL[0] + a * 0.04 * sSt, J0.ankL[1] + 0.21 * sSt, ankH + 0.15 * sLift];
+  const toeB = [ankB[0] + ftd * a * Math.cos(phi * 0.72), ankB[1] + ftd * Math.sin(phi * 0.72), J0.toeB[2]];
+  const phF = phi * 0.35 * kseg(tau, -0.2, -0.1);
+  const toeL = [ankL[0] + ftd * a * Math.cos(phF), ankL[1] + ftd * Math.sin(phF), J0.toeL[2] + 0.08 * sLift];
+  const pole = (x, y, z) => { const q = rotZ([x, y, 0], [0, 0, 0], th * 0.6); return V3.nrm([q[0], q[1], z]); };
+  const knL = ik2(hipL, ankL, J0.thigh, J0.shank, pole(a * 0.9, 0.35, 0.2)), knB = ik2(hipB, ankB, J0.thigh, J0.shank, pole(a * 0.9, -0.35, 0.2));
+  // trunk
+  const trunk = V3.len(V3.sub(J0.SC, J0.pelvis)), lean = (28 - 36 * kseg(tau, -0.2, 0.05) + 8 * fe) * D2R;
+  const u = V3.nrm([a * Math.sin(lean), 0, Math.cos(lean)]), SC = V3.add(pelvis, V3.mul(u, trunk));
+  const es = [-a * Math.sin(phi), Math.cos(phi), 0], f = [a * Math.cos(phi), Math.sin(phi), 0];
+  const shL = V3.add(V3.add(SC, V3.mul(es, J0.sw / 2)), [0, 0, (0.012 + 0.03 * kseg(tau, -0.2, 0)) * H]);
+  const shB = V3.add(V3.sub(SC, V3.mul(es, J0.sw / 2)), [0, 0, -(0.012 + 0.04 * kseg(tau, -0.2, 0)) * H]);
+  const head = V3.add(V3.add(SC, V3.mul(V3.nrm(V3.add(u, [0, 0, 1])), 0.117 * H)), [a * 0.02 * H * (1 - kseg(tau, -0.2, 0)), 0.012 * H, 0]);
+  // bat: stance -> load -> swing to the ball -> wrap over the lead shoulder
+  const d0 = V3.nrm(V3.sub(J0.tip, J0.knob)), h0 = J0.hands, dLoad = V3.nrm([-a * 0.15, -0.5, 0.85]), hLoad = V3.add(h0, [0, -0.08, 0.04]);
+  let hands, d;
+  if (tau <= 0) {
+    if (tau < -0.22) { hands = V3.lerp(h0, hLoad, ld); d = slerp3(d0, dLoad, ld); }
+    else { hands = V3.lerp(hLoad, hC, sw); d = slerp3(dLoad, axis, Math.pow(sw, 1.15)); }
+  } else {
+    const hF = V3.add(V3.add(shL, V3.mul(f, -0.04 * H)), [0, 0, 0.10 * H]);
+    const dF = V3.nrm(V3.add(V3.add(V3.mul(f, -0.55), V3.mul(es, -0.55)), [0, 0, 0.35]));
+    hands = V3.lerp(hC, hF, fe); d = slerp3(axis, dF, fe);
+  }
+  const knob = V3.sub(hands, V3.mul(d, 0.06)), tip = V3.add(knob, V3.mul(d, 0.86));
+  const hl = 0.145 * 0.385 * H, armR = 0.455 * 0.385 * H, armF = 0.40 * 0.385 * H;
+  const handL = V3.add(hands, V3.mul(d, 0.10));
+  const wrB = V3.sub(hands, V3.mul(V3.nrm(V3.sub(hands, shB)), hl)), wrL = V3.sub(handL, V3.mul(V3.nrm(V3.sub(handL, shL)), hl));
+  const bp = rotZ([-a * 0.2, -0.7, 0], [0, 0, 0], thS * 0.7);
+  const elB = ik2(shB, wrB, armR, armF, V3.nrm([bp[0], bp[1], 0.55])), elL = ik2(shL, wrL, armR, armF, V3.nrm([a * 0.3, 0.2, -0.9]));
+  return { sd, a, H, pelvis, SC, u, es, hipL, hipB, kneeL: knL.j, kneeB: knB.j, ankL, ankB, toeL, toeB, shL, shB,
+    elL: elL.j, wrL: elL.end, elB: elB.j, wrB: elB.end, hands, handL, head, headR: J0.headR, knob, tip, sw: J0.sw, hw: J0.hw, thigh: J0.thigh, shank: J0.shank };
+}
+
 /* ---------- renderer ---------- */
 /* Each part is a group of shapes with one colour. A shape is a capsule {a, b, ra, rb} (joint to joint, radii in metres),
  * a ball {c, r}, or a rounded polygon {pts, pad}. Groups are drawn far to near, outline first so a group is one piece. */
@@ -4502,7 +4621,7 @@ function pFigDraw(v, groups, o) {
   const g0 = v.g; let g = g0, off = null;
   if (o.alpha !== undefined && o.alpha < 1) {
     if (!PFC) PFC = document.createElement('canvas');
-    if (PFC.width !== pstage.width || PFC.height !== pstage.height) { PFC.width = pstage.width; PFC.height = pstage.height; }
+    const cv0 = g0.canvas || pstage; if (PFC.width !== cv0.width || PFC.height !== cv0.height) { PFC.width = cv0.width; PFC.height = cv0.height; }
     off = PFC.getContext('2d'); off.setTransform(1, 0, 0, 1, 0, 0); off.clearRect(0, 0, PFC.width, PFC.height); off.setTransform(g0.getTransform()); g = off;
   }
   const depth = (p) => v.persp ? v.cam(p[0], p[1], p[2])[2] : v.depth(p);
@@ -4597,10 +4716,10 @@ function pHandTrace(v, J) {
   if (J.tau > 0) for (let t = 0; t <= J.tau; t += 0.03) pts.push(pitcherAt(PS.P, t, true).hand);
   if (pts.length > 1) { v.g.save(); v.g.globalAlpha = 0.7; v.line(pts, T.accent, 1.6, [2, 3]); v.g.restore(); }
 }
-function pDrawBatter(v, withBat) {
-  const J = batterAt(PS.P), H = J.H, cap = (a, b, ra, rb) => ({ a, b, ra: ra * H, rb: (rb === undefined ? ra : rb) * H });
+function pDrawBatter(v, withBat, pose) {
+  const J = pose || batterAt(PS.P), H = J.H, cap = (a, b, ra, rb) => ({ a, b, ra: ra * H, rb: (rb === undefined ? ra : rb) * H });
   const body = T['ink-2'], dark = T.ink, G = [];
-  const leg = (hip, kn, an, toe) => { G.push({ col: body, s: [cap(hip, kn, 0.052, 0.042), cap(kn, an, 0.040, 0.029)] }); G.push({ col: dark, s: [cap([an[0] - (toe[0] - an[0]) * 0.35, an[1], an[2] - 0.02 * H], toe, 0.030, 0.027)] }); };
+  const leg = (hip, kn, an, toe) => { G.push({ col: body, s: [cap(hip, kn, 0.052, 0.042), cap(kn, an, 0.040, 0.029)] }); G.push({ col: dark, s: [cap([an[0] - (toe[0] - an[0]) * 0.35, an[1] - (toe[1] - an[1]) * 0.35, an[2] - 0.02 * H], toe, 0.030, 0.027)] }); };
   leg(J.hipL, J.kneeL, J.ankL, J.toeL); leg(J.hipB, J.kneeB, J.ankB, J.toeB);
   G.push({ col: body, s: [cap(J.hipL, J.hipB, 0.060, 0.060), cap(J.pelvis, J.SC, 0.072, 0.080), { pts: [J.shL, J.shB, J.hipB, J.hipL], pad: 0.036 * H }, { c: J.shL, r: 0.050 * H }, { c: J.shB, r: 0.050 * H }] });
   const arm = (sh, el, wr, hd) => G.push({ col: body, s: [cap(sh, el, 0.037, 0.031), cap(el, wr, 0.031, 0.024), cap(wr, hd, 0.024, 0.021)] });
