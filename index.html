@@ -62,6 +62,17 @@ button, select, input { font: inherit; color: inherit; }
 .brand h1 { font-size: 34px; line-height: 1; text-transform: uppercase; letter-spacing: .03em; }
 .brand h1 b { color: var(--accent); font-weight: 700; }
 .brand p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.ezsw { cursor: pointer; position: relative; margin-right: 12px; }
+.ezsw input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ezsw .trk { width: 34px; height: 18px; border-radius: 9px; background: var(--line); position: relative; transition: background .15s; flex: none; }
+.ezsw .trk::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg); box-shadow: 0 0 0 1px var(--muted); transition: transform .15s; }
+.ezsw input:checked + .trk { background: var(--accent); }
+.ezsw input:checked + .trk::after { transform: translateX(16px); box-shadow: none; }
+.ezsw input:focus-visible + .trk { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ezonly { display: none; }
+body[data-ez="1"] .ezonly { display: block; }
+body[data-ez="1"] .adv, body[data-ez="1"] #inputs .sp, body[data-ez="1"] #inputs .mcstrip, body[data-ez="1"] #inputs .hint { display: none !important; }
+.ezonly.note { margin: 0 0 10px; padding: 7px 10px; border: 1px dashed var(--line); border-radius: 4px; }
 .top-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .top-controls label { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
 
@@ -269,6 +280,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
     <p id="subtitle">Three-dimensional batted-ball trajectories with drag, Magnus lift, weather, Monte Carlo and a reverse hit finder.</p>
   </div>
   <div class="top-controls">
+    <label class="ezsw" title="EZ mode hides the advanced controls, tabs and options and keeps the basics. The app always opens in Advanced mode."><input type="checkbox" id="ez-switch" role="switch" aria-label="EZ mode"><span class="trk" aria-hidden="true"></span><span>EZ mode</span></label>
     <label>Preset <select id="preset" aria-label="Load a preset"></select></label>
     <button class="btn" id="btn-reset" type="button" title="Put every input, the field and the views back to their starting values"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Reset</span></button>
   </div>
@@ -1850,7 +1862,7 @@ function buildInputs() {
     if (g.app) det.dataset.app = g.app;
     det.appendChild(el('summary', { text: g.title }));
     const body = el('div', { class: 'grp' });
-    g.items.forEach(it => body.appendChild(buildItem(it)));
+    g.items.forEach(it => { const n = buildItem(it); n.dataset.k = it.key || it.type; body.appendChild(n); });
     det.appendChild(body); root.appendChild(det);
   });
   applyMode();
@@ -3572,7 +3584,7 @@ function buildPitchInputs() {
   const make = g => {
     const det = el('details', Object.assign({ 'data-app': 'pitch', id: 'grp-' + g.id }, g.open ? { open: '' } : {}));
     det.appendChild(el('summary', { text: g.title }));
-    const body = el('div', { class: 'grp' }); g.items.forEach(it => body.appendChild(buildPitchItem(it))); det.appendChild(body);
+    const body = el('div', { class: 'grp' }); g.items.forEach(it => { const n = buildPitchItem(it); n.dataset.k = it.k || it.type; body.appendChild(n); }); det.appendChild(body);
     return det;
   };
   let anchor = $('#grp-contact');
@@ -5472,8 +5484,8 @@ function pFillCmp(now) {
   box.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th></th><th class="l">Pitch</th><th class="l">Pitcher</th><th>Out of hand mph</th><th>Spin rpm / eff. %</th><th>At plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Plate vs. first (in)</th><th>Tunnel gap (in)</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     (PS.cmpSrc ? '<p class="note"><b>Source.</b> ' + PS.cmpSrc + (PS.cmp.some(c => c.real) ? ' Each pitch’s spin direction and lift were solved so the model’s induced break matches the published figure: ' + PS.cmp.filter(c => c.real).map(c => fmt(c.real.ivb, 1) + '/' + fmt(c.real.hb, 1) + ' → ' + fmt(c.real.fit.ivb, 1) + '/' + fmt(c.real.fit.hb, 1)).join(', ') + ' in (vertical/arm-side).' : '') + '</p>' : '') +
     '<p class="note">“Plate vs. first” and “Tunnel gap” compare each pitch with the first one shown in the list. Vertical and arm-side break are induced movement, measured from each pitcher’s own side.</p>' +
-    '<h3>Tunneling <small>how long the pitches look alike, and where they come apart</small></h3><div id="pcmp-tunt"></div><canvas class="plot" id="pcmp-tun" height="260"></canvas>' +
-    '<div id="pcmp-mcout"></div>' +
+    '<div class="adv"><h3>Tunneling <small>how long the pitches look alike, and where they come apart</small></h3><div id="pcmp-tunt"></div><canvas class="plot" id="pcmp-tun" height="260"></canvas>' +
+    '<div id="pcmp-mcout"></div></div>' +
     '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="pcmp-mv" height="320"></canvas>';
   const { g, W, H } = setupCv($('#pcmp-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
   const ax = axes(g, W, H, m, -R, R, -R, R, 'toward the glove side  ←   horizontal (in)   →  toward the arm side', 'vertical (in)');
@@ -5561,8 +5573,38 @@ function setApp(app) {
 }
 $('#apptabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setApp(b.dataset.app); });
 
+/* ---------- EZ mode: the same app with only the basics showing ---------- */
+const EZ_KEEP = new Set(['mode', 'ev', 'la', 'spray', 'batMph', 'pitchMph', 'attack', 'park', 'wind', 'tempF', 'windMph', 'windDir',
+  'hand', 'delivery', 'height', 'slot', 'ptype', 'velo', 'spin', 'aim', 'tx', 'tz', 'tgrid']);
+const EZ_GROUPS = ['aero', 'coll', 'match', 'batter', 'swing', 'paero'];
+const EZ_TABS = { hit: ['mc', 'sweep', 'phys'], pitch: ['mc', 'types', 'bat', 'phys'] };
+function ezTag() {
+  $$('#inputs > details').forEach(d => {
+    const gid = d.id.replace('grp-', '');
+    if (EZ_GROUPS.indexOf(gid) >= 0) { d.classList.add('adv'); return; }
+    $$('.grp > [data-k]', d).forEach(n => n.classList.toggle('adv', !EZ_KEEP.has(n.dataset.k)));
+  });
+  const tag = (sel, root) => $$(sel).forEach(n => { const t = n.closest('label') || n; t.classList.add('adv'); });
+  tag('#pt-hand, #pt-zones, #pt-arsenal, #t-forces, #t-compare');
+  $('#pt-arsmode').classList.add('adv');
+  EZ_TABS.pitch.forEach(t => $('#ptabs [data-tab="' + t + '"]').classList.add('adv'));
+  EZ_TABS.hit.forEach(t => $('#tabs [data-tab="' + t + '"]').classList.add('adv'));
+  tag('#pcmp-mode, #pcmp-tunnel, #pcmp-save, #pcmp-load, #pcmp-share, #pcmp-seq, #pcmp-gap, #pcmp-mcn, #pcmp-mc, #pcmp-mcshow');
+  $('#inputs').insertBefore(el('p', { class: 'note ezonly', text: 'EZ mode shows the basics. Switch it off at the top for every control.' }), $('#inputs').firstChild);
+}
+function setEZ(on) {
+  document.body.dataset.ez = on ? '1' : '';
+  const sw = $('#ez-switch'); if (sw.checked !== on) sw.checked = on;
+  if (on) {
+    if (EZ_TABS.hit.indexOf(S.tab) >= 0) showTab('flight');
+    if (EZ_TABS.pitch.indexOf(PS.tab) >= 0) pShowTab('data');
+  }
+  requestRender(); if (typeof pRequestRender === 'function') pRequestRender();
+}
+$('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
+
 (function pboot() {
-  buildPitchInputs(); pMountMatch();
+  buildPitchInputs(); pMountMatch(); ezTag();
   // the strip under the Pitch group heading that summarises a live Monte Carlo cloud
   const grp = $('#grp-pitch .grp'); if (grp) grp.insertBefore(el('div', { class: 'mcstrip', id: 'pmc-strip', hidden: '' }), grp.firstChild);
   PI.applyType(PS.P, PS.P.type, false); PS.P0 = Object.assign({}, PS.P);
