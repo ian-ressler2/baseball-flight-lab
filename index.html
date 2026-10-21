@@ -69,6 +69,14 @@ button, select, input { font: inherit; color: inherit; }
 .ezsw input:checked + .trk { background: var(--accent); }
 .ezsw input:checked + .trk::after { transform: translateX(16px); box-shadow: none; }
 .ezsw input:focus-visible + .trk { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kbd-back { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 45%, transparent); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.kbd-back[hidden] { display: none; }
+.kbd { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; max-width: 460px; width: 100%; max-height: 90vh; overflow: auto; }
+.kbd h2 { margin: 0 0 10px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: 20px; }
+.kbd dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0 0 12px; }
+.kbd dt { font-family: var(--font-mono); }
+.kbd dd { margin: 0; color: var(--ink-2); }
+.kbd kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 7px; background: var(--surface-2); font-family: var(--font-mono); font-size: 13px; }
 .ezonly { display: none; }
 body[data-ez="1"] .ezonly { display: block; }
 body[data-ez="1"] .adv, body[data-ez="1"] #inputs .sp, body[data-ez="1"] #inputs .mcstrip, body[data-ez="1"] #inputs .hint { display: none !important; }
@@ -287,6 +295,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
   <div class="top-controls">
     <label class="ezsw" title="EZ mode hides the advanced controls, tabs and options and keeps the basics. The app always opens in Advanced mode."><input type="checkbox" id="ez-switch" role="switch" aria-label="EZ mode"><span class="trk" aria-hidden="true"></span><span>EZ mode</span></label>
     <label>Preset <select id="preset" aria-label="Load a preset"></select></label>
+    <button class="btn" id="btn-keys" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (press ?)">?</button>
     <button class="btn" id="btn-reset" type="button" title="Put every input, the field and the views back to their starting values"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Reset</span></button>
   </div>
 </header>
@@ -5771,6 +5780,36 @@ function setApp(app) {
   window.scrollTo(0, 0);
 }
 $('#apptabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setApp(b.dataset.app); });
+
+/* ---------- keyboard shortcuts ---------- */
+const KEYS = [['Space', 'Throw, pause or resume'], ['R', 'Replay from the release'], ['1 2 3 4', 'Switch the view (Plate, Side, Overhead, 3-D)'], ['T', 'Real time (Pitching)'], ['C', 'Open the Compare tab (Pitching)'], ['A', 'Switch between Hitting and Pitching'], ['E', 'Turn EZ mode on or off'], ['?', 'Show or hide this list'], ['Esc', 'Close this list']];
+(function kbdMount() {
+  const back = el('div', { class: 'kbd-back', id: 'kbd-back', hidden: '' });
+  const box = el('div', { class: 'kbd', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Keyboard shortcuts' });
+  box.appendChild(el('h2', { text: 'Keyboard shortcuts' }));
+  const dl = el('dl'); KEYS.forEach(([k, t]) => { dl.appendChild(el('dt', {}, k.split(' ').map(x => el('kbd', { text: x })))); dl.appendChild(el('dd', { text: t })); });
+  box.appendChild(dl); box.appendChild(el('button', { class: 'btn', type: 'button', id: 'kbd-close', text: 'Close' }));
+  back.appendChild(box); document.body.appendChild(back);
+  const show = on => { back.hidden = !on; if (on) $('#kbd-close').focus(); };
+  $('#btn-keys').addEventListener('click', () => show(back.hidden));
+  $('#kbd-close').addEventListener('click', () => show(false));
+  back.addEventListener('click', e => { if (e.target === back) show(false); });
+  window.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target, tag = t && t.tagName; if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+    const k = e.key, pit = S.app === 'pitch';
+    if (k === 'Escape') { if (!back.hidden) show(false); return; }
+    if (k === '?') { e.preventDefault(); show(back.hidden); return; }
+    if (!back.hidden) return;
+    const click = sel => { const n = $(sel); if (n) { e.preventDefault(); n.click(); } };
+    if (k === 'r' || k === 'R') click(pit ? '#pbtn-replay' : '#btn-replay');
+    else if (/^[1-4]$/.test(k)) click((pit ? '#pviews' : '#views') + ' button:nth-child(' + k + ')');
+    else if ((k === 't' || k === 'T') && pit) click('#pbtn-real');
+    else if ((k === 'c' || k === 'C') && pit) click('#ptabs button[data-tab="cmp"]');
+    else if (k === 'a' || k === 'A') click('#apptabs button[aria-selected="false"]');
+    else if (k === 'e' || k === 'E') { e.preventDefault(); setEZ(document.body.dataset.ez !== '1'); }
+  });
+})();
 
 /* ---------- EZ mode: the same app with only the basics showing ---------- */
 const EZ_KEEP = new Set(['mode', 'ev', 'la', 'spray', 'batMph', 'pitchMph', 'attack', 'park', 'wind', 'tempF', 'windMph', 'windDir',
