@@ -244,6 +244,11 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
 .matchcard .mc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
 .matchcard h3 { margin: 0; }
 .matchcard .mc-sub { color: var(--muted); font-size: 13px; }
+.penv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.penv-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.penv-side label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink-2); }
+.penv-side select, .penv-side input { width: 100%; min-width: 0; }
+@media (max-width: 560px) { .penv-grid { grid-template-columns: 1fr; } }
 .matchcard .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .matchcard label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); min-width: 0; }
 .matchcard .mc-in { display: flex; align-items: center; gap: 6px; }
@@ -5471,6 +5476,43 @@ function pCmpPairs() {
   g.fillText('solid = ball at the decision point (' + fmt(PS.tunnel, 1) + ' ft out) · ring = where it ends up', m.l + 6, m.t + 2);
 }
 
+/* ---------- park and weather side by side: the same throw, in two places ---------- */
+function pEnvFor(side) {
+  const sel = $('#penv-' + side + '-park').value, e = Object.assign({}, S.p);
+  if (sel) { const pk = E.PARKS[sel]; Object.assign(e, { park: sel, elevFt: pk.elevFt, latitude: pk.lat, cfAz: pk.cfAz, rh: pk.roof === 2 ? 50 : pk.rh, roofClosed: pk.roof === 2 }); }
+  const v = k => parseFloat($('#penv-' + side + '-' + k).value);
+  if (isFinite(v('t'))) e.tempF = v('t'); if (isFinite(v('w'))) e.windMph = Math.max(0, v('w')); if (isFinite(v('d'))) e.windDir = v('d');
+  return e;
+}
+function pEnvMount() {
+  const host = $('#penv-host'); if (!host) return;
+  const keys = Object.keys(E.PARKS).filter(k => E.PARKS[k].key === k).sort((a, b) => E.PARKS[a].name.localeCompare(E.PARKS[b].name));
+  const opts = '<option value="">Current settings (left panel)</option>' + keys.map(k => '<option value="' + k + '">' + E.PARKS[k].name + (E.PARKS[k].team ? ' · ' + E.PARKS[k].team : '') + '</option>').join('');
+  const side = (k, name) => '<div class="penv-side"><b>' + name + '</b><label>Ballpark<select id="penv-' + k + '-park">' + opts + '</select></label><div class="field-row" style="gap:8px"><label style="flex:1 1 30%">Temp (°F)<input type="number" id="penv-' + k + '-t" step="1" min="0" max="120"></label><label style="flex:1 1 30%">Wind (mph)<input type="number" id="penv-' + k + '-w" step="1" min="0" max="45"></label><label style="flex:1 1 30%">Toward (°)<input type="number" id="penv-' + k + '-d" step="5" min="0" max="359"></label></div></div>';
+  host.innerHTML = '<h3>Park and weather side by side <small>the same throw, released the same way, in two places</small></h3><div class="penv-grid">' + side('a', 'A') + side('b', 'B') + '</div><div id="penv-out"></div>';
+  const fill = k => { const sel = $('#penv-' + k + '-park').value, pk = sel && E.PARKS[sel]; $('#penv-' + k + '-t').value = pk ? (pk.roof === 2 ? 72 : pk.tempF) : S.p.tempF; $('#penv-' + k + '-w').value = pk && pk.roof === 2 ? 0 : S.p.windMph; $('#penv-' + k + '-d').value = S.p.windDir; };
+  $('#penv-b-park').value = 'col'; fill('a'); fill('b');
+  ['a', 'b'].forEach(k => { $('#penv-' + k + '-park').addEventListener('change', () => { fill(k); pEnvRun(); }); ['t', 'w', 'd'].forEach(q => $('#penv-' + k + '-' + q).addEventListener('input', pEnvRun)); });
+  host.classList.add('adv');
+}
+function pEnvRun() {
+  const out = $('#penv-out'); if (!out || !$('#penv-a-park')) return;
+  const eA = pEnvFor('a'), eB = pEnvFor('b');
+  const list = PS.cmp.filter(c => c.vis && c.res && c.res.thV !== undefined).map(c => ({ P: c.P2 || c.P, res: c.res, label: (PS.cmp.indexOf(c) + 1) + ' ' + c.label, color: c.color }));
+  if (!list.length && PS.sim && PS.sim.thV !== undefined) list.push({ P: PS.P, res: PS.sim, label: 'The pitch on the left', color: T.accent });
+  if (!list.length) { out.innerHTML = '<p class="note">Add a pitch to the comparison, or set one on the left.</p>'; return; }
+  const run = (x, e) => PI.run(Object.assign({}, x.P, { aim: 'angles', angV: x.res.thV, angH: x.res.thH }), e, { record: false, twin: true, dt: 0.0015 });
+  const rows = list.map(x => {
+    let A, B; try { A = run(x, eA); B = run(x, eB); } catch (er) { return ''; }
+    const dx = B.plate.x - A.plate.x, dz = B.plate.z - A.plate.z;
+    return '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + x.color + ';margin-right:6px"></i>' + x.label.replace(/</g, '&lt;') + '</td><td>' + fmt(A.ivb, 1) + ' / ' + fmt(B.ivb, 1) + '</td><td>' + fmt(A.hbArm, 1) + ' / ' + fmt(B.hbArm, 1) + '</td><td>' + fmt(A.plate.speed, 1) + ' / ' + fmt(B.plate.speed, 1) + '</td><td>' + sgn(A.plate.x, 1) + ', ' + fmt(A.plate.z, 1) + '</td><td>' + sgn(B.plate.x, 1) + ', ' + fmt(B.plate.z, 1) + '</td><td><b>' + sgn(dx, 1) + ', ' + sgn(dz, 1) + '</b></td></tr>';
+  }).join('');
+  const nm = e => (e.park && E.PARKS[e.park] ? E.PARKS[e.park].name : 'current settings') + ', ' + fmt(e.tempF, 0) + ' °F, ' + fmt(e.elevFt, 0) + ' ft' + (e.windMph > 0.05 && !e.roofClosed ? ', wind ' + fmt(e.windMph, 0) + ' mph' : '');
+  out.innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Vert. break A / B (in)</th><th>Arm-side break A / B (in)</th><th>At plate A / B (mph)</th><th>Lands in A (x, z in)</th><th>Lands in B (x, z in)</th><th>B − A (x, z in)</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="note"><b>A:</b> ' + nm(eA) + '. <b>B:</b> ' + nm(eB) + '. Each pitch leaves the hand at the same speed, spin and angles in both places, so every difference is the air: thinner air at altitude, hotter air, humidity or wind.</p>';
+  pCardify(out);
+}
+
 /* ---------- Monte Carlo for every pitch in the comparison ---------- */
 function pCmpMcSpec() {
   const dist = $('#pmc-dist') ? $('#pmc-dist').value : 'gauss', spec = {};
@@ -5506,10 +5548,11 @@ function pCmpMcTable() {
   const box = $('#pcmp-mcout'); if (!box) return;
   const list = PS.cmp.filter(c => c.vis && c.mcObj && c.mcObj.done >= c.mcObj.n && c.mcObj.sx);
   if (!list.length) { box.innerHTML = ''; return; }
+  const cov = mc => { const reg = {}; (mc.region || []).forEach(q => { reg[q] = (reg[q] || 0) + 1; }); const n = (mc.region || []).length || 1; return ['heart', 'edge', 'shadow', 'chase', 'waste'].map(k => '<td>' + fmt((reg[k] || 0) / n * 100, 0) + ' %</td>').join(''); };
   const rows = list.map(c => { const mc = c.mcObj, e = mc.ell68;
-    return '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:6px"></i>' + (PS.cmp.indexOf(c) + 1) + ' ' + c.label.replace(/</g, '&lt;') + '</td><td>' + fmt(mc.strikePct, 0) + ' %</td><td>' + fmt(mc.dirtPct, 0) + ' %</td><td>' + sgn(mc.sx.mean, 1) + ', ' + fmt(mc.sz.mean, 1) + '</td><td>' + fmt(mc.sx.sd, 1) + ' / ' + fmt(mc.sz.sd, 1) + '</td><td>' + (e ? fmt(Math.PI * e.a * e.b, 0) : '–') + '</td></tr>'; }).join('');
-  box.innerHTML = '<h3>Where each pitch lands, with its own spread <small>' + list[0].mcObj.n + ' pitches each, using the spreads on the Monte Carlo tab</small></h3><div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Strikes</th><th>In the dirt</th><th>Mean plate x, z (in)</th><th>Spread x / z (in, 1 sd)</th><th>68 % area (sq in)</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-    '<p class="note">Each cloud is drawn in the pitch’s own colour in the plate view, with its 68 % ellipse. Tick “Show the clouds” under the Compare overlay to turn them on or off.</p>';
+    return '<tr><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:6px"></i>' + (PS.cmp.indexOf(c) + 1) + ' ' + c.label.replace(/</g, '&lt;') + '</td><td>' + fmt(mc.strikePct, 0) + ' %</td>' + cov(mc) + '<td>' + fmt(mc.dirtPct, 0) + ' %</td><td>' + sgn(mc.sx.mean, 1) + ', ' + fmt(mc.sz.mean, 1) + '</td><td>' + fmt(mc.sx.sd, 1) + ' / ' + fmt(mc.sz.sd, 1) + '</td><td>' + (e ? fmt(Math.PI * e.a * e.b, 0) : '–') + '</td></tr>'; }).join('');
+  box.innerHTML = '<h3>Where each pitch lands, with its own spread <small>' + list[0].mcObj.n + ' pitches each, using the spreads on the Monte Carlo tab</small></h3><div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Strikes</th><th>Heart</th><th>Edge</th><th>Shadow</th><th>Chase</th><th>Waste</th><th>In the dirt</th><th>Mean plate x, z (in)</th><th>Spread x / z (in, 1 sd)</th><th>68 % area (sq in)</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="note">Heart, edge, shadow, chase and waste split every pitch by where it crossed the plate (the same zones as Attack zones in the plate view), so you can see how much of each pitch’s spread lands where. Each cloud is drawn in the pitch’s own colour in the plate view, with its 68 % ellipse. Tick “Show the clouds” under the Compare overlay to turn them on or off.</p>';
   pCardify(box);
 }
 
@@ -5546,7 +5589,7 @@ function pCardify(root) {
     '<label>Monte Carlo pitches each<input type="number" id="pcmp-mcn" value="200" min="20" max="1500" step="20"></label><button class="btn" id="pcmp-mc" type="button" title="Throw many of each pitch with the spreads from the Monte Carlo tab">Run Monte Carlo on all</button><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pcmp-mcshow" checked> Show the clouds</label><span class="note" id="pcmp-mcnote"></span>' +
     '<button class="btn" id="pcmp-clear" type="button">Clear all</button><span class="note" id="pcmp-note"></span></div></div>' +
     '<p class="note" id="pcmp-msg" aria-live="polite"></p><input type="text" id="pcmp-link" readonly hidden aria-label="Share link" style="width:100%">' +
-    '<div id="pcmp-out"></div>';
+    '<div id="penv-host"></div><div id="pcmp-out"></div>';
   const add = $('#pcmp-add');
   add.addEventListener('click', () => pCmpAdd(PS.P));
   $('#pcmp-type').addEventListener('change', e => { const k = e.target.value; e.target.value = ''; if (!k) return; const P2 = Object.assign({}, PS.P); PI.applyType(P2, k, false); P2.aim = 'target'; pCmpAdd(P2); });
@@ -5643,7 +5686,7 @@ function pFillCmp(now) {
     g.fillStyle = c.color; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.strokeStyle = T.surface; g.lineWidth = 1.4; g.stroke();
     g.fillStyle = '#fff'; g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(PS.cmp.indexOf(c) + 1, x, y + 0.5);
   });
-  pCmpTunnel(); pCmpPairs(); pCmpMcTable(); pCardify($('#pcmp-out'));
+  pCmpTunnel(); pCmpPairs(); pCmpMcTable(); pEnvRun(); pCardify($('#pcmp-out'));
 }
 
 /* ===== Pitching: presets, app tabs, boot ===== */
@@ -5751,7 +5794,7 @@ function setEZ(on) {
 $('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
 
 (function pboot() {
-  buildPitchInputs(); pMountMatch(); ezTag();
+  buildPitchInputs(); pMountMatch(); pEnvMount(); ezTag();
   // the strip under the Pitch group heading that summarises a live Monte Carlo cloud
   const grp = $('#grp-pitch .grp'); if (grp) grp.insertBefore(el('div', { class: 'mcstrip', id: 'pmc-strip', hidden: '' }), grp.firstChild);
   PI.applyType(PS.P, PS.P.type, false); PS.P0 = Object.assign({}, PS.P);
