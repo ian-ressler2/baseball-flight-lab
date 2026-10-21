@@ -3419,7 +3419,7 @@ const PS = {
   cam: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 },
   sigma: { velo: 1.0, spin: 80, dir: 5, eff: 3, relH: 1.2, relSide: 1.5, relExt: 1.5, angV: 0.55, angH: 0.55, pCd: 0.008 },
   mc: null, mcStale: false, mcAuto: true, mcSwing: false, mcJob: 0, ver: 0,
-  cmp: [], cmpSeqOn: false, cmpGap: 1.2, cmpMode: 'angles', cmpSeq: 0, cmpSigV: null, arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
+  cmp: [], cmpSeqOn: false, cmpWind: false, cmpGap: 1.2, cmpMode: 'angles', cmpSeq: 0, cmpSigV: null, arsenal: null, tunnel: 23.8, hit: null, hitMap: null, hitMetric: 'ev', bat: { job: 0 }
 };
 PS.P0 = Object.assign({}, PS.P); PS.sigma0 = Object.assign({}, PS.sigma);
 const PCTL = {}, PSPREAD = [];
@@ -4168,7 +4168,7 @@ function pRender() {
   if (!PS.sim || S.app !== 'pitch') return;
   pSizeStage(); readTokensIfNeeded();
   const g = PG; g.clearRect(0, 0, PW, PH);
-  const d = pTotalDur(), tAbs = clamp(PS.play.t, 0, d), t = tAbs - pPre(); PS.tauNow = t;   // t is the ball's clock: negative while the pitcher is still winding up
+  const d = pTotalDur(), tAbs = clamp(PS.play.t, 0, d), t = tAbs - pPre(); PS.tauNow = pFigTau(t);   // t is the ball's clock: negative while the pitcher is still winding up
   pwrap.classList.toggle('wide', PS.view === 'top'); pwrap.classList.toggle('wide3', PS.view === 'side'); pwrap.classList.toggle('pzone', PS.view === 'zone');
   if (PS.view === 'zone') pDrawZone(t); else if (PS.view === 'side') pDrawSide(t); else if (PS.view === 'top') pDrawTop(t); else pDraw3D(t);
   $('#pscrub').value = Math.round(tAbs / d * 1000);
@@ -5118,7 +5118,15 @@ function pCmpAdd(P) {
   pFillCmp(true); pRequestRender();
 }
 function pCmpOn() { return PS.opt.cmp && PS.cmp.some(c => c.vis && c.res && c.res.tr); }
-function pCmpOff(c) { if (!PS.cmpSeqOn) return 0; let k = 0; for (const x of PS.cmp) { if (x === c) return k * PS.cmpGap; if (x.vis && x.res && x.res.tr) k++; } return 0; }
+function pCmpStep() { return PS.cmpWind && PS.opt.anim && PS.opt.pitcher ? P_FOLLOW + PS.cmpGap + pPre() : PS.cmpGap; }
+/* the pitcher's own clock: with the windup repeated, each pitch gets a full delivery of its own */
+function pFigTau(t) {
+  if (!(PS.cmpSeqOn && PS.cmpWind && PS.opt.cmp && PS.opt.anim && PS.opt.pitcher)) return t;
+  const pre = pPre(); let best = 0;
+  PS.cmp.forEach(c => { if (c.vis && c.res && c.res.tr) { const o = pCmpOff(c); if (o - pre <= t + 1e-9 && o > best) best = o; } });
+  return t - best;
+}
+function pCmpOff(c) { if (!PS.cmpSeqOn) return 0; let k = 0; for (const x of PS.cmp) { if (x === c) return k * pCmpStep(); if (x.vis && x.res && x.res.tr) k++; } return 0; }
 function pCmpDur() { let d = 0; PS.cmp.forEach(c => { if (c.vis && c.res && c.res.tEnd !== undefined && c.res.tEnd + pCmpOff(c) > d) d = c.res.tEnd + pCmpOff(c); }); return d; }
 
 function pDrawCmp(v, t) {
@@ -5585,7 +5593,7 @@ function pCardify(root) {
     '<label>Load a real pitcher<select id="pcmp-real"><option value="">Choose a pitcher…</option>' + REAL_PITCHERS.map((r, i) => '<option value="' + i + '">' + r.name + '</option>').join('') + '</select></label>' +
     '<label>Tunnel distance from the plate (ft)<input type="number" id="pcmp-tunnel" value="23.8" min="5" max="55" step="1"></label>' +
     '<button class="btn" id="pcmp-save" type="button" title="Keep this comparison in this browser">Save</button><button class="btn" id="pcmp-load" type="button" title="Bring back the comparison saved in this browser">Load saved</button><button class="btn" id="pcmp-share" type="button" title="Make a link that opens this comparison">Share link</button>' +
-    '<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pcmp-seq"> Throw them in order, one after another</label><label>Seconds between pitches<input type="number" id="pcmp-gap" value="1.2" min="0.3" max="6" step="0.1"></label>' +
+    '<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pcmp-seq"> Throw them in order, one after another</label><label style="flex-direction:row;align-items:center;gap:6px" title="Each pitch gets its own set, leg lift, stride and release, one after another"><input type="checkbox" id="pcmp-wind"> Repeat the full windup for each pitch</label><label>Seconds between pitches<input type="number" id="pcmp-gap" value="1.2" min="0.3" max="6" step="0.1"></label>' +
     '<label>Monte Carlo pitches each<input type="number" id="pcmp-mcn" value="200" min="20" max="1500" step="20"></label><button class="btn" id="pcmp-mc" type="button" title="Throw many of each pitch with the spreads from the Monte Carlo tab">Run Monte Carlo on all</button><label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pcmp-mcshow" checked> Show the clouds</label><span class="note" id="pcmp-mcnote"></span>' +
     '<button class="btn" id="pcmp-clear" type="button">Clear all</button><span class="note" id="pcmp-note"></span></div></div>' +
     '<p class="note" id="pcmp-msg" aria-live="polite"></p><input type="text" id="pcmp-link" readonly hidden aria-label="Share link" style="width:100%">' +
@@ -5630,6 +5638,7 @@ function pCardify(root) {
     try { navigator.clipboard.writeText(url).then(() => done(true), () => done(false)); } catch (e) { done(false); }
   });
   $('#pcmp-seq').addEventListener('change', e => { PS.cmpSeqOn = e.target.checked; PS.opt.cmp = true; $('#pt-cmp').checked = true; PS.view = PS.view; pStopPlay(); PS.play.t = PS.cmpSeqOn ? 0 : pTotalDur(); pStartPlay(true); pFillCmp(true); });
+  $('#pcmp-wind').addEventListener('change', e => { PS.cmpWind = e.target.checked; if (PS.cmpWind && !PS.cmpSeqOn) { PS.cmpSeqOn = true; $('#pcmp-seq').checked = true; } PS.opt.cmp = true; $('#pt-cmp').checked = true; if (PS.cmpWind) { PS.opt.anim = true; PS.opt.pitcher = true; $('#pt-anim').checked = true; $('#pt-pitcher').checked = true; } pStopPlay(); PS.play.t = 0; pStartPlay(true); pFillCmp(true); });
   $('#pcmp-gap').addEventListener('change', e => { const v = parseFloat(e.target.value); if (isFinite(v)) { PS.cmpGap = clamp(v, 0.3, 6); if (PS.cmpSeqOn) { PS.play.t = 0; pStartPlay(true); } else pRequestRender(); } });
   $('#pcmp-mc').addEventListener('click', pCmpRunMC);
   $('#pcmp-mcshow').addEventListener('change', e => { PS.opt.cmpMc = e.target.checked; pRequestRender(); });
@@ -5728,13 +5737,13 @@ function resetPitch() {
   PS.aimSwing = { on: false, xs: 0, zs: 30 };
   PS.mc = null; PS.mcStale = false; PS.mcSwing = false; PS.colorHit = false; PS.arsenal = null; PS.hit = null; PS.hitMap = null;
   PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false, cmpMc: true };
-  PS.cmp = []; PS.cmpSrc = null; PS.cmpSeqOn = false; PS.cmpGap = 1.2; PS.cmpMode = 'angles'; PS.cmpSigV = null;
+  PS.cmp = []; PS.cmpSrc = null; PS.cmpSeqOn = false; PS.cmpWind = false; PS.cmpGap = 1.2; PS.cmpMode = 'angles'; PS.cmpSigV = null;
   $('#pt-arsmode').value = 'angles';
   [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-cmp', false], ['pt-anim', true], ['pt-hand', true], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
   $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false;
   Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 };
   PS.view = 'zone'; $$('#pviews button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === 'zone')));
-  { const q = $('#pcmp-seq'); if (q) q.checked = false; }
+  { const q = $('#pcmp-seq'); if (q) q.checked = false; const w = $('#pcmp-wind'); if (w) w.checked = false; }
   $('#preset').value = '';
   applyMode(); syncAll(); pSyncAll(); pRenderMcSpec(); pUpdateMcStrip(); pchanged('reset'); pShowTab('data'); pStartPlay(true);
 }
@@ -5779,7 +5788,7 @@ function ezTag() {
   $('#pt-arsmode').classList.add('adv');
   EZ_TABS.pitch.forEach(t => $('#ptabs [data-tab="' + t + '"]').classList.add('adv'));
   EZ_TABS.hit.forEach(t => $('#tabs [data-tab="' + t + '"]').classList.add('adv'));
-  tag('#pcmp-csv, #pcmp-mode, #pcmp-tunnel, #pcmp-save, #pcmp-load, #pcmp-share, #pcmp-seq, #pcmp-gap, #pcmp-mcn, #pcmp-mc, #pcmp-mcshow');
+  tag('#pcmp-csv, #pcmp-mode, #pcmp-tunnel, #pcmp-save, #pcmp-load, #pcmp-share, #pcmp-seq, #pcmp-wind, #pcmp-gap, #pcmp-mcn, #pcmp-mc, #pcmp-mcshow');
   $('#inputs').insertBefore(el('p', { class: 'note ezonly', text: 'EZ mode shows the basics. Switch it off at the top for every control.' }), $('#inputs').firstChild);
 }
 function setEZ(on) {
