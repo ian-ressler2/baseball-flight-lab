@@ -5707,6 +5707,84 @@ function pFillCmp(now) {
   pCmpTunnel(); pCmpPairs(); pCmpMcTable(); pEnvRun(); pCardify($('#pcmp-out'));
 }
 
+/* ---------- export: PNG, CSV and an animated GIF ---------- */
+function xSave(blob, name) {
+  const a = document.createElement('a'), url = URL.createObjectURL(blob); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+}
+const xCsvCell = v => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+const xCsv = rows => rows.map(r => r.map(xCsvCell).join(',')).join('\n') + '\n';
+const xStamp = () => new Date().toISOString().slice(0, 10);
+function xPng(cv, name) { cv.toBlob(b => { if (b) xSave(b, name); }, 'image/png'); }
+
+function xTrackCsv(tr, yPlate, name) {
+  const rows = [['time_s', 'x_ft_toward_first_base', 'distance_from_plate_ft', 'height_ft', 'speed_mph', 'spin_rpm']];
+  for (let i = 0; i < tr.t.length; i++) rows.push([tr.t[i].toFixed(4), (tr.x[i] / FT).toFixed(3), ((tr.y[i] - yPlate) / FT).toFixed(3), (tr.z[i] / FT).toFixed(3), (Math.hypot(tr.vx[i], tr.vy[i], tr.vz[i]) / MPH).toFixed(2), (Math.hypot(tr.wx[i], tr.wy[i], tr.wz[i]) / E.RPM).toFixed(0)]);
+  xSave(new Blob([xCsv(rows)], { type: 'text/csv' }), name);
+}
+function xCompareCsv() {
+  const rows = [['pitch', 'type', 'thrown_by', 'height_in', 'out_of_hand_mph', 'plate_speed_mph', 'spin_rpm', 'efficiency_pct', 'spin_direction_deg', 'induced_vertical_in', 'arm_side_break_in', 'plate_x_in', 'plate_z_in', 'strike', 'mc_strike_pct', 'mc_heart_pct', 'mc_edge_pct', 'mc_shadow_pct', 'mc_chase_pct', 'mc_waste_pct']];
+  PS.cmp.forEach((c, i) => {
+    const r = c.res; if (!r || !r.plate) return; const P = c.P, mc = c.mcObj, reg = {}; let n = 0;
+    if (mc && mc.done >= mc.n && mc.region) { mc.region.forEach(q => { reg[q] = (reg[q] || 0) + 1; }); n = mc.region.length; }
+    const pc = k => n ? (100 * (reg[k] || 0) / n).toFixed(1) : '';
+    rows.push([i + 1, c.label, P.hand + 'HP', P.height, r.speed.toFixed(1), r.plate.speed.toFixed(1), P.spin.toFixed(0), P.eff.toFixed(0), P.dir.toFixed(0), r.ivb === undefined ? '' : r.ivb.toFixed(1), r.hbArm === undefined ? '' : r.hbArm.toFixed(1), r.plate.x.toFixed(1), r.plate.z.toFixed(1), r.strike ? 'yes' : 'no', n && mc.strikePct !== undefined ? mc.strikePct.toFixed(1) : '', pc('heart'), pc('edge'), pc('shadow'), pc('chase'), pc('waste')]);
+  });
+  xSave(new Blob([xCsv(rows)], { type: 'text/csv' }), 'comparison-' + xStamp() + '.csv');
+}
+
+/* a small GIF89a writer: fixed 6x6x6 colour cube with ordered dither, LZW per frame */
+function xGif(frames, w, h, delayCs) {
+  const out = []; const w16 = v => out.push(v & 255, v >> 8 & 255);
+  'GIF89a'.split('').forEach(c => out.push(c.charCodeAt(0))); w16(w); w16(h); out.push(0xF7, 0, 0);
+  for (let i = 0; i < 256; i++) { if (i < 216) out.push(Math.round((i / 36 | 0) * 51), Math.round((i / 6 | 0) % 6 * 51), Math.round(i % 6 * 51)); else out.push(0, 0, 0); }
+  out.push(0x21, 0xFF, 11); 'NETSCAPE2.0'.split('').forEach(c => out.push(c.charCodeAt(0))); out.push(3, 1, 0, 0, 0);
+  const bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  frames.forEach(px => {
+    out.push(0x21, 0xF9, 4, 0, delayCs & 255, delayCs >> 8 & 255, 0, 0); out.push(0x2C); w16(0); w16(0); w16(w); w16(h); out.push(0, 8);
+    const idx = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const o = (y * w + x) * 4, t = (bayer[(y & 3) * 4 + (x & 3)] / 16 - 0.47) * 51, q = v => Math.max(0, Math.min(5, Math.round((v + t) / 51)));
+      idx[y * w + x] = q(px[o]) * 36 + q(px[o + 1]) * 6 + q(px[o + 2]);
+    }
+    // LZW, 8-bit codes
+    const bytes = []; let bits = 0, nb = 0, cs = 9, next = 258, dict = new Map(); const put = c => { bits |= c << nb; nb += cs; while (nb >= 8) { bytes.push(bits & 255); bits >>= 8; nb -= 8; } };
+    put(256); let pre = idx[0];
+    for (let i = 1; i < idx.length; i++) {
+      const c = idx[i], key = pre * 256 + c, hit = dict.get(key);
+      if (hit !== undefined) { pre = hit; continue; }
+      put(pre); dict.set(key, next++); if (next > (1 << cs) && cs < 12) cs++;
+      if (next >= 4095) { put(256); dict.clear(); next = 258; cs = 9; }
+      pre = c;
+    }
+    put(pre); put(257); if (nb > 0) bytes.push(bits & 255);
+    for (let i = 0; i < bytes.length; i += 255) { const n = Math.min(255, bytes.length - i); out.push(n); for (let k = 0; k < n; k++) out.push(bytes[i + k]); }
+    out.push(0);
+  });
+  out.push(0x3B); return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+}
+async function xRecordGif(app) {
+  const pit = app === 'pitch', src = $(pit ? '#pstage' : '#stage'), sel = $(pit ? '#pexp' : '#exp');
+  const st = pit ? PS : S, stop = pit ? pStopPlay : stopPlay, draw = pit ? pRender : render, total = pit ? pTotalDur : totalDur, t0 = st.play.t;
+  stop(); const dur = total(), N = 48, w = Math.min(480, src.width), h = Math.round(src.height * w / src.width), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d', { willReadFrequently: true }), frames = [];
+  for (let i = 0; i < N; i++) {
+    st.play.t = dur * i / (N - 1); draw(); g.drawImage(src, 0, 0, w, h); frames.push(g.getImageData(0, 0, w, h).data);
+    if (i % 6 === 5) { sel.options[0].text = 'Recording ' + Math.round(100 * i / N) + ' %'; await new Promise(r => setTimeout(r, 0)); }
+  }
+  sel.options[0].text = 'Encoding…'; await new Promise(r => setTimeout(r, 20));
+  xSave(xGif(frames, w, h, 7), (pit ? 'pitch-' : 'hit-') + xStamp() + '.gif');
+  st.play.t = t0; draw(); sel.options[0].text = 'Save…';
+}
+(function xMount() {
+  const mk = (id, opts) => { const s = el('select', { id, 'aria-label': 'Save', title: 'Save an image, an animated GIF or the numbers' }); s.appendChild(el('option', { value: '', text: 'Save…' })); opts.forEach(([v, t]) => s.appendChild(el('option', { value: v, text: t }))); return s; };
+  const hs = mk('exp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Ball flight (CSV)']]);
+  const ps = mk('pexp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Pitch track (CSV)'], ['cmp', 'Comparison table (CSV)']]);
+  $('#btn-cam').after(hs); $('#pbtn-cam').after(ps);
+  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
+  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
+})();
+
 /* ===== Pitching: presets, app tabs, boot ===== */
 const PPRESETS = [
   { name: 'Four-seamer up in the zone (rising)', type: 'FF', set: { height: 75, wingspan: 78, slot: 55, velo: 97, spin: 2550, eff: 96, tx: 0, tz: 37 } },
