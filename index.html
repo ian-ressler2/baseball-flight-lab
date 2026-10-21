@@ -90,6 +90,13 @@ body[data-embed="1"] .stage-card { position: static; }
   .stage-card { position: static !important; }
   .stage-wrap { max-height: none !important; }
 }
+.tour-hl { position: fixed; border-radius: 6px; box-shadow: 0 0 0 9999px color-mix(in srgb, var(--ink) 55%, transparent), 0 0 0 2px var(--accent); z-index: 70; pointer-events: none; transition: all .2s; }
+.tour-card { position: fixed; z-index: 71; width: min(340px, calc(100vw - 24px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; box-shadow: 0 8px 28px rgba(0,0,0,.28); }
+.tour-card h3 { margin: 0 0 6px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; font-size: 17px; }
+.tour-card p { margin: 0 0 12px; color: var(--ink-2); line-height: 1.45; }
+.tour-card .row { display: flex; gap: 8px; align-items: center; }
+.tour-card .row span { flex: 1; font-size: 12px; color: var(--muted); }
+@media print { .tour-hl, .tour-card, #btn-tour { display: none !important; } }
 .ezonly { display: none; }
 body[data-ez="1"] .ezonly { display: block; }
 body[data-ez="1"] .adv, body[data-ez="1"] #inputs .sp, body[data-ez="1"] #inputs .mcstrip, body[data-ez="1"] #inputs .hint { display: none !important; }
@@ -308,6 +315,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
   <div class="top-controls">
     <label class="ezsw" title="EZ mode hides the advanced controls, tabs and options and keeps the basics. The app always opens in Advanced mode."><input type="checkbox" id="ez-switch" role="switch" aria-label="EZ mode"><span class="trk" aria-hidden="true"></span><span>EZ mode</span></label>
     <label>Preset <select id="preset" aria-label="Load a preset"></select></label>
+    <button class="btn" id="btn-tour" type="button" title="A short guided tour of this page">Tour</button>
     <button class="btn" id="btn-keys" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (press ?)">?</button>
     <button class="btn" id="btn-reset" type="button" title="Put every input, the field and the views back to their starting values"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Reset</span></button>
   </div>
@@ -5904,7 +5912,7 @@ const KEYS = [['Space', 'Throw, pause or resume'], ['R', 'Replay from the releas
     const k = e.key, pit = S.app === 'pitch';
     if (k === 'Escape') { if (!back.hidden) show(false); return; }
     if (k === '?') { e.preventDefault(); show(back.hidden); return; }
-    if (!back.hidden) return;
+    if (!back.hidden || $('.tour-card')) return;
     const click = sel => { const n = $(sel); if (n) { e.preventDefault(); n.click(); } };
     if (k === 'r' || k === 'R') click(pit ? '#pbtn-replay' : '#btn-replay');
     else if (/^[1-4]$/.test(k)) click((pit ? '#pviews' : '#views') + ' button:nth-child(' + k + ')');
@@ -5913,6 +5921,51 @@ const KEYS = [['Space', 'Throw, pause or resume'], ['R', 'Replay from the releas
     else if (k === 'a' || k === 'A') click('#apptabs button[aria-selected="false"]');
     else if (k === 'e' || k === 'E') { e.preventDefault(); setEZ(document.body.dataset.ez !== '1'); }
   });
+})();
+
+/* ---------- guided tour ---------- */
+const TOURS = {
+  hit: [['#inputs', 'The inputs', 'Everything that sets the hit lives here: exit velocity, launch and spray angle, the ballpark, the weather and the ball. Drag a slider or type a number.'],
+    ['#hit-stage', 'The field', 'The ball flies through the park you picked. Drag to turn the camera, scroll to zoom, double-click to put it back.'],
+    ['#views', 'Three views', '3-D, overhead and side. The overhead view lets you click to choose where the ball lands.'],
+    ['#btn-play', 'Play it', 'Play the flight, replay from the bat, or drag the timeline to any moment.'],
+    ['#tabs', 'More analysis', 'Flight data, Monte Carlo randomness, the reverse hit finder, the EV × LA map and the physics.'],
+    ['.ezsw', 'EZ mode', 'Too many controls? EZ mode keeps the basics and hides the rest. Flip it back for everything.'],
+    ['#exp', 'Save and share', 'Save an image, a GIF or the numbers, print the page, or copy embed code.']],
+  pitch: [['#inputs', 'The pitcher and the pitch', 'Set the pitcher’s body and delivery, then the pitch: speed, spin and where it is aimed.'],
+    ['#pstagecard', 'The plate and the mound', 'The whole delivery plays, then the ball flies with its spin. The dashed path is the same throw with no spin, so the gap is the movement.'],
+    ['#pviews', 'Four views', 'Plate, side, overhead and 3-D. In the plate view, click to aim.'],
+    ['#pbtn-play', 'Throw it', 'Throw, replay, or use Real time to see it at the speed a hitter does.'],
+    ['#ptabs', 'Analysis', 'Pitch data, Monte Carlo spread, pitch types, Compare, Pitch → bat and the physics.'],
+    ['.ezsw', 'EZ mode', 'EZ mode hides the advanced controls so you can focus on the pitch.'],
+    ['#pexp', 'Save and share', 'Save an image, a GIF or the numbers, print the page, or copy embed code.']]
+};
+(function tourMount() {
+  let i = 0, steps = [], hl = null, card = null;
+  const end = () => { if (hl) hl.remove(); if (card) card.remove(); hl = card = null; window.removeEventListener('resize', place); };
+  const vis = s => { const n = $(s[0]); return n && n.getClientRects().length > 0; };
+  function place() {
+    if (!hl) return; const s = steps[i], n = $(s[0]); if (!n) return;
+    n.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    const q = n.getBoundingClientRect(), pad = 4, vw = innerWidth, vh = innerHeight, t0 = Math.max(q.top, 4), b0 = Math.min(q.bottom, vh - 4);
+    const r = { left: q.left, right: q.right, width: q.width, top: t0, bottom: Math.max(b0, t0 + 24), height: Math.max(b0 - t0, 24) };
+    Object.assign(hl.style, { left: r.left - pad + 'px', top: r.top - pad + 'px', width: r.width + 2 * pad + 'px', height: r.height + 2 * pad + 'px' });
+    const cw = card.offsetWidth, ch = card.offsetHeight; let x = r.left, y = r.bottom + 12;
+    if (y + ch > vh - 8) y = Math.max(8, r.top - ch - 12); if (y < 8 || y + ch > vh - 8) y = Math.max(8, Math.min(vh - ch - 8, r.top + 12));
+    x = Math.max(8, Math.min(vw - cw - 8, x)); card.style.left = x + 'px'; card.style.top = y + 'px';
+  }
+  function show() {
+    if (!hl) { hl = el('div', { class: 'tour-hl' }); card = el('div', { class: 'tour-card', role: 'dialog', 'aria-label': 'Guided tour' }); document.body.append(hl, card); window.addEventListener('resize', place); }
+    const s = steps[i]; card.innerHTML = '';
+    card.append(el('h3', { text: s[1] }), el('p', { text: s[2] }), el('div', { class: 'row' }, [
+      el('button', { class: 'btn', type: 'button', text: 'Skip', onclick: end }), el('span', { text: (i + 1) + ' of ' + steps.length }),
+      el('button', { class: 'btn', type: 'button', text: 'Back', onclick: () => { i--; show(); } }),
+      el('button', { class: 'btn primary', type: 'button', text: i === steps.length - 1 ? 'Done' : 'Next', onclick: () => { if (i === steps.length - 1) end(); else { i++; show(); } } })]));
+    $$('button', card)[1].disabled = i === 0;
+    place(); $$('button', card)[2].focus();
+  }
+  $('#btn-tour').addEventListener('click', () => { end(); steps = TOURS[S.app === 'pitch' ? 'pitch' : 'hit'].filter(vis); i = 0; if (steps.length) show(); });
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && hl) end(); });
 })();
 
 /* ---------- EZ mode: the same app with only the basics showing ---------- */
