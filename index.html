@@ -229,11 +229,11 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
 .derived .full { grid-column: 1 / -1; }
 .clockface { display: flex; align-items: center; gap: 10px; }
 .clockface canvas { width: 54px; height: 54px; flex: none; }
-.matchcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 0 0 14px; background: var(--surface, transparent); }
+.matchcard { padding: 2px 0 4px; }
 .matchcard .mc-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
 .matchcard h3 { margin: 0; }
 .matchcard .mc-sub { color: var(--muted); font-size: 13px; }
-.matchcard .mc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.matchcard .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .matchcard label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); min-width: 0; }
 .matchcard .mc-in { display: flex; align-items: center; gap: 6px; }
 .matchcard .mc-in input { flex: 1 1 auto; min-width: 0; width: 100%; font-size: 15px; padding: 6px 8px; color: var(--ink); background: var(--field, var(--surface)); border: 1px solid var(--line); border-radius: 6px; }
@@ -3450,6 +3450,7 @@ const PGROUPS = [
     { k: 'liftK', label: 'Seam / wake lift factor', unit: '×', min: 0, max: 8, step: 0.01, d: 2, hint: 'Scales the lift this spin makes. About 1 for fastballs; below 1 for sliders and curves, whose seams cut lift' },
     { type: 'select', k: 'gyroSign', label: 'Gyro spin sense', opts: [[1, 'Clockwise (from behind the mound)'], [-1, 'Counter-clockwise']] }
   ] },
+  { id: 'match', title: 'Match to published data', open: false, items: [ { type: 'pmatch' } ] },
   { id: 'aim', title: 'Aim and command', open: true, items: [
     { type: 'seg', k: 'aim', opts: [['target', 'Aim at a spot'], ['angles', 'Set release angles']] },
     { k: 'tx', label: 'Target, side to side', unit: 'in', min: -30, max: 30, step: 0.5, d: 1, dis: () => PS.P.aim !== 'target', hint: '+ toward the catcher’s right (first base). Click the plate view to aim' },
@@ -3517,6 +3518,7 @@ function buildPitchItem(it) {
       el('div', { class: 'hint', text: 'On: the pitch’s miss from this spot sets the vertical offset and the sweet-spot distance, and a big enough miss is a swing and miss. Off: the offset and sweet-spot boxes below apply to every pitch.' })]);
   }
   if (it.type === 'note') return el('div', { class: 'note', text: it.text });
+  if (it.type === 'pmatch') return el('div', { id: 'pmatch-host', style: 'grid-column:1/-1' });
   if (it.type === 'pderived') return el('div', { class: 'derived', id: 'pderived' });
   if (it.type === 'ptype') {
     const sel = el('select', { 'aria-label': 'Pitch type', id: 'ptype' });
@@ -5223,10 +5225,10 @@ function pMatchPitch(P0, velo, spin, ivb, hb) {
   const r2 = PI.run(fin, S.p, { record: false, twin: true, dt: 0.0015 });
   return { dir: d2, eff, liftK, capped, ivb: r2.ivb, hb: r2.hbArm, plateSpeed: r2.plate && r2.plate.speed };
 }
-(function () {
-  const host = $('#ppane-data'); if (!host) return;
+function pMountMatch() {
+  const host = $('#pmatch-host'); if (!host) return;
   const box = document.createElement('div'); box.id = 'pmatch-card'; box.className = 'matchcard';
-  box.innerHTML = '<div class="mc-head"><h3>Match a published pitch</h3><span class="mc-sub">Enter the Savant numbers and the model fits the spin to them</span></div>' +
+  box.innerHTML = '<div class="mc-head"><span class="mc-sub">Enter the Savant numbers and the model fits the spin to them</span></div>' +
     '<div class="mc-grid">' +
     '<label>Out-of-hand speed<span class="mc-in"><input type="number" id="pm-velo" step="0.1" min="40" max="110" placeholder="97.6"><em>mph</em></span></label>' +
     '<label>Spin rate<span class="mc-in"><input type="number" id="pm-spin" step="10" min="0" max="3500" placeholder="2400"><em>rpm</em></span></label>' +
@@ -5235,7 +5237,7 @@ function pMatchPitch(P0, velo, spin, ivb, hb) {
     '<div class="mc-btns"><button class="btn primary" id="pm-go" type="button">Solve and apply</button><button class="btn" id="pm-add" type="button">Solve, apply and add to Compare</button></div>' +
     '<p class="note" id="pm-out" aria-live="polite"></p>' +
     '<details class="mc-more"><summary>How this works</summary><p class="note">Speed is the out-of-hand number a broadcast shows. Horizontal break is positive toward the pitcher’s arm side and negative toward the glove side. The model finds the spin direction and the spin efficiency that give that movement, and adds a lift adjustment only if even full efficiency falls short. Your body, arm slot and release point stay as they are on the left.</p></details>';
-  host.insertBefore(box, host.firstChild);
+  host.appendChild(box);
   const val = id => parseFloat($(id).value);
   function go(add) {
     const o = $('#pm-out'), v = val('#pm-velo'), sp = val('#pm-spin'), iv = val('#pm-ivb'), hb = val('#pm-hb');
@@ -5250,7 +5252,7 @@ function pMatchPitch(P0, velo, spin, ivb, hb) {
   }
   $('#pm-go').addEventListener('click', () => go(false));
   $('#pm-add').addEventListener('click', () => go(true));
-})();
+}
 
 /* ---------- save, share and reload a comparison ---------- */
 const CMP_ENV = ['windMph', 'windDir', 'tempF', 'rh', 'elevFt', 'roofClosed'], CMP_KEY = 'bfl-compare-v1';
@@ -5560,7 +5562,7 @@ function setApp(app) {
 $('#apptabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setApp(b.dataset.app); });
 
 (function pboot() {
-  buildPitchInputs();
+  buildPitchInputs(); pMountMatch();
   // the strip under the Pitch group heading that summarises a live Monte Carlo cloud
   const grp = $('#grp-pitch .grp'); if (grp) grp.insertBefore(el('div', { class: 'mcstrip', id: 'pmc-strip', hidden: '' }), grp.firstChild);
   PI.applyType(PS.P, PS.P.type, false); PS.P0 = Object.assign({}, PS.P);
