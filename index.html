@@ -5420,6 +5420,57 @@ function pCmpTunnel() {
   });
 }
 
+/* ---------- pair scoring and the hitter's decision-point view ---------- */
+function pCmpPairData() {
+  const vis = PS.cmp.filter(c => c.vis && c.res && c.res.tr && c.res.plate), yP = PI.PLATE_Y, yD = PS.tunnel * FT + yP, out = [];
+  const at = (c, y) => pAtY(c.res.tr, y);
+  for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
+    const a = vis[i], b = vis[j], A = at(a, yD), B = at(b, yD), gD = Math.hypot(A.x - B.x, A.z - B.z) / IN_;
+    const gP = Math.hypot(a.res.plate.x - b.res.plate.x, a.res.plate.z - b.res.plate.z);
+    const tD = ((a.res.plate.t - pTAtY(a.res.tr, yD)) + (b.res.plate.t - pTAtY(b.res.tr, yD))) / 2;
+    out.push({ a, b, gD, gP, tD, score: gP / Math.max(gD, 1) });
+  }
+  return { vis, pairs: out.sort((p, q) => q.score - p.score), yD };
+}
+function pCmpPairs() {
+  const box = $('#pcmp-pairs'), cv = $('#pcmp-dec'); if (!box || !cv) return;
+  const d = pCmpPairData();
+  if (d.vis.length < 2) { box.innerHTML = '<p class="note">Show at least two pitches to score pairs.</p>'; cv.style.display = 'none'; return; }
+  cv.style.display = '';
+  const dot = c => '<i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + c.color + ';margin-right:4px"></i>' + (PS.cmp.indexOf(c) + 1);
+  const rows = d.pairs.slice(0, 12).map((p, k) => '<tr><td class="l">' + dot(p.a) + ' + ' + dot(p.b) + '</td><td>' + fmt(p.gD, 1) + '</td><td>' + fmt(p.gP, 1) + '</td><td>' + fmt(p.tD * 1000, 0) + '</td><td><b>' + fmt(p.score, 1) + '×</b></td></tr>').join('');
+  box.innerHTML = '<h3>Best pairs <small>how much two pitches pull apart after the hitter has to decide</small></h3><div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pair</th><th>Gap at ' + fmt(PS.tunnel, 1) + ' ft (in)</th><th>Gap at the plate (in)</th><th>Decision point, ms before the plate</th><th>Separation</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="note">Separation = the gap at the plate divided by the gap at the decision point (never less than 1 in). A high number means the pitches look alike when the hitter has to commit and land far apart. The decision point is the tunnel distance set above. Pairs are sorted best first.</p>';
+  pCardify(box);
+  const pts0 = [];
+  d.vis.forEach(c => { const A = pAtY(c.res.tr, d.yD); pts0.push([A.x / IN_, A.z / IN_], [c.res.plate.x, c.res.plate.z]); });
+  { const P1 = d.vis[0].P, zb1 = P1.batH * P1.zBot / 100, zt1 = P1.batH * P1.zTop / 100; let xa = -14, xb = 14, za = Math.min(zb1 - 4, 6), zb2 = Math.max(zt1 + 4, 46);
+    pts0.forEach(([x, z]) => { xa = Math.min(xa, x - 4); xb = Math.max(xb, x + 4); za = Math.min(za, z - 4); zb2 = Math.max(zb2, z + 4); });
+    const w = cv.parentNode.clientWidth || 600; cv.dataset.h = Math.round(clamp((w - 58) * (zb2 - za) / (xb - xa) + 46, 240, 520)); }
+  const { g, W, H } = setupCv(cv), m = { l: 44, r: 14, t: 12, b: 34 };
+  const pts = [];
+  d.vis.forEach(c => { const A = pAtY(c.res.tr, d.yD); pts.push([A.x / IN_, A.z / IN_], [c.res.plate.x, c.res.plate.z]); });
+  const P0 = d.vis[0].P, zb = P0.batH * P0.zBot / 100, zt = P0.batH * P0.zTop / 100;
+  let x0 = -14, x1 = 14, z0 = Math.min(zb - 4, 6), z1 = Math.max(zt + 4, 46);
+  pts.forEach(([x, z]) => { x0 = Math.min(x0, x - 4); x1 = Math.max(x1, x + 4); z0 = Math.min(z0, z - 4); z1 = Math.max(z1, z + 4); });
+  const wspan = x1 - x0, hspan = z1 - z0, plotW = W - m.l - m.r, plotH = H - m.t - m.b;
+  // equal scale on both axes, so a ball is round
+  const sc = Math.min(plotW / wspan, plotH / hspan), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  x0 = cx - plotW / sc / 2; x1 = cx + plotW / sc / 2; z0 = cz - plotH / sc / 2; z1 = cz + plotH / sc / 2;
+  const ax = axes(g, W, H, m, x0, x1, z0, z1, 'inches, catcher’s view (+ = first base side)', 'inches above the ground');
+  g.strokeStyle = T['ink-2']; g.lineWidth = 1.4; g.strokeRect(ax.px(-8.5), ax.py(zt), ax.px(8.5) - ax.px(-8.5), ax.py(zb) - ax.py(zt));
+  const r = Math.max(3, BALL_D / 2 * sc);
+  d.vis.forEach(c => {
+    const A = pAtY(c.res.tr, d.yD), x1p = A.x / IN_, z1p = A.z / IN_, X = c.res.plate.x, Z = c.res.plate.z;
+    g.strokeStyle = c.color; g.globalAlpha = 0.55; g.lineWidth = 1.3; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(ax.px(x1p), ax.py(z1p)); g.lineTo(ax.px(X), ax.py(Z)); g.stroke(); g.setLineDash([]);
+    g.beginPath(); g.arc(ax.px(X), ax.py(Z), r, 0, 7); g.lineWidth = 2; g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = c.color; g.globalAlpha = 0.85; g.beginPath(); g.arc(ax.px(x1p), ax.py(z1p), r, 0, 7); g.fill(); g.globalAlpha = 1;
+    g.fillStyle = T.bg; g.font = 'bold 10px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(PS.cmp.indexOf(c) + 1, ax.px(x1p), ax.py(z1p));
+  });
+  g.fillStyle = T['ink-2']; g.font = '10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillText('solid = ball at the decision point (' + fmt(PS.tunnel, 1) + ' ft out) · ring = where it ends up', m.l + 6, m.t + 2);
+}
+
 /* ---------- Monte Carlo for every pitch in the comparison ---------- */
 function pCmpMcSpec() {
   const dist = $('#pmc-dist') ? $('#pmc-dist').value : 'gauss', spec = {};
@@ -5581,7 +5632,7 @@ function pFillCmp(now) {
     (PS.cmpSrc ? '<p class="note"><b>Source.</b> ' + PS.cmpSrc + (PS.cmp.some(c => c.real) ? ' Each pitch’s spin direction and lift were solved so the model’s induced break matches the published figure: ' + PS.cmp.filter(c => c.real).map(c => fmt(c.real.ivb, 1) + '/' + fmt(c.real.hb, 1) + ' → ' + fmt(c.real.fit.ivb, 1) + '/' + fmt(c.real.fit.hb, 1)).join(', ') + ' in (vertical/arm-side).' : '') + '</p>' : '') +
     '<p class="note">“Plate vs. first” and “Tunnel gap” compare each pitch with the first one shown in the list. Vertical and arm-side break are induced movement, measured from each pitcher’s own side.</p>' +
     '<div class="adv"><h3>Tunneling <small>how long the pitches look alike, and where they come apart</small></h3><div id="pcmp-tunt"></div><canvas class="plot" id="pcmp-tun" height="260"></canvas>' +
-    '<div id="pcmp-mcout"></div></div>' +
+    '<div id="pcmp-pairs"></div><canvas class="plot" id="pcmp-dec" height="340"></canvas><div id="pcmp-mcout"></div></div>' +
     '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="pcmp-mv" height="320"></canvas>';
   const { g, W, H } = setupCv($('#pcmp-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
   const ax = axes(g, W, H, m, -R, R, -R, R, 'toward the glove side  ←   horizontal (in)   →  toward the arm side', 'vertical (in)');
@@ -5592,7 +5643,7 @@ function pFillCmp(now) {
     g.fillStyle = c.color; g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); g.strokeStyle = T.surface; g.lineWidth = 1.4; g.stroke();
     g.fillStyle = '#fff'; g.font = '700 10.5px ' + getComputedStyle(document.body).getPropertyValue('--font-mono'); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(PS.cmp.indexOf(c) + 1, x, y + 0.5);
   });
-  pCmpTunnel(); pCmpMcTable(); pCardify($('#pcmp-out'));
+  pCmpTunnel(); pCmpPairs(); pCmpMcTable(); pCardify($('#pcmp-out'));
 }
 
 /* ===== Pitching: presets, app tabs, boot ===== */
