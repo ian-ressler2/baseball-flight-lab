@@ -340,6 +340,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
       <div class="toggles">
         <span class="seg" id="hbat" role="group" aria-label="Batter hits from" title="Which side of the plate the batter stands on. The flight physics is the same either way; it sets the swing animation and which side counts as pull."><button type="button" data-v="R" aria-pressed="true">Right-handed</button><button type="button" data-v="L" aria-pressed="false">Left-handed</button></span>
         <label title="A batter swings and the pitch arrives before the ball leaves the bat (3-D view)"><input type="checkbox" id="t-swing" checked> Batter swings</label>
+        <label title="Start each played hit close on the plate, then pull back to your camera"><input type="checkbox" id="t-cine"> Close-up camera</label>
         <label><input type="checkbox" id="t-trail" checked> Trail</label>
         <label><input type="checkbox" id="t-forces"> Force vectors</label>
         <label><input type="checkbox" id="t-stands" checked> Stands</label>
@@ -1793,7 +1794,7 @@ const S = {
   p: Object.assign({}, E.DEFAULTS, { ev: 96, la: 28, spray: 6 }),
   sim: null, ctx: null, fencePts: null, dur: 1, bud: null,
   view: '3d', tab: 'flight', app: 'hit',
-  opt: { trail: true, forces: false, compare: false, ens: true, swing: true },
+  opt: { trail: true, forces: false, compare: false, ens: true, swing: true, cine: false },
   cam: { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 },
   play: { t: 0, playing: false, speed: 1, last: 0, intro: false },
   mc: null, mcStale: false,
@@ -2203,7 +2204,7 @@ function updatePlayButton() {
   b.innerHTML = (pl ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg>' : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2l11 6-11 6z" fill="currentColor"/></svg>') + '<span>' + (pl ? 'Pause' : 'Play') + '</span>';
 }
 function startPlay(fromStart) {
-  if (fromStart || S.play.t >= totalDur() - 0.01) { const pre = swingOn() ? SW_PRE : 0; S.play.t = -pre; S.play.intro = pre > 0; }
+  if (fromStart || S.play.t >= totalDur() - 0.01) { const pre = swingOn() ? SW_PRE : 0; S.play.t = -pre; S.play.intro = pre > 0 && S.opt.cine; }
   S.play.playing = true; S.play.last = performance.now(); updatePlayButton(); requestRender();
 }
 // the batter swings (and the pitch arrives) only in the 3-D view; the clock runs negative until contact
@@ -2654,7 +2655,7 @@ function drawGhosts(v, t) {
 function mcOn() { const mc = S.mc; return !!(mc && mc.tracks.length && mc.visible && S.opt.ens); }
 function draw3D(t, st, tp) {
   tp = tp === undefined ? t : tp;
-  const sw = swingOn(), keep = sw && S.play.intro ? introCam(tp) : null;
+  const sw = swingOn(), keep = sw && S.opt.cine && S.play.intro ? introCam(tp) : null;
   const v = makeView('3d'); drawField(v); drawPitchLink(v);
   if (mcOn()) { drawEnsemble(v, t); drawTarget(v); if (sw) drawSwing(v, tp); if (keep) Object.assign(S.cam, keep); return v; }
   drawGhosts(v, t); drawTarget(v);
@@ -2891,6 +2892,7 @@ $('#t-stands').addEventListener('change', e => {
   S.inVer = (S.inVer || 0) + 1; S.mcStale = true;
   recompute(); if (typeof scheduleAutoMC === 'function') scheduleAutoMC(); requestRender();
 });
+$('#t-cine').addEventListener('change', e => { S.opt.cine = e.target.checked; if (!S.opt.cine) S.play.intro = false; requestRender(); });
 $('#t-swing').addEventListener('change', e => { S.opt.swing = e.target.checked; if (!S.opt.swing) S.play.intro = false; requestRender(); });
 // batter handedness is one setting shared with the Pitching app; it never changes the ball flight, only the swing, the pull side and the labels
 let hbatSeen = '', hbatSim = null;
@@ -4567,36 +4569,42 @@ function batterSwingAt(P, tau, c, att, psi) {
   const axis = V3.nrm([a * Math.cos(sr) * Math.cos(ar), -a * Math.sin(sr) * Math.cos(ar), -Math.sin(ar) * 0.9]);
   const hC = V3.sub(c, V3.mul(axis, 0.60));
   // progress curves
-  const ld = kseg(tau, -0.42, -0.24), sLift = kseg(tau, -0.36, -0.27) * (1 - kseg(tau, -0.27, -0.17)), sSt = kseg(tau, -0.34, -0.17);
+  const ld = kseg(tau, -0.44, -0.26), sLift = kseg(tau, -0.40, -0.30) * (1 - kseg(tau, -0.30, -0.15)), sSt = kseg(tau, -0.36, -0.14);
   const sw = Math.pow(klin(tau, -0.22, 0), 1.7), fo = klin(tau, 0, 0.5), fe = 1 - (1 - fo) * (1 - fo);
-  const phiC = 82 * D2R, phi = tau <= 0 ? phiC * Math.pow(klin(tau, -0.22, 0), 1.5) : phiC + 48 * D2R * (1 - Math.pow(1 - klin(tau, 0, 0.45), 2));
-  const th = a * phi * 0.72, thS = a * phi;
+  const phiC = 86 * D2R, coil = -16 * D2R * ld;
+  const phiAt = q => q <= 0 ? coil + (phiC - coil) * Math.pow(klin(q, -0.24, 0), 1.45) : phiC + 52 * D2R * (1 - Math.pow(1 - klin(q, 0, 0.45), 2));
+  const phi = phiAt(tau), phiP = Math.max(phiAt(tau + 0.04) * 0.82, coil * 0.8);
+  const th = a * phiP, thS = a * phi;
   // pelvis
-  const pelvis = [J0.pelvis[0] + a * 0.07 * sSt, J0.pelvis[1] + 0.20 * sSt - 0.05 * ld, J0.pelvis[2] - 0.035 * ld - 0.03 * sSt + 0.02 * fe];
-  const b = [-a * Math.sin(phi * 0.72), Math.cos(phi * 0.72), 0];
+  const pelvis = [J0.pelvis[0] + a * 0.10 * sSt, J0.pelvis[1] + 0.28 * sSt - 0.09 * ld, J0.pelvis[2] - 0.05 * ld - 0.05 * sSt + 0.025 * fe];
+  const b = [-a * Math.sin(phiP), Math.cos(phiP), 0];
   const hipL = V3.add(pelvis, V3.mul(b, J0.hw / 2)), hipB = V3.sub(pelvis, V3.mul(b, J0.hw / 2));
   // feet
   const ankH = J0.ankL[2], ftd = 0.115 * H;
-  const ankB = [J0.ankB[0], J0.ankB[1], ankH + 0.07 * kseg(tau, -0.08, 0.12)];
-  const ankL = [J0.ankL[0] + a * 0.04 * sSt, J0.ankL[1] + 0.21 * sSt, ankH + 0.15 * sLift];
-  const toeB = [ankB[0] + ftd * a * Math.cos(phi * 0.72), ankB[1] + ftd * Math.sin(phi * 0.72), J0.toeB[2]];
-  const phF = phi * 0.35 * kseg(tau, -0.2, -0.1);
+  const ankB = [J0.ankB[0], J0.ankB[1], ankH + 0.10 * kseg(tau, -0.10, 0.10)];
+  const ankL = [J0.ankL[0] + a * 0.05 * sSt, J0.ankL[1] + 0.30 * sSt, ankH + 0.22 * sLift];
+  const toeB = [ankB[0] + ftd * a * Math.cos(phiP), ankB[1] + ftd * Math.sin(phiP), J0.toeB[2]];
+  const phF = Math.max(0, phiP) * 0.35 * kseg(tau, -0.2, -0.1);
   const toeL = [ankL[0] + ftd * a * Math.cos(phF), ankL[1] + ftd * Math.sin(phF), J0.toeL[2] + 0.08 * sLift];
   const pole = (x, y, z) => { const q = rotZ([x, y, 0], [0, 0, 0], th * 0.6); return V3.nrm([q[0], q[1], z]); };
   const knL = ik2(hipL, ankL, J0.thigh, J0.shank, pole(a * 0.9, 0.35, 0.2)), knB = ik2(hipB, ankB, J0.thigh, J0.shank, pole(a * 0.9, -0.35, 0.2));
   // trunk
-  const trunk = V3.len(V3.sub(J0.SC, J0.pelvis)), lean = (28 - 36 * kseg(tau, -0.2, 0.05) + 8 * fe) * D2R;
+  const trunk = V3.len(V3.sub(J0.SC, J0.pelvis)), lean = (28 + 4 * ld - 38 * kseg(tau, -0.2, 0.05) + 10 * fe) * D2R;
   const u = V3.nrm([a * Math.sin(lean), 0, Math.cos(lean)]), SC = V3.add(pelvis, V3.mul(u, trunk));
   const es = [-a * Math.sin(phi), Math.cos(phi), 0], f = [a * Math.cos(phi), Math.sin(phi), 0];
   const shL = V3.add(V3.add(SC, V3.mul(es, J0.sw / 2)), [0, 0, (0.012 + 0.03 * kseg(tau, -0.2, 0)) * H]);
   const shB = V3.add(V3.sub(SC, V3.mul(es, J0.sw / 2)), [0, 0, -(0.012 + 0.04 * kseg(tau, -0.2, 0)) * H]);
   const head = V3.add(V3.add(SC, V3.mul(V3.nrm(V3.add(u, [0, 0, 1])), 0.117 * H)), [a * 0.02 * H * (1 - kseg(tau, -0.2, 0)), 0.012 * H, 0]);
   // bat: stance -> load -> swing to the ball -> wrap over the lead shoulder
-  const d0 = V3.nrm(V3.sub(J0.tip, J0.knob)), h0 = J0.hands, dLoad = V3.nrm([-a * 0.15, -0.5, 0.85]), hLoad = V3.add(h0, [0, -0.08, 0.04]);
+  const d0 = V3.nrm(V3.sub(J0.tip, J0.knob)), h0 = J0.hands, dLoad = V3.nrm([-a * 0.15, -0.5, 0.85]), hLoad = V3.add(h0, [0, -0.15, 0.05]);
   let hands, d;
   if (tau <= 0) {
     if (tau < -0.22) { hands = V3.lerp(h0, hLoad, ld); d = slerp3(d0, dLoad, ld); }
-    else { hands = V3.lerp(hLoad, hC, sw); d = slerp3(dLoad, axis, Math.pow(sw, 1.15)); }
+    else {
+      const ctl = V3.add(V3.add(shB, V3.mul(f, 0.12)), [0, 0, -0.30 * H]);
+      hands = V3.add(V3.add(V3.mul(hLoad, (1 - sw) * (1 - sw)), V3.mul(ctl, 2 * (1 - sw) * sw)), V3.mul(hC, sw * sw));
+      d = slerp3(dLoad, axis, Math.pow(sw, 1.15));
+    }
   } else {
     const hF = V3.add(V3.add(shL, V3.mul(f, -0.04 * H)), [0, 0, 0.10 * H]);
     const dF = V3.nrm(V3.add(V3.add(V3.mul(f, -0.55), V3.mul(es, -0.55)), [0, 0, 0.35]));
@@ -4718,20 +4726,21 @@ function pHandTrace(v, J) {
 }
 function pDrawBatter(v, withBat, pose) {
   const J = pose || batterAt(PS.P), H = J.H, cap = (a, b, ra, rb) => ({ a, b, ra: ra * H, rb: (rb === undefined ? ra : rb) * H });
-  const body = T['ink-2'], dark = T.ink, G = [];
+  // the swinging batter in the hitting app is drawn in uniform colours and opaque; the pitching overlay keeps its grey silhouette
+  const col = !!pose, body = col ? PF.pants : T['ink-2'], top = col ? PF.jersey : body, skin = col ? PF.skin : body, dark = col ? '#2c3440' : T.ink, G = [];
   const leg = (hip, kn, an, toe) => { G.push({ col: body, s: [cap(hip, kn, 0.052, 0.042), cap(kn, an, 0.040, 0.029)] }); G.push({ col: dark, s: [cap([an[0] - (toe[0] - an[0]) * 0.35, an[1] - (toe[1] - an[1]) * 0.35, an[2] - 0.02 * H], toe, 0.030, 0.027)] }); };
   leg(J.hipL, J.kneeL, J.ankL, J.toeL); leg(J.hipB, J.kneeB, J.ankB, J.toeB);
-  G.push({ col: body, s: [cap(J.hipL, J.hipB, 0.060, 0.060), cap(J.pelvis, J.SC, 0.072, 0.080), { pts: [J.shL, J.shB, J.hipB, J.hipL], pad: 0.036 * H }, { c: J.shL, r: 0.050 * H }, { c: J.shB, r: 0.050 * H }] });
-  const arm = (sh, el, wr, hd) => G.push({ col: body, s: [cap(sh, el, 0.037, 0.031), cap(el, wr, 0.031, 0.024), cap(wr, hd, 0.024, 0.021)] });
+  G.push({ col: top, s: [cap(J.hipL, J.hipB, 0.060, 0.060), cap(J.pelvis, J.SC, 0.072, 0.080), { pts: [J.shL, J.shB, J.hipB, J.hipL], pad: 0.036 * H }, { c: J.shL, r: 0.050 * H }, { c: J.shB, r: 0.050 * H }] });
+  const arm = (sh, el, wr, hd) => { G.push({ col: top, s: [cap(sh, el, 0.037, 0.031)] }); G.push({ col: skin, s: [cap(el, wr, 0.031, 0.024), cap(wr, hd, 0.024, 0.021)] }); };
   arm(J.shL, J.elL, J.wrL, J.handL); arm(J.shB, J.elB, J.wrB, J.hands);
   if (withBat !== false) G.push({ col: PF.bat, s: [{ a: J.knob, b: J.tip, ra: 0.016, rb: 0.037 }] });
   const nb = V3.add(J.SC, V3.mul(J.u, 0.02 * H)), hb = V3.sub(J.head, V3.mul(V3.nrm(V3.sub(J.head, J.SC)), 0.05 * H));
-  G.push({ col: body, s: [cap(nb, hb, 0.030, 0.027), { c: J.head, r: J.headR }] });
+  G.push({ col: skin, s: [cap(nb, hb, 0.030, 0.027), { c: J.head, r: J.headR }] });
   // helmet with a brim toward the pitcher and a flap over the near ear
   const hc = V3.add(J.head, [0, 0, 0.012 * H]);
   G.push({ col: dark, s: [{ c: hc, r: J.headR * 1.14 }, cap(hc, V3.add(hc, [0, 0.10 * H, -0.01 * H]), 0.014, 0.011), { c: V3.add(J.head, [-J.a * 0.045 * H, -0.01 * H, -0.02 * H]), r: J.headR * 0.62 }] });
   pFigGroundShadow(v, [J.pelvis[0], J.pelvis[1], 0], 0.62 * H / 1.88, 0.16);
-  pFigDraw(v, G, { alpha: 0.72, shade: 0.18, outline: 0 });
+  pFigDraw(v, G, col ? { shade: 0.22, outline: 0 } : { alpha: 0.72, shade: 0.18, outline: 0 });
   return J;
 }
 
@@ -6099,7 +6108,7 @@ function ezTag() {
     $$('.grp > [data-k]', d).forEach(n => n.classList.toggle('adv', !EZ_KEEP.has(n.dataset.k)));
   });
   const tag = (sel, root) => $$(sel).forEach(n => { const t = n.closest('label') || n; t.classList.add('adv'); });
-  tag('#pt-hand, #pt-zones, #pt-arsenal, #t-forces, #t-compare');
+  tag('#pt-hand, #pt-zones, #pt-arsenal, #t-forces, #t-compare, #t-cine');
   $('#pt-arsmode').classList.add('adv');
   EZ_TABS.pitch.forEach(t => $('#ptabs [data-tab="' + t + '"]').classList.add('adv'));
   EZ_TABS.hit.forEach(t => $('#tabs [data-tab="' + t + '"]').classList.add('adv'));
