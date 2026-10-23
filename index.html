@@ -12,6 +12,7 @@
 <meta property="og:title" content="Baseball Flight Lab">
 <meta property="og:description" content="Simulate batted-ball flight and pitch movement with real physics: drag, spin and the Magnus force, wind, temperature, altitude and ballpark walls. Run Monte Carlo clouds, compare pitches, and watch a pitcher's delivery and a hitter's swing.">
 <meta property="og:url" content="https://baseballflightlab.com/">
+<script data-goatcounter="https://baseballflightlab.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Baseball Flight Lab">
 <meta name="twitter:description" content="Simulate batted-ball flight and pitch movement with real physics: drag, spin and the Magnus force, wind, temperature, altitude and ballpark walls. Run Monte Carlo clouds, compare pitches, and watch a pitcher's delivery and a hitter's swing.">
@@ -352,7 +353,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
     <li>Plate locations use the Statcast convention: inches at the front of the plate, measured from its centre.</li>
   </ul>
   <h3>Privacy</h3>
-  <p>Everything runs in your browser. Nothing you enter is uploaded, there are no accounts, and nothing is tracked. A share link carries your inputs in the address itself. The only thing the page remembers is whether it has already offered you the tour.</p>
+  <p>Everything runs in your browser. Nothing you enter is uploaded, and there are no accounts. The site counts visits and a few feature clicks, such as share links copied, with GoatCounter, which uses no cookies and stores no personal data. A share link carries your inputs in the address itself. The only thing the page remembers is whether it has already offered you the tour.</p>
   <p class="note">Not affiliated with Major League Baseball or any team.</p>
 </dialog>
 
@@ -1842,6 +1843,9 @@ const OUTCOME = {
 // people who ask their system for less motion start without the swing and the delivery run-up; both are one tick away
 const REDUCED_MOTION = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
 
+// privacy-friendly visit counting (GoatCounter: no cookies, no personal data); custom events carry a name only, never an input
+function gcEvent(id, title) { try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: 'event/' + id, title: title || id, event: true }); } catch (e) {} }
+
 /* ---------- state ---------- */
 const S = {
   p: Object.assign({}, E.DEFAULTS, { ev: 96, la: 28, spray: 6 }),
@@ -2946,7 +2950,7 @@ $('#t-stands').addEventListener('change', e => {
   recompute(); if (typeof scheduleAutoMC === 'function') scheduleAutoMC(); requestRender();
 });
 $('#t-cine').addEventListener('change', e => { S.opt.cine = e.target.checked; if (!S.opt.cine) S.play.intro = false; requestRender(); });
-$('#t-swing').addEventListener('change', e => { S.opt.swing = e.target.checked; if (!S.opt.swing) S.play.intro = false; requestRender(); });
+$('#t-swing').addEventListener('change', e => { S.opt.swing = e.target.checked; gcEvent('swing-' + (S.opt.swing ? 'on' : 'off'), 'Batter swing ' + (S.opt.swing ? 'on' : 'off')); if (!S.opt.swing) S.play.intro = false; requestRender(); });
 // batter handedness is one setting shared with the Pitching app; it never changes the ball flight, only the swing, the pull side and the labels
 let hbatSeen = '', hbatSim = null;
 function syncHbat() {
@@ -6033,6 +6037,7 @@ function xShareFromUrl() {
 }
 function xCopyLink() {
   const url = xShareUrl();
+  gcEvent('share-link', 'Share link copied');
   const done = ok => xToast(ok ? 'Link copied. It reopens with these inputs.' : url);
   try { navigator.clipboard.writeText(url).then(() => done(true), () => done(false)); } catch (e) { done(false); }
 }
@@ -6041,8 +6046,8 @@ function xCopyLink() {
   const hs = mk('exp', [['link', 'Link to these inputs (copy)'], ['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Ball flight (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
   const ps = mk('pexp', [['link', 'Link to these inputs (copy)'], ['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Pitch track (CSV)'], ['cmp', 'Comparison table (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
   $('#btn-cam').after(hs); $('#pbtn-cam').after(ps);
-  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v === 'link') xCopyLink(); else if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(false); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
-  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v === 'link') xCopyLink(); else if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(true); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
+  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v) gcEvent('export-' + v, 'Save: ' + v); if (v === 'link') xCopyLink(); else if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(false); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
+  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v) gcEvent('export-' + v, 'Save: ' + v); if (v === 'link') xCopyLink(); else if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(true); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
 })();
 
 /* ===== Pitching: presets, app tabs, boot ===== */
@@ -6108,7 +6113,7 @@ function fillPresetList() {
 function setApp(app) {
   if (S.app === app) return;
   stopPlay(); pStopPlay();
-  S.app = app; document.body.dataset.app = app;
+  S.app = app; document.body.dataset.app = app; if (app === 'pitch') gcEvent('app-pitching', 'Pitching app opened');
   $$('#apptabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.app === app)));
   $('#subtitle').textContent = APP_TEXT[app]; fillPresetList();
   document.title = app === 'pitch' ? 'Baseball Flight Lab: Pitching' : document.title.replace(/: Pitching$/, '');
@@ -6190,7 +6195,7 @@ const TOURS = {
     $$('button', card)[1].disabled = i === 0;
     place(); $$('button', card)[2].focus();
   }
-  $('#btn-tour').addEventListener('click', () => { end(); steps = TOURS[S.app === 'pitch' ? 'pitch' : 'hit'].filter(vis); i = 0; if (steps.length) show(); });
+  $('#btn-tour').addEventListener('click', () => { gcEvent('tour-start', 'Tour started'); end(); steps = TOURS[S.app === 'pitch' ? 'pitch' : 'hit'].filter(vis); i = 0; if (steps.length) show(); });
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && hl) end(); });
 })();
 
