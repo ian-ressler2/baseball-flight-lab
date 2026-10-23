@@ -5951,13 +5951,45 @@ function xEmbed(pit) {
   const done = ok => xToast(ok ? 'Embed code copied. Paste it into your page.' : code);
   try { navigator.clipboard.writeText(code).then(() => done(true), () => done(false)); } catch (e) { done(false); }
 }
+/* ---------- share link: every input that differs from the starting values, packed into the address ---------- */
+const xDiff = (cur, base) => { const o = {}; Object.keys(cur).forEach(k => { const v = cur[k]; if (v !== base[k] && (typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && isFinite(v)))) o[k] = typeof v === 'number' ? +v.toFixed(6) : v; }); return o; };
+function xState() {
+  const pit = S.app === 'pitch';
+  return { v: 1, a: S.app, t: pit ? PS.tab : S.tab, w: pit ? PS.view : S.view, p: xDiff(S.p, S.p0), s: xDiff(S.sigma, S.sigma0), P: xDiff(PS.P, PS.P0), g: xDiff(PS.sigma, PS.sigma0), sw: S.opt.swing ? undefined : 0 };
+}
+function xShareUrl() {
+  const base = location.protocol === 'file:' ? 'https://baseballflightlab.com/' : location.origin + location.pathname;
+  return base + '#s=' + pB64(JSON.stringify(xState()));
+}
+function xApplyShare(o) {
+  if (!o || o.v !== 1) return false;
+  Object.assign(S.p, o.p || {}); Object.assign(S.sigma, o.s || {}); Object.assign(PS.P, o.P || {}); Object.assign(PS.sigma, o.g || {});
+  if (o.sw === 0) { S.opt.swing = false; $('#t-swing').checked = false; }
+  const pit = o.a === 'pitch';
+  applyMode(); syncAll(); recompute(true); pSyncAll(); pRecompute(true); renderMcSpec(); pRenderMcSpec();
+  if (pit) setApp('pitch');
+  try {
+    const vb = $((pit ? '#pviews' : '#views') + ' button[data-view="' + o.w + '"]'); if (vb) vb.click();
+    const tb = $((pit ? '#ptabs' : '#tabs') + ' button[data-tab="' + o.t + '"]'); if (tb) tb.click();
+  } catch (e) {}
+  return true;
+}
+function xShareFromUrl() {
+  const m = /^#s=([A-Za-z0-9_-]+)/.exec(location.hash); if (!m) return false;
+  try { return xApplyShare(JSON.parse(pUnB64(m[1]))); } catch (e) { return false; }
+}
+function xCopyLink() {
+  const url = xShareUrl();
+  const done = ok => xToast(ok ? 'Link copied. It reopens with these inputs.' : url);
+  try { navigator.clipboard.writeText(url).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+}
 (function xMount() {
   const mk = (id, opts) => { const s = el('select', { id, 'aria-label': 'Save', title: 'Save an image, an animated GIF or the numbers' }); s.appendChild(el('option', { value: '', text: 'Save…' })); opts.forEach(([v, t]) => s.appendChild(el('option', { value: v, text: t }))); return s; };
-  const hs = mk('exp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Ball flight (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
-  const ps = mk('pexp', [['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Pitch track (CSV)'], ['cmp', 'Comparison table (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
+  const hs = mk('exp', [['link', 'Link to these inputs (copy)'], ['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Ball flight (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
+  const ps = mk('pexp', [['link', 'Link to these inputs (copy)'], ['png', 'Image (PNG)'], ['gif', 'Animation (GIF)'], ['csv', 'Pitch track (CSV)'], ['cmp', 'Comparison table (CSV)'], ['print', 'Print this page'], ['embed', 'Embed code (copy)']]);
   $('#btn-cam').after(hs); $('#pbtn-cam').after(ps);
-  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(false); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
-  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(true); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
+  hs.addEventListener('change', async () => { const v = hs.value; hs.value = ''; if (v === 'link') xCopyLink(); else if (v === 'png') { render(); xPng($('#stage'), 'hit-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('hit'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(false); else if (v === 'csv' && S.sim) xTrackCsv(S.sim.tr, 0, 'ball-flight-' + xStamp() + '.csv'); });
+  ps.addEventListener('change', async () => { const v = ps.value; ps.value = ''; if (v === 'link') xCopyLink(); else if (v === 'png') { pRender(); xPng($('#pstage'), 'pitch-' + xStamp() + '.png'); } else if (v === 'gif') await xRecordGif('pitch'); else if (v === 'print') window.print(); else if (v === 'embed') xEmbed(true); else if (v === 'csv' && PS.sim) xTrackCsv(PS.sim.tr, PI.PLATE_Y, 'pitch-track-' + xStamp() + '.csv'); else if (v === 'cmp') { if (PS.cmp.length) xCompareCsv(); else { pShowTab('cmp'); $('#pcmp-msg').textContent = 'Add some pitches first, then save the table.'; } } });
 })();
 
 /* ===== Pitching: presets, app tabs, boot ===== */
@@ -6152,6 +6184,7 @@ $('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
   $('#pt-ens-wrap').hidden = true;
   try { if (location.hash === '#pitching' || /[?&]cmp=/.test(location.search)) setApp('pitch'); } catch (e) {}
   try { pCmpFromUrl(); } catch (e) {}
+  try { xShareFromUrl(); } catch (e) {}
   Object.assign(window.BFL_APP, { PS, PI, setApp, pRecompute, pRunMC, pRunHitMap, applyPitchPreset, resetPitch, pShowTab, sendToHitting, pHitResult, pComputeArsenal, pRunPitchValidation, pRunCalibration, pStartPlay, pRender });
 })();
 
