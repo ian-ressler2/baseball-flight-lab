@@ -3469,7 +3469,7 @@ function resetAll() {
   $('#hf-out').innerHTML = '<div class="empty">No spot chosen yet. Switch to the overhead view and click the field.</div>';
   $('#hf-spin').value = 'auto'; $('#hf-tol').value = 8;
   S.mc = null; S.mcStale = false; $('#mc-out').innerHTML = ''; $('#mc-prog').hidden = true; $('#mc-run').disabled = false; $('#mc-play').disabled = true;
-  $('#t-ens-wrap').hidden = true; S.opt = { trail: true, forces: false, compare: false, ens: true };
+  $('#t-ens-wrap').hidden = true; S.opt = { trail: true, forces: false, compare: false, ens: true, swing: true, cine: false }; $('#t-swing').checked = true; $('#t-cine').checked = false;
   $('#t-trail').checked = true; $('#t-forces').checked = false; $('#t-compare').checked = false; if ($('#t-stands') && !$('#t-stands').checked) { $('#t-stands').checked = true; E.setStands(true); S.standsOn = true; S.fenceSig = null; S.fencePts = null; } $('#t-ens').checked = true;
   $('#mc-n').value = 500; $('#mc-seed').value = 2026; $('#mc-dist').value = 'gauss';
   S.mcAuto = true; S.showSpread = true; $('#show-spread').checked = true; $('#inputs').classList.remove('nospread');
