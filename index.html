@@ -93,6 +93,13 @@ body[data-embed="1"] .app { grid-template-columns: minmax(0, 1fr) !important; gr
 body[data-embed="1"] .stage-card { position: static; }
 .xtoast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 60; max-width: calc(100vw - 32px); }
 .xtoast[hidden] { display: none; }
+.about { max-width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 22px 26px 26px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 48px rgba(0,0,0,.28); }
+.about::backdrop { background: rgba(10, 16, 12, .55); }
+.about h2 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; font-size: 22px; margin: 0 0 4px; }
+.about h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .07em; font-size: 14px; margin: 18px 0 4px; color: var(--ink-2); }
+.about p, .about li { font-size: 14px; line-height: 1.55; margin: 0 0 8px; max-width: 65ch; }
+.about ul { padding-left: 20px; margin: 0 0 8px; }
+.about .x { position: sticky; top: 0; float: right; }
 .skip { position: absolute; left: 8px; top: -48px; z-index: 80; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
 .skip:focus { top: 8px; }
 .nudge { position: fixed; left: 16px; bottom: 16px; z-index: 55; width: min(320px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 14px; font-size: 13px; display: grid; gap: 10px; }
@@ -100,7 +107,7 @@ body[data-embed="1"] .stage-card { position: static; }
 .nudge .row { display: flex; gap: 8px; }
 body[data-embed="1"] .nudge, .nudge[hidden] { display: none !important; }
 @media print {
-  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, .nudge, .skip, #btn-keys { display: none !important; }
+  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, .nudge, .skip, #btn-keys, #btn-about, .about { display: none !important; }
   body, html { background: #fff !important; color: #000; }
   .app { display: block !important; }
   .card { break-inside: avoid; box-shadow: none !important; border-color: #bbb !important; margin-bottom: 10px; }
@@ -324,6 +331,30 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
 </head>
 <body data-app="hit">
 <a class="skip" id="skip-link" href="#stage">Skip to the field</a>
+<dialog class="about" id="about" aria-labelledby="about-h">
+  <button class="btn sm x" id="about-x" type="button" aria-label="Close">Close</button>
+  <h2 id="about-h">About Baseball Flight Lab</h2>
+  <p>A free workbench for batted balls and pitches. It flies each ball from the physics up and shows the result in 3-D, overhead, side and plate views. It is built for exploring ideas and building intuition; it does not replace tracking data.</p>
+  <h3>How the model works</h3>
+  <p>Every ball is stepped forward in 1 ms steps (fourth-order Runge–Kutta) under gravity, air drag, Magnus lift from spin, and the Coriolis effect of the Earth&rsquo;s rotation. Air density comes from temperature, humidity and elevation, and wind follows a power-law profile with height. A batted ball can start from an exit velocity, launch angle and spray angle, or from a bat–ball collision. A pitch starts from a delivery model (release point, extension, arm slot) plus velocity and spin. The Physics tab in each app lists every equation and constant in use.</p>
+  <h3>How it is checked</h3>
+  <p>Each app has built-in checks you can run yourself from its Physics tab. They include the vacuum range against its closed form, step-size convergence, terminal speed, energy conservation without air, a 470.5 ft Statcast home run that Alan Nathan fitted, the effect of temperature per degree, the extra carry at Coors Field altitude, headwind against tailwind, and the direction of sidespin. The pitching app adds checks of its own. These show the code is consistent and lands in the published range. They are not a fit to your own tracking data.</p>
+  <h3>What it leaves out</h3>
+  <ul>
+    <li>The seam-shifted wake. A fitted lift factor stands in for it and is a model input, not a Statcast measurement.</li>
+    <li>Spin-axis precession, turbulence and gusts, real stadium airflow, and bat flex beyond the sweet-spot fit.</li>
+    <li>Batter handedness never changes the flight of the ball. It sets the stance and swing animation, which side counts as pull, and the batter&rsquo;s side of the plate for pitches.</li>
+  </ul>
+  <h3>Where the numbers come from</h3>
+  <ul>
+    <li>Ballpark distances and wall heights are posted figures and are approximate. The typical weather for each park is a summer game-time estimate.</li>
+    <li>Pitch types use typical major-league values. Pitcher presets are labelled in the app as verified or approximate; the approximate ones are rounded season averages with estimated arm slot and body. To use exact numbers, load a Baseball Savant CSV in the Compare tab.</li>
+    <li>Plate locations use the Statcast convention: inches at the front of the plate, measured from its centre.</li>
+  </ul>
+  <h3>Privacy</h3>
+  <p>Everything runs in your browser. Nothing you enter is uploaded, there are no accounts, and nothing is tracked. A share link carries your inputs in the address itself. The only thing the page remembers is whether it has already offered you the tour.</p>
+  <p class="note">Not affiliated with Major League Baseball or any team.</p>
+</dialog>
 
 <header class="top">
   <div class="brand">
@@ -333,6 +364,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
   <div class="top-controls">
     <label class="ezsw" title="EZ mode hides the advanced controls, tabs and options and keeps the basics. The app always opens in Advanced mode."><input type="checkbox" id="ez-switch" role="switch" aria-label="EZ mode"><span class="trk" aria-hidden="true"></span><span>EZ mode</span></label>
     <label>Preset <select id="preset" aria-label="Load a preset"></select></label>
+    <button class="btn" id="btn-about" type="button" title="What this is, how it works and how it is checked">About</button>
     <button class="btn" id="btn-tour" type="button" title="A short guided tour of this page">Tour</button>
     <button class="btn" id="btn-keys" type="button" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (press ?)">?</button>
     <button class="btn" id="btn-reset" type="button" title="Put every input, the field and the views back to their starting values"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 105.7 4h-1.7A4.4 4.4 0 118 3.6V6l4-3-4-3z" fill="currentColor"/></svg><span>Reset</span></button>
@@ -6194,6 +6226,12 @@ $('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
 
 if (REDUCED_MOTION) { $('#t-swing').checked = false; $('#pt-anim').checked = false; }
 $('#skip-link').addEventListener('click', e => { e.preventDefault(); const c = $(S.app === 'pitch' ? '#pstage' : '#stage'); c.tabIndex = -1; c.focus(); });
+(function aboutMount() {
+  const d = $('#about'), open = () => { if (!d.open) { try { d.showModal(); } catch (e) { d.setAttribute('open', ''); } } };
+  $('#btn-about').addEventListener('click', open); $('#about-x').addEventListener('click', () => d.close());
+  d.addEventListener('click', e => { if (e.target === d) d.close(); });
+  try { if (location.hash === '#about') open(); } catch (e) {}
+})();
 /* ---------- first visit: offer the tour once ---------- */
 (function tourNudge() {
   try {
