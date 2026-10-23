@@ -17,13 +17,13 @@
   --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --bg: #eceee7; --surface: #f7f8f3; --surface-2: #e4e8de; --ink: #17201b; --ink-2: #404d46; --muted: #66736b;
+  --bg: #eceee7; --surface: #f7f8f3; --surface-2: #e4e8de; --ink: #17201b; --ink-2: #404d46; --muted: #5a665f;
   --line: #d0d6c8; --accent: #b8322a; --accent-ink: #ffffff; --accent-soft: #f3d9d4; --focus: #1f6fa8;
 
   --sky-top: #c7dde6; --sky-bot: #e8f0ec; --outside: #aab5a1; --stand: #8d99a0; --stand-2: #a7b1b6;
   --grass-a: #70a35f; --grass-b: #689a58; --foul: #5c8a50; --dirt: #c5a47d; --dirt-2: #d2b48f; --track: #b58c61;
   --wall: #1f4a3a; --chalk: #f5f7f1; --path: #17609b; --path-2: #6ba6d4; --ghost: #7a857e;
-  --c-hr: #d03a25; --c-wall: #d29114; --c-in: #1f78a8; --c-foul: #7b857f; --c-good: #2d8a4e;
+  --c-hr: #d03a25; --c-wall: #d29114; --c-in: #1f78a8; --c-foul: #7b857f; --c-good: #267a45; --chip-ink: #fff;
   --heat-0: #eef3e9; --heat-1: #b6d4c2; --heat-2: #4f9a8b; --heat-3: #1f5f78; --heat-4: #2a2a5e;
 }
 @media (prefers-color-scheme: dark) {
@@ -33,7 +33,7 @@
     --sky-top: #14222a; --sky-bot: #0d171c; --outside: #0b110d; --stand: #232d33; --stand-2: #2f3a41;
     --grass-a: #2f5b35; --grass-b: #2a522f; --foul: #244b2a; --dirt: #6b5640; --dirt-2: #7a644b; --track: #765a3f;
     --wall: #3c7c63; --chalk: #dfe6dc; --path: #5fb0e6; --path-2: #2c6a95; --ghost: #8a978f;
-    --c-hr: #f06a4f; --c-wall: #e9b03a; --c-in: #54b2e0; --c-foul: #8e9a93; --c-good: #5cc487;
+    --c-hr: #f06a4f; --c-wall: #e9b03a; --c-in: #54b2e0; --c-foul: #8e9a93; --c-good: #5cc487; --chip-ink: #0e1310;
     --heat-0: #17211c; --heat-1: #254a45; --heat-2: #2f7f78; --heat-3: #8fc9b1; --heat-4: #f1ecb8;
     color-scheme: dark;
   }
@@ -44,7 +44,7 @@
   --sky-top: #14222a; --sky-bot: #0d171c; --outside: #0b110d; --stand: #232d33; --stand-2: #2f3a41;
   --grass-a: #2f5b35; --grass-b: #2a522f; --foul: #244b2a; --dirt: #6b5640; --dirt-2: #7a644b; --track: #765a3f;
   --wall: #3c7c63; --chalk: #dfe6dc; --path: #5fb0e6; --path-2: #2c6a95; --ghost: #8a978f;
-  --c-hr: #f06a4f; --c-wall: #e9b03a; --c-in: #54b2e0; --c-foul: #8e9a93; --c-good: #5cc487;
+  --c-hr: #f06a4f; --c-wall: #e9b03a; --c-in: #54b2e0; --c-foul: #8e9a93; --c-good: #5cc487; --chip-ink: #0e1310;
   --heat-0: #17211c; --heat-1: #254a45; --heat-2: #2f7f78; --heat-3: #8fc9b1; --heat-4: #f1ecb8;
   color-scheme: dark;
 }
@@ -82,12 +82,14 @@ body[data-embed="1"] .app { grid-template-columns: minmax(0, 1fr) !important; gr
 body[data-embed="1"] .stage-card { position: static; }
 .xtoast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 60; max-width: calc(100vw - 32px); }
 .xtoast[hidden] { display: none; }
+.skip { position: absolute; left: 8px; top: -48px; z-index: 80; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+.skip:focus { top: 8px; }
 .nudge { position: fixed; left: 16px; bottom: 16px; z-index: 55; width: min(320px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 14px; font-size: 13px; display: grid; gap: 10px; }
 .nudge b { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; font-size: 12px; }
 .nudge .row { display: flex; gap: 8px; }
 body[data-embed="1"] .nudge, .nudge[hidden] { display: none !important; }
 @media print {
-  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, .nudge, #btn-keys { display: none !important; }
+  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, .nudge, .skip, #btn-keys { display: none !important; }
   body, html { background: #fff !important; color: #000; }
   .app { display: block !important; }
   .card { break-inside: avoid; box-shadow: none !important; border-color: #bbb !important; margin-bottom: 10px; }
@@ -141,7 +143,7 @@ body[data-ez="1"] .adv, body[data-ez="1"] #inputs .sp, body[data-ez="1"] #inputs
 .hud { position: absolute; left: 8px; top: 8px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; max-width: calc(100% - 16px); }
 .chip { background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
 .chip b { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .07em; font-size: 12px; color: var(--muted); margin-right: 5px; }
-.chip.out { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #fff; border-color: transparent; }
+.chip.out { font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--chip-ink); border-color: transparent; }
 .stage-hint { position: absolute; right: 8px; bottom: 8px; font-size: 12px; color: var(--ink-2); background: color-mix(in srgb, var(--surface) 85%, transparent); border: 1px solid var(--line); padding: 3px 8px; border-radius: 4px; pointer-events: none; max-width: 46%; text-align: right; }
 @media (max-width: 700px) { .stage-hint { display: none; } }
 .stage-wrap.wide { aspect-ratio: 2.3 / 1; }
@@ -239,7 +241,7 @@ table.dt td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(
 .tablewrap { overflow-x: auto; }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
-.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-family: var(--font-display); letter-spacing: .06em; text-transform: uppercase; font-size: 13px; font-weight: 600; color: #fff; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-family: var(--font-display); letter-spacing: .06em; text-transform: uppercase; font-size: 13px; font-weight: 600; color: var(--chip-ink); }
 .eqs { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: pre; line-height: 1.6; }
 .ok { color: var(--c-good); } .bad { color: var(--c-hr); }
 .empty { border: 1px dashed var(--line); border-radius: 6px; padding: 18px; color: var(--muted); text-align: center; }
@@ -306,10 +308,11 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
   .cardtbl td.cfull::before { content: none; }
   .cardtbl td.cfull input { width: 100%; }
 }
-@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body data-app="hit">
+<a class="skip" id="skip-link" href="#stage">Skip to the field</a>
 
 <header class="top">
   <div class="brand">
@@ -387,8 +390,8 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
       <div class="two">
         <div>
           <h3>Speed and forces <small>vs. time of flight</small></h3>
-          <canvas class="plot" id="ch-speed" height="190"></canvas>
-          <canvas class="plot" id="ch-force" height="170" style="margin-top:8px"></canvas>
+          <canvas class="plot" id="ch-speed" height="190" role="img" aria-label="Chart: ball speed against time"></canvas>
+          <canvas class="plot" id="ch-force" height="170" style="margin-top:8px" role="img" aria-label="Chart: forces on the ball against time"></canvas>
         </div>
         <div style="display:grid;gap:14px;align-content:start">
           <div>
@@ -397,7 +400,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
           </div>
           <div>
             <h3>Ball spin <small>live orientation</small></h3>
-            <div class="spin-wrap"><canvas id="spin-cv" width="236" height="236"></canvas><div id="spin-read"></div></div>
+            <div class="spin-wrap"><canvas id="spin-cv" width="236" height="236" role="img" aria-label="Ball spin orientation"></canvas><div id="spin-read"></div></div>
           </div>
         </div>
       </div>
@@ -439,7 +442,7 @@ body:not([data-app="pitch"]) #pstagecard, body:not([data-app="pitch"]) #panalysi
         <p class="note">Uses the current weather, wind, spray angle and spin model. Click a cell to load that hit.</p>
       </div>
       <div class="field-row"><button class="btn primary" id="sw-run" type="button">Compute map</button><span class="note" id="sw-status"></span></div>
-      <canvas class="plot" id="sw-cv" height="360"></canvas>
+      <canvas class="plot" id="sw-cv" height="360" role="img" aria-label="Sweep chart: distance across launch angle and exit velocity"></canvas>
       <div class="legend" id="sw-legend"></div>
     </div>
 
@@ -1793,12 +1796,15 @@ const OUTCOME = {
   inplay: { label: 'In play', col: 'c-in' }, foul: { label: 'Foul', col: 'c-foul' }, none: { label: '—', col: 'c-foul' }
 };
 
+// people who ask their system for less motion start without the swing and the delivery run-up; both are one tick away
+const REDUCED_MOTION = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+
 /* ---------- state ---------- */
 const S = {
   p: Object.assign({}, E.DEFAULTS, { ev: 96, la: 28, spray: 6 }),
   sim: null, ctx: null, fencePts: null, dur: 1, bud: null,
   view: '3d', tab: 'flight', app: 'hit',
-  opt: { trail: true, forces: false, compare: false, ens: true, swing: true, cine: false },
+  opt: { trail: true, forces: false, compare: false, ens: true, swing: !REDUCED_MOTION, cine: false },
   cam: { yaw: 0.55, pitch: 0.36, dist: 215, tx: -4, ty: 78, tz: 14 },
   play: { t: 0, playing: false, speed: 1, last: 0, intro: false },
   mc: null, mcStale: false,
@@ -3486,7 +3492,7 @@ function resetAll() {
   $('#hf-out').innerHTML = '<div class="empty">No spot chosen yet. Switch to the overhead view and click the field.</div>';
   $('#hf-spin').value = 'auto'; $('#hf-tol').value = 8;
   S.mc = null; S.mcStale = false; $('#mc-out').innerHTML = ''; $('#mc-prog').hidden = true; $('#mc-run').disabled = false; $('#mc-play').disabled = true;
-  $('#t-ens-wrap').hidden = true; S.opt = { trail: true, forces: false, compare: false, ens: true, swing: true, cine: false }; $('#t-swing').checked = true; $('#t-cine').checked = false;
+  $('#t-ens-wrap').hidden = true; S.opt = { trail: true, forces: false, compare: false, ens: true, swing: !REDUCED_MOTION, cine: false }; $('#t-swing').checked = !REDUCED_MOTION; $('#t-cine').checked = false;
   $('#t-trail').checked = true; $('#t-forces').checked = false; $('#t-compare').checked = false; if ($('#t-stands') && !$('#t-stands').checked) { $('#t-stands').checked = true; E.setStands(true); S.standsOn = true; S.fenceSig = null; S.fencePts = null; } $('#t-ens').checked = true;
   $('#mc-n').value = 500; $('#mc-seed').value = 2026; $('#mc-dist').value = 'gauss';
   S.mcAuto = true; S.showSpread = true; $('#show-spread').checked = true; $('#inputs').classList.remove('nospread');
@@ -3522,7 +3528,7 @@ const PS = {
   view: 'zone', tab: 'data',
   play: { t: 0, playing: false, speed: 0.25, last: 0 },
   tauNow: 0,
-  opt: { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false, cmpMc: true },
+  opt: { trail: true, nospin: true, batter: true, pitcher: true, anim: !REDUCED_MOTION, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false, cmpMc: true },
   cam: { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 },
   sigma: { velo: 1.0, spin: 80, dir: 5, eff: 3, relH: 1.2, relSide: 1.5, relExt: 1.5, angV: 0.55, angH: 0.55, pCd: 0.008 },
   mc: null, mcStale: false, mcAuto: true, mcSwing: false, mcJob: 0, ver: 0,
@@ -3666,7 +3672,7 @@ function buildPitchItem(it) {
   }
   // slider + number
   const rg = el('input', { type: 'range', min: it.min, max: it.max, step: it.step, 'aria-label': it.label });
-  const nb = el('input', { type: 'number', min: it.min, max: it.max, step: it.step });
+  const nb = el('input', { type: 'number', min: it.min, max: it.max, step: it.step, 'aria-label': it.label + ', exact value' });
   const u = el('span', { class: 'unit', text: it.unit || '' });
   const hintEl = el('div', { class: 'hint' });
   const wrap = el('div', { class: 'ctl' }, [el('label', { text: it.label }), el('span', { class: 'num' }, [nb, u]), rg, hintEl]);
@@ -4788,11 +4794,11 @@ $('#ptabs').addEventListener('click', e => { const b = e.target.closest('button'
   $('#ppane-data').innerHTML =
     '<div id="pverdict"></div><div class="tiles" id="ptiles"></div>' +
     '<div class="two"><div>' +
-    '<h3>Speed <small>vs. time since release</small></h3><canvas class="plot" id="pch-speed" height="180"></canvas>' +
-    '<h3 style="margin-top:10px">Movement <small>how far the spin has pushed the ball off its no-spin path</small></h3><canvas class="plot" id="pch-move" height="180"></canvas>' +
+    '<h3>Speed <small>vs. time since release</small></h3><canvas class="plot" id="pch-speed" height="180" role="img" aria-label="Chart: pitch speed against time since release"></canvas>' +
+    '<h3 style="margin-top:10px">Movement <small>how far the spin has pushed the ball off its no-spin path</small></h3><canvas class="plot" id="pch-move" height="180" role="img" aria-label="Chart: pitch movement against time since release"></canvas>' +
     '</div><div style="display:grid;gap:14px;align-content:start">' +
     '<div><h3>Where the break comes from <small>one effect at a time</small></h3><div class="budget" id="pbudget"></div></div>' +
-    '<div><h3>Ball spin <small>live orientation, seen from third base</small></h3><div class="spin-wrap"><canvas id="pspin-cv" width="236" height="236"></canvas><div id="pspin-read"></div></div></div>' +
+    '<div><h3>Ball spin <small>live orientation, seen from third base</small></h3><div class="spin-wrap"><canvas id="pspin-cv" width="236" height="236" role="img" aria-label="Ball spin orientation"></canvas><div id="pspin-read"></div></div></div>' +
     '</div></div><p class="note" id="penv-note"></p>';
 })();
 function pFillData() {
@@ -5067,7 +5073,7 @@ function pFillTypes(now) {
     return '<tr data-k="' + a.key + '" class="' + (a.cur ? 'cur' : '') + '" style="cursor:pointer"><td class="l"><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + a.color + ';margin-right:6px"></i>' + a.name + '</td><td>' + fmt(r.speed, 1) + '</td><td>' + fmt(a.P.spin, 0) + '</td><td>' + fmt(a.P.eff, 0) + '</td><td>' + fmt(p.speed, 1) + '</td><td>' + (r.ivb === undefined ? '–' : sgn(r.ivb, 1)) + '</td><td>' + (r.hbArm === undefined ? '–' : sgn(r.hbArm, 1)) + '</td><td>' + sgn(p.x, 1) + ', ' + fmt(p.z, 1) + '</td><td>' + sgn(p.vaa, 1) + '</td><td>' + fmt(p.t, 3) + '</td><td>' + (a.cur ? '–' : fmt(gap, 1)) + '</td></tr>';
   }).join('');
   $('#ptypes-out').innerHTML = '<div class="tablewrap"><table class="dt"><thead><tr><th class="l">Pitch</th><th>Out of hand mph</th><th>Spin rpm</th><th>Eff. %</th><th>At plate mph</th><th>Vert. in</th><th>Arm-side in</th><th>Plate x, z (in)</th><th>VAA °</th><th>Time s</th><th>Tunnel in</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
-    '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="ptype-mv" height="320"></canvas>';
+    '<h3>Movement map <small>induced vertical against horizontal, both from the pitcher’s side</small></h3><canvas class="plot" id="ptype-mv" height="320" role="img" aria-label="Movement map: induced vertical against horizontal break for each pitch type"></canvas>';
   $$('#ptypes-out tbody tr').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.k; if (!k) return; PI.applyType(PS.P, k, false); PS.sigma.dir = k === 'KN' ? 120 : PS.sigma0.dir; pchanged('type'); pSyncAll(); pStartPlay(true); }));
   const { g, W, H } = setupCv($('#ptype-mv')), m = { l: 44, r: 14, t: 12, b: 34 }, R = 26;
   const ax = axes(g, W, H, m, -R, R, -R, R, 'toward the glove side  ←   horizontal (in)   →  toward the arm side', 'vertical (in)');
@@ -5084,7 +5090,7 @@ function pFillTypes(now) {
     '<div class="field-row"><button class="btn primary" id="pbat-send" type="button">Send this pitch and swing to the Hitting tab</button><span class="note">Opens the Hitting tab in Bat–ball mode with this pitch drawn on the field, so you can use the Monte Carlo, Hit finder and EV × LA map on this exact contact.</span></div>' +
     '<div><h3>Swing map <small>the same swing against a pitch thrown to each spot</small></h3>' +
     '<div class="field-row"><label>Colour by<select id="pbat-metric"><option value="ev">Exit velocity</option><option value="dist">Distance</option><option value="la">Launch angle</option><option value="outcome">Result</option></select></label><button class="btn" id="pbat-run" type="button">Recompute</button><span class="note" id="pbat-status"></span></div>' +
-    '<canvas class="plot" id="pbat-map" height="380" style="cursor:pointer"></canvas><div class="legend" id="pbat-legend"></div><div class="note" id="pbat-tip">Click a cell to throw there.</div></div>';
+    '<canvas class="plot" id="pbat-map" height="380" style="cursor:pointer" role="img" aria-label="Map of hit results across the strike zone. Click a cell for details."></canvas><div class="legend" id="pbat-legend"></div><div class="note" id="pbat-tip">Click a cell to throw there.</div></div>';
   $('#pbat-send').addEventListener('click', () => { if (sendToHitting()) { setApp('hit'); S.p.mode = 'bat'; applyMode(); syncAll(); showTab('flight'); recompute(true); startPlay(true); } });
   $('#pbat-metric').addEventListener('change', () => { PS.hitMetric = $('#pbat-metric').value; pDrawHitMap(); });
   $('#pbat-run').addEventListener('click', pRunHitMap);
@@ -6034,10 +6040,10 @@ function resetPitch() {
   Object.keys(S.sigma).forEach(k => { S.sigma[k] = S.sigma0[k]; });
   PS.aimSwing = { on: false, xs: 0, zs: 30 };
   PS.mc = null; PS.mcStale = false; PS.mcSwing = false; PS.colorHit = false; PS.arsenal = null; PS.hit = null; PS.hitMap = null;
-  PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, anim: true, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false, cmpMc: true };
+  PS.opt = { trail: true, nospin: true, batter: true, pitcher: true, anim: !REDUCED_MOTION, hand: true, zones: false, ens: true, arsenal: false, arsMode: 'angles', cmp: false, cmpMc: true };
   PS.cmp = []; PS.cmpSrc = null; PS.cmpSeqOn = false; PS.cmpWind = false; PS.cmpGap = 1.2; PS.cmpMode = 'angles'; PS.cmpSigV = null;
   $('#pt-arsmode').value = 'angles';
-  [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-cmp', false], ['pt-anim', true], ['pt-hand', true], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
+  [['pt-trail', true], ['pt-nospin', true], ['pt-pitcher', true], ['pt-batter', true], ['pt-zones', false], ['pt-arsenal', false], ['pt-cmp', false], ['pt-anim', !REDUCED_MOTION], ['pt-hand', true], ['pt-ens', true]].forEach(([id, v]) => { $('#' + id).checked = v; });
   $('#pt-ens-wrap').hidden = true; $('#pmc-out').innerHTML = ''; $('#pmc-play').disabled = true; $('#pmc-prog').hidden = true; $('#pmc-run').disabled = false;
   Object.assign(PS.cam, { yaw: 0.6, pitch: 0.22, dist: 21, tx: 0, ty: 8.6, tz: 1.1 }); PS.zoom.side = { k: 1, px: 0, py: 0 }; PS.zoom.top = { k: 1, px: 0, py: 0 };
   PS.view = 'zone'; $$('#pviews button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === 'zone')));
@@ -6175,6 +6181,8 @@ function setEZ(on) {
 }
 $('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
 
+if (REDUCED_MOTION) { $('#t-swing').checked = false; $('#pt-anim').checked = false; }
+$('#skip-link').addEventListener('click', e => { e.preventDefault(); const c = $(S.app === 'pitch' ? '#pstage' : '#stage'); c.tabIndex = -1; c.focus(); });
 /* ---------- first visit: offer the tour once ---------- */
 (function tourNudge() {
   try {
