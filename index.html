@@ -82,8 +82,12 @@ body[data-embed="1"] .app { grid-template-columns: minmax(0, 1fr) !important; gr
 body[data-embed="1"] .stage-card { position: static; }
 .xtoast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 60; max-width: calc(100vw - 32px); }
 .xtoast[hidden] { display: none; }
+.nudge { position: fixed; left: 16px; bottom: 16px; z-index: 55; width: min(320px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 12px 14px; font-size: 13px; display: grid; gap: 10px; }
+.nudge b { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .06em; font-size: 12px; }
+.nudge .row { display: flex; gap: 8px; }
+body[data-embed="1"] .nudge, .nudge[hidden] { display: none !important; }
 @media print {
-  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, #btn-keys { display: none !important; }
+  header.top, .apptabs, #inputs, .toggles, .stage-top select, .stage-top .btn, .transport, #kbd-back, .xtoast, .nudge, #btn-keys { display: none !important; }
   body, html { background: #fff !important; color: #000; }
   .app { display: block !important; }
   .card { break-inside: avoid; box-shadow: none !important; border-color: #bbb !important; margin-bottom: 10px; }
@@ -6171,6 +6175,23 @@ function setEZ(on) {
 }
 $('#ez-switch').addEventListener('change', e => setEZ(e.target.checked));
 
+/* ---------- first visit: offer the tour once ---------- */
+(function tourNudge() {
+  try {
+    if (localStorage.getItem('bfl-tour-seen') || document.body.dataset.embed || /^#s=/.test(location.hash) || /[?&]embed=1/.test(location.search)) return;
+    localStorage.setItem('bfl-tour-seen', '1');
+  } catch (e) { return; }
+  setTimeout(() => {
+    if (document.querySelector('.tour-card')) return;
+    const box = el('div', { class: 'nudge', role: 'dialog', 'aria-label': 'Take the tour' }), close = () => box.remove();
+    box.appendChild(el('b', { text: 'New here?' }));
+    box.appendChild(el('span', { text: 'A one-minute tour shows what each part of the page does. You can start it any time from the Tour button.' }));
+    box.appendChild(el('div', { class: 'row' }, [
+      el('button', { class: 'btn primary sm', type: 'button', text: 'Take the tour', onclick: () => { close(); $('#btn-tour').click(); } }),
+      el('button', { class: 'btn sm', type: 'button', text: 'Not now', onclick: close })]));
+    document.body.appendChild(box); setTimeout(close, 20000);
+  }, 1500);
+})();
 (function embedBoot() { try { if (/[?&]embed=1/.test(location.search)) document.body.dataset.embed = '1'; } catch (e) {} })();
 (function pboot() {
   buildPitchInputs(); pMountMatch(); pEnvMount(); ezTag();
