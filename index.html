@@ -2907,7 +2907,7 @@ function syncHbat() {
 }
 $('#hbat').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b || PS.P.bat === b.dataset.v) return;
-  PS.P.bat = b.dataset.v; pchanged('bat'); pSyncAll(); syncHbat(); requestRender();
+  PS.P.bat = b.dataset.v; pchanged('bat'); pSyncAll(); syncHbat(); if (S.mc && S.mc.visible && $('#mc-out').firstChild) { renderMcResults(); if (S.mcStale) updateMcStaleNote(); } requestRender();
 });
 $('#btn-play').addEventListener('click', () => { if (S.play.playing) stopPlay(); else startPlay(false); });
 $('#btn-replay').addEventListener('click', () => startPlay(true));
@@ -3129,6 +3129,19 @@ function finishMC(mc, quiet) {
 function updateMcStaleNote() {
   const n = $('#mc-stale'); if (!n) return; n.hidden = !S.mcStale;
 }
+// where the cloud landed relative to the batter: thirds of the 90-degree fair field, pull side set by which side he hits from
+function mcPullHtml(mc) {
+  const a = PS.P.bat === 'R' ? 1 : -1; let pull = 0, mid = 0, opp = 0, k = 0;
+  for (let i = 0; i < mc.n; i++) {
+    const x = mc.landX[i], y = mc.landY[i]; if (!isFinite(x) || !isFinite(y)) continue;
+    const ang = Math.atan2(x, y) * R2D * -a;   // + toward the pull side
+    k++; if (ang > 15) pull++; else if (ang < -15) opp++; else mid++;
+  }
+  if (!k) return '';
+  const side = a > 0 ? 'right' : 'left';
+  return '<div class="tiles">' + tile('Pulled', fmt(pull / k * 100, 1), '%') + tile('Up the middle', fmt(mid / k * 100, 1), '%') + tile('Opposite field', fmt(opp / k * 100, 1), '%') + '</div>' +
+    '<p class="note">Thirds of the fair field for a ' + side + '-handed batter. Change the batter above the field and these reassign; the flight itself does not change.</p>';
+}
 function renderMcResults() {
   const mc = S.mc, out = $('#mc-out'), n = mc.n;
   const cnt = { hr: 0, wall: 0, inplay: 0, foul: 0 }; mc.outcome.forEach(o => { cnt[o] = (cnt[o] || 0) + 1; });
@@ -3142,7 +3155,7 @@ function renderMcResults() {
     '<div class="tiles">' +
     tile('Home runs', fmt(pctOf('hr'), 1), '%', 1) + tile('Off the wall', fmt(pctOf('wall'), 1), '%') + tile('In play', fmt(pctOf('inplay'), 1), '%') + tile('Foul', fmt(pctOf('foul'), 1), '%') +
     tile('Mean distance', fmt(ds.mean, 0), 'ft') + tile('Spread (1σ)', fmt(ds.sd, 1), 'ft') +
-    (sig ? tile('Landing ellipse', fmt(sig.a, 0) + ' × ' + fmt(sig.b, 0), 'ft 1σ') : '') + tile('Balls flown', n, '') + '</div>' +
+    (sig ? tile('Landing ellipse', fmt(sig.a, 0) + ' × ' + fmt(sig.b, 0), 'ft 1σ') : '') + tile('Balls flown', n, '') + '</div>' + mcPullHtml(mc) +
     '<div class="legend">' + ['hr', 'wall', 'inplay', 'foul'].map(k => '<span><i style="background:' + T[OUTCOME[k].col] + '"></i>' + OUTCOME[k].label + '</span>').join('') +
     '<span>Overhead view: solid ellipse = 68%, dashed = 95% of landings</span></div>' +
     '<div class="tablewrap"><table class="dt"><thead><tr><th>Measure</th><th>mean ± sd</th><th>median</th><th>5th – 95th pct.</th><th></th></tr></thead><tbody>' +
